@@ -10,7 +10,6 @@
         <div v-if="resources.length === 0" class="empty">
             暂无资源数据
         </div>
-        <button @click="test">ffff</button>
     </div>
 </template>
 
@@ -48,7 +47,7 @@ const categories = computed(() => [
 async function test() {
     try {
         const resp = await axios.post(
-            'api/auth/access/3',   // ← 你的用户代理地址
+            '/api/auth/access/3',   // ← 你的用户代理地址
             {
                 name: "测试"
             },
