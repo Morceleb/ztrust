@@ -196,7 +196,7 @@ const toggleWorkbench = () => {
 .workbench {
     width: 160px; /* 稍微加宽一点，更透气 */
     background: #ffffff;
-    border-right: 1px solid #e2e8f0;
+    border-right: none;
     display: flex;
     flex-direction: column;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* 使用贝塞尔曲线使动画更高级 */
@@ -328,5 +328,6 @@ const toggleWorkbench = () => {
     background: #f1f5f9; 
     position: relative;
     overflow: hidden;
+    padding-left: 16px; /* 参考图二，几乎紧贴但有一点点空隙 */
 }
 </style>

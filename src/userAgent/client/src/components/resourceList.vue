@@ -72,8 +72,8 @@ async function test() {
 <style scoped>
 .resource-list {
     max-width: 1000px;
-    margin: 0 auto;
-    padding: 20px;
+    margin: 0 ;
+    padding: 10px 10px 10px 0;
     font-family: system-ui, sans-serif;
 }
 
