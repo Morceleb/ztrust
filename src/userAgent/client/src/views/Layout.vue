@@ -327,7 +327,8 @@ const toggleWorkbench = () => {
     flex: 1;
     background: #f1f5f9; 
     position: relative;
-    overflow: hidden;
+    overflow: visible;
     padding-left: 16px; /* 参考图二，几乎紧贴但有一点点空隙 */
+    padding-right: 0;
 }
 </style>
