@@ -1,5 +1,5 @@
 <template>
-    <div class="layout-container" :class="{ 'workbench-collapsed': !isExpanded }">
+    <div class="layout-container" :class="{ 'workbench-collapsed': !isExpanded || $route.path === '/settings' }">
         <aside class="sidebar">
             <div class="logo">
                 <div class="logo-icon-bg">
@@ -13,13 +13,24 @@
 
             <nav class="nav-menu">
                 <ul>
-                    <li class="nav-item active">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-                            <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
-                        </svg>
-                        <span>工作台</span>
+                    <li class="nav-item" :class="{ active: $route.path === '/' }">
+                        <router-link to="/" class="nav-link">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+                                <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+                            </svg>
+                            <span>工作台</span>
+                        </router-link>
+                    </li>
+                    <li class="nav-item" :class="{ active: $route.path === '/settings' }">
+                        <router-link to="/settings" class="nav-link">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                            </svg>
+                            <span>设置</span>
+                        </router-link>
                     </li>
                 </ul>
             </nav>
@@ -38,7 +49,7 @@
             </div>
         </aside>
 
-        <aside class="workbench" :class="{ collapsed: !isExpanded }">
+        <aside v-if="$route.path !== '/settings'" class="workbench" :class="{ collapsed: !isExpanded }">
             <button @click="toggleWorkbench" class="toggle-btn" title="切换侧边栏">
                 <svg 
                     class="arrow-icon" 
@@ -51,7 +62,13 @@
 
             <div class="workbench-content">
                 <div class="content-header">资源列表</div>
-                <div class="resource-item" v-for="resource in resources" :key="resource.type">
+                <div 
+                    v-for="resource in resources" 
+                    :key="resource.type ?? 'all'" 
+                    class="resource-item" 
+                    :class="{ active: selectedCategory === resource.type }"
+                    @click="selectCategory(resource.type)"
+                >
                     <span class="dot"></span>
                     <span class="resource-text">{{ resource.name }}</span>
                 </div>
@@ -65,16 +82,24 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, provide } from 'vue'
 
 const isExpanded = ref(true)
+// 选中的资源类别，null 表示全部
+const selectedCategory = ref(null)
+provide('selectedCategory', selectedCategory)
 
 const resources = ref([
+    { type: null, name: '全部' },
     { type: 'web_page', name: '网页应用' },
     { type: 'api', name: 'API 接口管理' },
     { type: 'static', name: '静态资源库' },
     { type: 'log', name: '系统日志' }
 ])
+
+const selectCategory = (type) => {
+    selectedCategory.value = type
+}
 
 const toggleWorkbench = () => {
     isExpanded.value = !isExpanded.value
@@ -138,19 +163,27 @@ const toggleWorkbench = () => {
 .nav-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    cursor: pointer;
     transition: all 0.2s;
     font-size: 15px;
 }
 
-.nav-item:hover {
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    width: 100%;
+    cursor: pointer;
+    color: inherit;
+    text-decoration: none;
+}
+
+.nav-item:hover .nav-link {
     background: rgba(255,255,255,0.05);
     color: #f1f5f9;
 }
 
-.nav-item.active {
+.nav-item.active .nav-link {
     background: #3b82f6;
     color: white;
     box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.5);
@@ -304,6 +337,15 @@ const toggleWorkbench = () => {
 .resource-item:hover {
     background: #f1f5f9;
     color: #0f172a;
+}
+
+.resource-item.active {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.resource-item.active .dot {
+    background: #0ea5e9;
 }
 
 .dot {

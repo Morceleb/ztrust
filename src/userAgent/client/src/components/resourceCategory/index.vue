@@ -6,8 +6,8 @@
             {{ title }} ({{ items.length }})
         </h3>
 
-        <div class="resource-grid">
-            <div v-for="item in items" :key="item.id" class="resource-card clickable" @click="handleCardClick(item)">
+        <div class="resource-grid" :class="viewMode">
+            <div v-for="item in items" :key="item.id" class="resource-card clickable" :class="viewMode" @click="handleCardClick(item)">
                 <img :src="item.icon || defaultIcon" alt="icon" class="card-icon" @error="handleImageError($event)" />
                 <div class="card-content">
                     <div class="card-name">{{ item.name }}</div>
@@ -51,7 +51,8 @@ import defaultIcon from '@/assets/vue.svg'
 const props = defineProps({
     type: { type: String, required: true },
     title: { type: String, required: true },
-    items: { type: Array, required: true }
+    items: { type: Array, required: true },
+    viewMode: { type: String, default: 'square' } // 'square' | 'horizontal'
 })
 
 // 模态框状态
