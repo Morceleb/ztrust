@@ -14,7 +14,6 @@
             登录成功！当前用户：{{ info.user || info.message || '未知用户' }}
         </p>
         <button v-if="flag" @click="testAuth" style="margin-top: 20px;">测试认证接口</button>
-        <hr>
         <button v-if="flag" @click="handleAccess(1)" style="margin-top: 20px;">访问资源1</button>
         <button v-if="flag" @click="handleAccess(2)" style="margin-top: 20px;">访问资源2</button>
         <button v-if="flag" @click="handleAccess(3)" style="margin-top: 20px;">访问资源3</button>
