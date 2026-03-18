@@ -34,6 +34,13 @@
             "icon": "https://www.baidu.com/favicon.ico",
             "type": "web_page",
             "allow_method": "GET"
+        },
+        {
+            "id": 6,
+            "name": "受限数据库资源",
+            "icon": "",
+            "type": "database",
+            "allow_method": "--"
         }
     ]
 }

@@ -15,19 +15,25 @@
                 <ul>
                     <li class="nav-item" :class="{ active: $route.path === '/' }">
                         <router-link to="/" class="nav-link">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-                                <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="7" />
+                                <rect x="14" y="3" width="7" height="7" />
+                                <rect x="14" y="14" width="7" height="7" />
+                                <rect x="3" y="14" width="7" height="7" />
                             </svg>
                             <span>工作台</span>
                         </router-link>
                     </li>
                     <li class="nav-item" :class="{ active: $route.path === '/settings' }">
                         <router-link to="/settings" class="nav-link">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3" />
+                                <path
+                                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                             </svg>
                             <span>设置</span>
                         </router-link>
@@ -37,13 +43,15 @@
 
             <div class="user-profile">
                 <div class="avatar-wrapper">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="avatar-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        class="avatar-icon">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                         <circle cx="12" cy="7" r="4"></circle>
                     </svg>
                 </div>
                 <div class="user-info">
-                    <div class="username">Admin</div>
+                    <div class="username">{{ store.getters['auth/user'] || '未知用户' }}</div>
                     <div class="role">管理员</div>
                 </div>
             </div>
@@ -51,24 +59,17 @@
 
         <aside v-if="$route.path !== '/settings'" class="workbench" :class="{ collapsed: !isExpanded }">
             <button @click="toggleWorkbench" class="toggle-btn" title="切换侧边栏">
-                <svg 
-                    class="arrow-icon" 
-                    :class="{ 'icon-rotated': !isExpanded }"
-                    xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" 
-                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M15 18l-6-6 6-6"/>
+                <svg class="arrow-icon" :class="{ 'icon-rotated': !isExpanded }" xmlns="http://www.w3.org/2000/svg"
+                    width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 18l-6-6 6-6" />
                 </svg>
             </button>
 
             <div class="workbench-content">
                 <div class="content-header">资源列表</div>
-                <div 
-                    v-for="resource in resources" 
-                    :key="resource.type ?? 'all'" 
-                    class="resource-item" 
-                    :class="{ active: selectedCategory === resource.type }"
-                    @click="selectCategory(resource.type)"
-                >
+                <div v-for="resource in resources" :key="resource.type ?? 'all'" class="resource-item"
+                    :class="{ active: selectedCategory === resource.type }" @click="selectCategory(resource.type)">
                     <span class="dot"></span>
                     <span class="resource-text">{{ resource.name }}</span>
                 </div>
@@ -83,7 +84,7 @@
 
 <script setup>
 import { ref, provide } from 'vue'
-
+import store from '../store'
 const isExpanded = ref(true)
 // 选中的资源类别，null 表示全部
 const selectedCategory = ref(null)
@@ -94,6 +95,7 @@ const resources = ref([
     { type: 'web_page', name: '网页应用' },
     { type: 'api', name: 'API 接口管理' },
     { type: 'static', name: '静态资源库' },
+    { type: 'database', name: '数据库资源' },
     { type: 'log', name: '系统日志' }
 ])
 
@@ -118,19 +120,21 @@ const toggleWorkbench = () => {
 
 
 .sidebar {
-    width: 64px; 
-    width: 140px; 
-    background: #0f172a; /* 更深邃的蓝 */
+    width: 64px;
+    width: 140px;
+    background: #0f172a;
+    /* 更深邃的蓝 */
     color: #94a3b8;
     display: flex;
     flex-direction: column;
-    z-index: 20; /* 确保层级高于 workbench */
-    box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+    z-index: 20;
+    /* 确保层级高于 workbench */
+    box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
 }
 
 .layout-container.workbench-collapsed .sidebar {
-    
-    box-shadow: 2px 0 8px rgba(0,0,0,0.2); 
+
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.2);
 }
 
 .logo {
@@ -179,7 +183,7 @@ const toggleWorkbench = () => {
 }
 
 .nav-item:hover .nav-link {
-    background: rgba(255,255,255,0.05);
+    background: rgba(255, 255, 255, 0.05);
     color: #f1f5f9;
 }
 
@@ -227,12 +231,14 @@ const toggleWorkbench = () => {
 
 
 .workbench {
-    width: 160px; /* 稍微加宽一点，更透气 */
+    width: 160px;
+    /* 稍微加宽一点，更透气 */
     background: #ffffff;
     border-right: none;
     display: flex;
     flex-direction: column;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* 使用贝塞尔曲线使动画更高级 */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* 使用贝塞尔曲线使动画更高级 */
     position: relative;
     z-index: 10;
 }
@@ -250,22 +256,25 @@ const toggleWorkbench = () => {
 /* --- 切换按钮美化 --- */
 .toggle-btn {
     position: absolute;
-    left: 100%; /* 紧贴右侧 */
-    top: 50%; /* 垂直居中 */
-    transform: translateY(-50%) translateX(-50%); /* 初始状态：压在边线上 */
-    
+    left: 100%;
+    /* 紧贴右侧 */
+    top: 50%;
+    /* 垂直居中 */
+    transform: translateY(-50%) translateX(-50%);
+    /* 初始状态：压在边线上 */
+
     /* 尺寸与形状 */
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    
+
     /* 颜色与边框 */
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    
+
     /* 阴影让其浮起来 */
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-    
+
     /* 交互设置 */
     cursor: pointer;
     display: flex;
@@ -274,7 +283,7 @@ const toggleWorkbench = () => {
     color: #64748b;
     z-index: 50;
     transition: all 0.3s ease;
-    
+
     /* 移除默认按钮样式 */
     padding: 0;
     outline: none;
@@ -283,7 +292,8 @@ const toggleWorkbench = () => {
 /* 按钮悬浮态 */
 .toggle-btn:hover {
     background: #f8fafc;
-    color: #3b82f6; /* 悬浮变为品牌色 */
+    color: #3b82f6;
+    /* 悬浮变为品牌色 */
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
     transform: translateY(-50%) translateX(-50%) scale(1.1);
 }
@@ -300,17 +310,19 @@ const toggleWorkbench = () => {
 
 
 .workbench.collapsed .toggle-btn {
-    
-    box-shadow: 2px 0 6px rgba(0,0,0,0.1);
+
+    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
 }
 
 /* --- 内容区域 --- */
 .workbench-content {
     flex: 1;
     padding: 16px 8px;
-    transition: opacity 0.2s; /* 内容淡入淡出 */
+    transition: opacity 0.2s;
+    /* 内容淡入淡出 */
     opacity: 1;
-    width: 160px; /* 强制宽度，防止折叠时文字换行导致的跳动 */
+    width: 160px;
+    /* 强制宽度，防止折叠时文字换行导致的跳动 */
 }
 
 .content-header {
@@ -356,7 +368,8 @@ const toggleWorkbench = () => {
 }
 
 .resource-item:hover .dot {
-    background: #3b82f6; /* 悬浮时点变蓝 */
+    background: #3b82f6;
+    /* 悬浮时点变蓝 */
 }
 
 .resource-text {
@@ -367,10 +380,11 @@ const toggleWorkbench = () => {
 
 .main-content {
     flex: 1;
-    background: #f1f5f9; 
+    background: #f1f5f9;
     position: relative;
     overflow: visible;
-    padding-left: 16px; /* 参考图二，几乎紧贴但有一点点空隙 */
+    padding-left: 16px;
+    /* 参考图二，几乎紧贴但有一点点空隙 */
     padding-right: 0;
 }
 </style>
