@@ -7,7 +7,8 @@
         </h3>
 
         <div class="resource-grid" :class="viewMode">
-            <div v-for="item in items" :key="item.id" class="resource-card clickable" :class="viewMode" @click="handleCardClick(item)">
+            <div v-for="item in items" :key="item.id" class="resource-card clickable" :class="viewMode"
+                @click="handleCardClick(item)">
                 <img :src="item.icon || defaultIcon" alt="icon" class="card-icon" @error="handleImageError($event)" />
                 <div class="card-content">
                     <div class="card-name">{{ item.name }}</div>
@@ -47,6 +48,8 @@
 <script setup>
 import { ref, computed } from 'vue'
 import defaultIcon from '@/assets/vue.svg'
+
+import request from '../../utils/request'
 
 const props = defineProps({
     type: { type: String, required: true },
@@ -108,7 +111,7 @@ const jsonError = computed(() => {
     }
 })
 
-// 提交 POST 请求（通过代理 + fetch 携带 body）
+// 提交 POST 请求
 const submitPost = async () => {
     if (jsonError.value) return
 
@@ -116,23 +119,19 @@ const submitPost = async () => {
     const body = JSON.parse(postBody.value)
 
     try {
-        const response = await fetch(`/api/auth/access/${resourceId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(body)
-        })
+        // 使用封装后的 request（axios）
+        const response = await request.post(`/auth/access/${resourceId}`, body)
 
-        if (response.ok || response.redirected) {
-            // 如果后端返回重定向或页面，浏览器会自动跳转
-            window.open(`/api/auth/access/${resourceId}`, '_blank')
-        } else {
-            const text = await response.text()
-            alert(`请求失败（${response.status}）：${text || '未知错误'}`)
-        }
-    } catch (err) {
-        alert('网络错误：' + err.message)
+        // 成功后打开新页面
+        window.open(`/api/auth/access/${resourceId}`, '_blank')
+
+    } catch (error) {
+        const status = error.response?.status || '未知'
+        const message = error.response?.data?.message
+            || error.response?.data
+            || error.message
+
+        alert(`请求失败（${status}）：${message}`)
     } finally {
         closeModal()
     }
