@@ -30,10 +30,10 @@
                                     @change="updateLevel(role.id, rg.id, $event.target.value)"
                                     class="level-select"
                                 >
-                                    <option value="1">L1-读取</option>
-                                    <option value="2">L2-写入</option>
-                                    <option value="3">L3-删除</option>
-                                    <option value="4">L4-管理</option>
+                                    <option value="1">1级</option>
+                                    <option value="2">2级</option>
+                                    <option value="3">3级</option>
+                                    <option value="4">4级</option>
                                 </select>
                                 <button class="btn-remove" @click="removePermission(role.id, rg.id)" title="移除权限">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -58,19 +58,19 @@
             <div class="summary-content">
                 <div class="summary-item">
                     <span class="summary-icon level-1"></span>
-                    <span class="summary-text">L1 - 读取：只读访问权限</span>
+                    <span class="summary-text">1级</span>
                 </div>
                 <div class="summary-item">
                     <span class="summary-icon level-2"></span>
-                    <span class="summary-text">L2 - 写入：可读可写权限</span>
+                    <span class="summary-text">2级</span>
                 </div>
                 <div class="summary-item">
                     <span class="summary-icon level-3"></span>
-                    <span class="summary-text">L3 - 删除：包含读写删权限</span>
+                    <span class="summary-text">3级</span>
                 </div>
                 <div class="summary-item">
                     <span class="summary-icon level-4"></span>
-                    <span class="summary-text">L4 - 管理：完全控制权限</span>
+                    <span class="summary-text">4级</span>
                 </div>
             </div>
         </div>

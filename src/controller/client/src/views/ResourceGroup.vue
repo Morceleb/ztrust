@@ -98,10 +98,10 @@
                                 <option v-for="res in availableResources" :key="res.id" :value="res.id">{{ res.name }}</option>
                             </select>
                             <select v-model="match.effectiveLevel" class="level-select">
-                                <option value="1">等级1 - 读取</option>
-                                <option value="2">等级2 - 写入</option>
-                                <option value="3">等级3 - 删除</option>
-                                <option value="4">等级4 - 管理</option>
+                                <option value="1">1级</option>
+                                <option value="2">2级</option>
+                                <option value="3">3级</option>
+                                <option value="4">4级</option>
                             </select>
                             <button class="btn-icon delete" @click="removeMatch(idx)" title="删除">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -177,7 +177,7 @@ const filteredGroups = computed(() => {
 })
 
 const levelText = (level) => {
-    const map = { 1: 'L1', 2: 'L2', 3: 'L3', 4: 'L4' }
+    const map = { 1: '1级', 2: '2级', 3: '3级', 4: '4级' }
     return map[level] || level
 }
 

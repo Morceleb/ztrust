@@ -76,9 +76,16 @@
                     <button class="modal-close" @click="showModal = false">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
+                    <div class="form-group" :class="{ error: formErrors.name }">
                         <label>资源名称 <span class="required">*</span></label>
                         <input type="text" v-model="formData.name" placeholder="请输入资源名称" />
+                        <div class="error-text" v-if="formErrors.name">{{ formErrors.name }}</div>
+                    </div>
+                    <div class="form-group" v-if="modalMode === 'add'" :class="{ error: formErrors.firstUrl }">
+                        <label>资源URL <span class="required">*</span></label>
+                        <input type="text" v-model="formData.firstUrl" placeholder="请输入资源URL，例如：/api/vpn/*" />
+                        <div class="hint-text">添加资源时必须至少输入 1 个 URL（以 / 开头）</div>
+                        <div class="error-text" v-if="formErrors.firstUrl">{{ formErrors.firstUrl }}</div>
                     </div>
                     <div class="form-group">
                         <label>图标</label>
@@ -169,6 +176,7 @@ const showUrlModal = ref(false)
 const modalMode = ref('add')
 const currentResource = ref(null)
 const currentUrls = ref([])
+const formErrors = ref({})
 
 const defaultIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>'
 
@@ -215,6 +223,7 @@ const formData = ref({
     name: '',
     icon: '',
     type: '',
+    firstUrl: '',
     allowMethods: []
 })
 
@@ -236,7 +245,8 @@ const handleSearch = () => {}
 
 const handleAdd = () => {
     modalMode.value = 'add'
-    formData.value = { name: '', icon: '', type: '', allowMethods: ['GET', 'POST'] }
+    formData.value = { name: '', icon: '', type: '', firstUrl: '', allowMethods: ['GET', 'POST'] }
+    formErrors.value = {}
     showModal.value = true
 }
 
@@ -246,8 +256,10 @@ const handleEdit = (resource) => {
         name: resource.name,
         icon: resource.icon,
         type: resource.type,
+        firstUrl: '',
         allowMethods: parseMethods(resource.allow_method)
     }
+    formErrors.value = {}
     currentResource.value = resource
     showModal.value = true
 }
@@ -259,22 +271,48 @@ const handleDelete = (resource) => {
 }
 
 const handleSubmit = () => {
+    formErrors.value = {}
+    if (!formData.value.name || formData.value.name.trim() === '') {
+        formErrors.value.name = '请输入资源名称'
+    }
+    if (modalMode.value === 'add') {
+        const url = (formData.value.firstUrl || '').trim()
+        if (!url) {
+            formErrors.value.firstUrl = '请输入资源URL'
+        } else if (!url.startsWith('/')) {
+            formErrors.value.firstUrl = 'URL 必须以 / 开头'
+        }
+    }
+    if (Object.keys(formErrors.value).length > 0) return
+
     const now = new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\//g, '-')
     if (modalMode.value === 'add') {
+        const newId = Date.now()
         resources.value.push({
-            id: Date.now(),
-            ...formData.value,
+            id: newId,
+            name: formData.value.name.trim(),
+            icon: formData.value.icon || '',
+            type: formData.value.type || '',
             allow_method: formatMethods(formData.value.allowMethods),
             created_at: now,
             updated_at: now,
-            urls: []
+            urls: [
+                {
+                    id: newId + 1,
+                    resource_id: newId,
+                    url: formData.value.firstUrl.trim(),
+                    is_active: true
+                }
+            ]
         })
     } else {
         const idx = resources.value.findIndex(r => r.id === currentResource.value.id)
         if (idx !== -1) {
             resources.value[idx] = {
                 ...resources.value[idx],
-                ...formData.value,
+                name: formData.value.name.trim(),
+                icon: formData.value.icon,
+                type: formData.value.type,
                 allow_method: formatMethods(formData.value.allowMethods),
                 updated_at: now
             }
@@ -342,18 +380,22 @@ const saveUrls = () => {
 .empty-cell { text-align: center; padding: 60px 0 !important; }
 .empty-state { color: #909399; }
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.modal { background: white; border-radius: 12px; width: 500px; max-width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+.modal { background: white; border-radius: 14px; width: 520px; max-width: 92%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); overflow: hidden; }
 .modal-lg { width: 640px; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #ebeef5; }
-.modal-header h3 { font-size: 18px; font-weight: 600; color: #303133; }
-.modal-close { background: none; border: none; font-size: 24px; color: #909399; cursor: pointer; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 22px; border-bottom: 1px solid #ebeef5; background: linear-gradient(135deg, #409eff 0%, #6f7cf7 100%); }
+.modal-header h3 { font-size: 18px; font-weight: 600; color: #fff; margin: 0; }
+.modal-close { background: rgba(255,255,255,0.15); border: none; font-size: 22px; color: #fff; cursor: pointer; width: 32px; height: 32px; border-radius: 50%; }
+.modal-close:hover { background: rgba(255,255,255,0.22); }
 .modal-body { padding: 24px; }
 .modal-footer { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 24px; border-top: 1px solid #ebeef5; }
 .form-group { margin-bottom: 20px; }
 .form-group label { display: block; margin-bottom: 8px; color: #606266; font-size: 14px; }
 .form-group label .required { color: #f56c6c; }
-.form-group input, .form-group select { width: 100%; padding: 10px 12px; border: 1px solid #dcdfe6; border-radius: 6px; font-size: 14px; outline: none; }
-.form-group input:focus, .form-group select:focus { border-color: #409eff; }
+.form-group input, .form-group select { width: 100%; padding: 10px 12px; border: 1px solid #dcdfe6; border-radius: 8px; font-size: 14px; outline: none; transition: box-shadow 0.2s, border-color 0.2s; background: #fbfcff; }
+.form-group input:focus, .form-group select:focus { border-color: #409eff; box-shadow: 0 0 0 4px rgba(64,158,255,0.15); background: #fff; }
+.form-group.error input { border-color: #f56c6c; box-shadow: 0 0 0 4px rgba(245,108,108,0.12); }
+.hint-text { margin-top: 6px; color: #909399; font-size: 12px; }
+.error-text { margin-top: 6px; color: #f56c6c; font-size: 12px; }
 .method-checkboxes { display: flex; gap: 16px; flex-wrap: wrap; }
 .checkbox-item { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .checkbox-item input { width: 16px; height: 16px; }

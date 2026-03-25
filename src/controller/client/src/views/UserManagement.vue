@@ -31,8 +31,8 @@
                         <th>头像</th>
                         <th>用户名</th>
                         <th>邮箱</th>
-                        <th>手机</th>
-                        <th>状态</th>
+                        <th class="phone-col">手机</th>
+                        <th class="status-col">状态</th>
                         <th>创建时间</th>
                     </tr>
                 </thead>
@@ -47,8 +47,8 @@
                         </td>
                         <td>{{ user.username }}</td>
                         <td>{{ user.email }}</td>
-                        <td>{{ user.phone }}</td>
-                        <td>
+                        <td class="phone-col">{{ user.phone }}</td>
+                        <td class="status-col">
                             <span class="status-badge" :class="'status-' + user.status">{{ statusText(user.status) }}</span>
                         </td>
                         <td>{{ user.created_at }}</td>
@@ -79,45 +79,51 @@
         </div>
 
         <!-- 添加用户弹窗 -->
-        <div class="modal-overlay" v-if="showModal" @click.self="showModal = false">
-            <div class="modal">
+        <div class="modal-overlay" v-if="showModal" @click.self="closeModal">
+            <div class="add-user-modal" @click.stop>
                 <div class="modal-header">
-                    <h3>添加用户</h3>
-                    <button class="modal-close" @click="showModal = false">&times;</button>
+                    <div class="modal-title-wrap">
+                        <span class="modal-title-accent"></span>
+                        <h3 class="modal-title">添加用户</h3>
+                        <p class="modal-subtitle">填写账号信息，系统默认头像由用户后续自行设置</p>
+                    </div>
+                    <button type="button" class="modal-close" @click="closeModal" aria-label="关闭">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label>用户名 <span class="required">*</span></label>
-                        <input type="text" v-model="formData.username" placeholder="请输入用户名" />
-                    </div>
-                    <div class="form-group">
-                        <label>密码 <span class="required">*</span></label>
-                        <input type="password" v-model="formData.password" placeholder="请输入密码" />
-                    </div>
-                    <div class="form-group">
-                        <label>邮箱</label>
-                        <input type="email" v-model="formData.email" placeholder="请输入邮箱" />
-                    </div>
-                    <div class="form-group">
-                        <label>手机</label>
-                        <input type="text" v-model="formData.phone" placeholder="请输入手机号" />
-                    </div>
-                    <div class="form-group">
-                        <label>头像URL</label>
-                        <input type="text" v-model="formData.avatar" placeholder="请输入头像URL" />
-                    </div>
-                    <div class="form-group">
-                        <label>状态</label>
-                        <select v-model="formData.status">
-                            <option value="active">正常</option>
-                            <option value="frozen">冻结</option>
-                            <option value="deleted">已删除</option>
-                        </select>
+                    <div class="form-grid">
+                        <div class="form-field">
+                            <label>用户名 <span class="required">*</span></label>
+                            <input type="text" v-model="formData.username" class="field-input" placeholder="请输入用户名" autocomplete="off" />
+                        </div>
+                        <div class="form-field">
+                            <label>密码 <span class="required">*</span></label>
+                            <input type="password" v-model="formData.password" class="field-input" placeholder="请输入密码" autocomplete="new-password" />
+                        </div>
+                        <div class="form-field">
+                            <label>邮箱</label>
+                            <input type="email" v-model="formData.email" class="field-input" placeholder="name@example.com" />
+                        </div>
+                        <div class="form-field">
+                            <label>手机</label>
+                            <input type="text" v-model="formData.phone" class="field-input" placeholder="11 位手机号" />
+                        </div>
+                        <div class="form-field form-field-full">
+                            <label>状态</label>
+                            <select v-model="formData.status" class="field-input field-select">
+                                <option value="active">正常</option>
+                                <option value="frozen">冻结</option>
+                                <option value="deleted">已删除</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn" @click="showModal = false">取消</button>
-                    <button class="btn btn-primary" @click="handleSubmit">确定</button>
+                    <button type="button" class="btn-modal btn-modal-ghost" @click="closeModal">取消</button>
+                    <button type="button" class="btn-modal btn-modal-primary" @click="handleSubmit">确定添加</button>
                 </div>
             </div>
         </div>
@@ -168,6 +174,10 @@ const handleSearch = () => {
     currentPage.value = 1
 }
 
+const closeModal = () => {
+    showModal.value = false
+}
+
 const handleAdd = () => {
     formData.value = { username: '', password: '', email: '', phone: '', avatar: '', status: 'active' }
     showModal.value = true
@@ -178,11 +188,12 @@ const handleSubmit = () => {
     const newId = Math.max(...users.value.map(u => u.id), 0) + 1
     users.value.push({
         ...formData.value,
+        avatar: '',
         id: newId,
         created_at: now,
         updated_at: now
     })
-    showModal.value = false
+    closeModal()
 }
 </script>
 
@@ -289,6 +300,18 @@ const handleSubmit = () => {
     font-size: 14px;
 }
 
+.data-table th.phone-col,
+.data-table td.phone-col {
+    padding-left: 10px;
+}
+
+.data-table th.status-col,
+.data-table td.status-col {
+    width: 96px;
+    text-align: left;
+    padding-left: 10px;
+}
+
 .data-table tbody tr:hover {
     background: #f5f7fa;
 }
@@ -317,7 +340,10 @@ const handleSubmit = () => {
 }
 
 .status-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 56px;
     padding: 4px 12px;
     border-radius: 4px;
     font-size: 12px;
@@ -338,17 +364,27 @@ const handleSubmit = () => {
     color: #999;
 }
 
-.empty-cell {
-    text-align: center;
-    padding: 60px 0 !important;
+.data-table td.empty-cell {
+    text-align: center !important;
+    padding: 60px 16px !important;
 }
 
 .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     color: #909399;
 }
 
 .empty-state svg {
-    margin-bottom: 16px;
+    display: block;
+    margin: 0 auto 16px;
+}
+
+.empty-state p {
+    margin: 0;
+    text-align: center;
 }
 
 .pagination {
@@ -398,92 +434,192 @@ const handleSubmit = () => {
 
 .modal-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
+    padding: 24px;
 }
 
-.modal {
-    background: white;
-    border-radius: 12px;
-    width: 500px;
-    max-width: 90%;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+.add-user-modal {
+    width: 100%;
+    max-width: 520px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
 }
 
 .modal-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding: 20px 24px;
-    border-bottom: 1px solid #ebeef5;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 22px 24px 18px;
+    background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+    border-bottom: 1px solid #e2e8f0;
 }
 
-.modal-header h3 {
+.modal-title-wrap {
+    min-width: 0;
+}
+
+.modal-title-accent {
+    display: block;
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #409eff, #66b1ff);
+    margin-bottom: 10px;
+}
+
+.modal-title {
+    margin: 0;
     font-size: 18px;
     font-weight: 600;
-    color: #303133;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+}
+
+.modal-subtitle {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.45;
 }
 
 .modal-close {
-    background: none;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
     border: none;
-    font-size: 24px;
-    color: #909399;
+    border-radius: 10px;
+    background: #f1f5f9;
+    color: #64748b;
     cursor: pointer;
+    transition: background 0.2s, color 0.2s;
 }
 
 .modal-close:hover {
-    color: #303133;
+    background: #e2e8f0;
+    color: #0f172a;
 }
 
 .modal-body {
-    padding: 24px;
+    padding: 20px 24px 8px;
 }
 
-.form-group {
-    margin-bottom: 20px;
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 20px;
 }
 
-.form-group label {
-    display: block;
-    margin-bottom: 8px;
-    color: #606266;
-    font-size: 14px;
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
-.form-group label .required {
+.form-field-full {
+    grid-column: 1 / -1;
+}
+
+.form-field label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #475569;
+}
+
+.form-field label .required {
     color: #f56c6c;
     margin-left: 2px;
 }
 
-.form-group input,
-.form-group select {
+.field-input {
     width: 100%;
-    padding: 10px 12px;
-    border: 1px solid #dcdfe6;
-    border-radius: 6px;
+    padding: 10px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
     font-size: 14px;
+    color: #0f172a;
+    background: #fff;
     outline: none;
-    transition: border-color 0.3s ease;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
 }
 
-.form-group input:focus,
-.form-group select:focus {
+.field-input::placeholder {
+    color: #94a3b8;
+}
+
+.field-input:focus {
     border-color: #409eff;
+    box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.12);
+}
+
+.field-select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
 }
 
 .modal-footer {
     display: flex;
     justify-content: flex-end;
+    align-items: center;
     gap: 12px;
-    padding: 16px 24px;
-    border-top: 1px solid #ebeef5;
+    padding: 16px 24px 20px;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+}
+
+.btn-modal {
+    min-width: 96px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.btn-modal-ghost {
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #475569;
+}
+
+.btn-modal-ghost:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+    color: #0f172a;
+}
+
+.btn-modal-primary {
+    border: none;
+    background: linear-gradient(180deg, #409eff 0%, #3a8ee6 100%);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.btn-modal-primary:hover {
+    background: linear-gradient(180deg, #66b1ff 0%, #409eff 100%);
+    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.35);
+}
+
+@media (max-width: 540px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
