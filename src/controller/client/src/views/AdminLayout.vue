@@ -167,8 +167,7 @@ const menuItems = [
     { path: '/resources', label: '资源管理', icon: ResourceIcon },
     { path: '/user-groups', label: '用户组管理', icon: UserGroupIcon },
     { path: '/resource-groups', label: '资源组管理', icon: ResourceGroupIcon },
-    { path: '/permissions', label: '权限配置', icon: PermissionIcon },
-    { path: '/permission-approval', label: '权限审批', icon: PermissionIcon },
+    { path: '/permissions', label: '权限审批', icon: PermissionIcon },
     { path: '/import', label: '导入数据', icon: ImportIcon }
 ]
 

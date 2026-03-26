@@ -34,10 +34,12 @@
                         <th class="phone-col">手机</th>
                         <th class="status-col">状态</th>
                         <th>创建时间</th>
+                        <th class="spa-status-col">安全码</th>
+                        <th class="spa-actions-col">SPA 操作</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="(user, index) in filteredUsers" :key="user.id">
+                    <tr v-for="(user, index) in pagedUsers" :key="user.id">
                         <td>{{ (currentPage - 1) * pageSize + index + 1 }}</td>
                         <td>
                             <div class="user-avatar">
@@ -52,9 +54,33 @@
                             <span class="status-badge" :class="'status-' + user.status">{{ statusText(user.status) }}</span>
                         </td>
                         <td>{{ user.created_at }}</td>
+                        <td class="spa-status-col">
+                            <span class="spa-badge" :class="'spa-' + (user.spaStatus || 'none')">{{ spaStatusText(user.spaStatus) }}</span>
+                        </td>
+                        <td class="spa-actions-col">
+                            <div class="spa-actions">
+                                <button
+                                    type="button"
+                                    class="spa-btn spa-btn-primary"
+                                    :disabled="primarySpaDisabled(user)"
+                                    @click="onPrimarySpa(user)"
+                                >
+                                    {{ primarySpaLabel(user) }}
+                                </button>
+                                <button
+                                    type="button"
+                                    class="spa-btn spa-btn-secondary"
+                                    :class="{ 'is-muted': secondarySpaDisabled(user) }"
+                                    :disabled="secondarySpaDisabled(user)"
+                                    @click="onSecondarySpa(user)"
+                                >
+                                    {{ secondarySpaLabel(user) }}
+                                </button>
+                            </div>
+                        </td>
                     </tr>
                     <tr v-if="filteredUsers.length === 0">
-                        <td colspan="7" class="empty-cell">
+                        <td colspan="9" class="empty-cell">
                             <div class="empty-state">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -127,21 +153,63 @@
                 </div>
             </div>
         </div>
+
+        <!-- 发放/更新成功：展示安全码 -->
+        <div class="modal-overlay" v-if="showTokenModal" @click.self="showTokenModal = false">
+            <div class="token-modal" @click.stop>
+                <div class="modal-header">
+                    <div class="modal-title-wrap">
+                        <span class="modal-title-accent"></span>
+                        <h3 class="modal-title">安全码已生成</h3>
+                        <p class="modal-subtitle">请复制并安全交付给用户；关闭后需通过「更新安全码」重新轮转</p>
+                    </div>
+                    <button type="button" class="modal-close" @click="showTokenModal = false" aria-label="关闭">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="token-box">
+                        <code class="token-hex">{{ lastTokenHex }}</code>
+                        <button type="button" class="btn-copy" @click="copyToken">复制</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal btn-modal-primary" @click="showTokenModal = false">知道了</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 轻提示 -->
+        <div class="toast" v-if="toastMessage">{{ toastMessage }}</div>
     </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
+import { issueSpaToken, disableSpaToken, enableSpaToken } from '@/api/spaAdmin.js'
 
 const searchKeyword = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
 const showModal = ref(false)
+const showTokenModal = ref(false)
+const lastTokenHex = ref('')
+const toastMessage = ref('')
+const loadingSpaUserId = ref(null)
+
+let toastTimer = null
+function showToast(msg, ms = 3200) {
+    toastMessage.value = msg
+    if (toastTimer) clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => { toastMessage.value = '' }, ms)
+}
 
 const users = ref([
-    { id: 1, username: 'admin', password: '******', email: 'admin@company.com', phone: '13800138000', avatar: '', status: 'active', created_at: '2026-01-01 10:00:00', updated_at: '2026-01-01 10:00:00' },
-    { id: 2, username: 'zhangsan', password: '******', email: 'zhangsan@company.com', phone: '13800138001', avatar: '', status: 'active', created_at: '2026-02-15 14:30:00', updated_at: '2026-02-15 14:30:00' },
-    { id: 3, username: 'lisi', password: '******', email: 'lisi@company.com', phone: '13800138002', avatar: '', status: 'frozen', created_at: '2026-03-01 09:00:00', updated_at: '2026-03-10 16:00:00' }
+    { id: 1, username: 'admin', password: '******', email: 'admin@company.com', phone: '13800138000', avatar: '', status: 'active', created_at: '2026-01-01 10:00:00', updated_at: '2026-01-01 10:00:00', spaStatus: 'none' },
+    { id: 2, username: 'zhangsan', password: '******', email: 'zhangsan@company.com', phone: '13800138001', avatar: '', status: 'active', created_at: '2026-02-15 14:30:00', updated_at: '2026-02-15 14:30:00', spaStatus: 'none' },
+    { id: 3, username: 'lisi', password: '******', email: 'lisi@company.com', phone: '13800138002', avatar: '', status: 'frozen', created_at: '2026-03-01 09:00:00', updated_at: '2026-03-10 16:00:00', spaStatus: 'none' }
 ])
 
 const formData = ref({
@@ -165,6 +233,12 @@ const filteredUsers = computed(() => {
         user.username.toLowerCase().includes(keyword) ||
         user.email.toLowerCase().includes(keyword)
     )
+})
+
+const pagedUsers = computed(() => {
+    const list = filteredUsers.value
+    const start = (currentPage.value - 1) * pageSize.value
+    return list.slice(start, start + pageSize.value)
 })
 
 const totalCount = computed(() => filteredUsers.value.length)
@@ -191,9 +265,120 @@ const handleSubmit = () => {
         avatar: '',
         id: newId,
         created_at: now,
-        updated_at: now
+        updated_at: now,
+        spaStatus: 'none'
     })
     closeModal()
+}
+
+function findUserIndex(id) {
+    return users.value.findIndex(u => u.id === id)
+}
+
+function setUserSpaStatus(userId, status) {
+    const i = findUserIndex(userId)
+    if (i !== -1) users.value[i].spaStatus = status
+}
+
+const spaStatusText = (s) => {
+    const map = { none: '未发放', issued: '已发放', disabled: '已禁用', updating: '更新中' }
+    return map[s] || map.none
+}
+
+const primarySpaLabel = (user) => {
+    const s = user.spaStatus || 'none'
+    if (s === 'none') return '发放安全码'
+    return '更新安全码'
+}
+
+const secondarySpaLabel = (user) => {
+    const s = user.spaStatus || 'none'
+    if (s === 'none') return '禁用安全码'
+    if (s === 'disabled') return '启用安全码'
+    return '禁用安全码'
+}
+
+const primarySpaDisabled = (user) => {
+    const s = user.spaStatus || 'none'
+    if (s === 'updating') return true
+    return loadingSpaUserId.value === user.id
+}
+
+const secondarySpaDisabled = (user) => {
+    const s = user.spaStatus || 'none'
+    if (s === 'none') return true
+    if (s === 'updating') return true
+    return loadingSpaUserId.value === user.id
+}
+
+async function onPrimarySpa(user) {
+    const s = user.spaStatus || 'none'
+    const rotate = s !== 'none'
+    const spaBeforeRotate = s
+    loadingSpaUserId.value = user.id
+    if (rotate) setUserSpaStatus(user.id, 'updating')
+    try {
+        const res = await issueSpaToken(user.id, rotate)
+        if (res.code === 200 && typeof res.data === 'string' && res.data) {
+            lastTokenHex.value = res.data
+            showTokenModal.value = true
+            setUserSpaStatus(user.id, 'issued')
+            showToast(rotate ? '安全码已轮转' : '安全码已发放')
+            return
+        }
+        if (res.code === 500 && String(res.message || '').includes('已有安全码')) {
+            setUserSpaStatus(user.id, 'issued')
+            showToast('该用户已有安全码，请使用「更新安全码」轮转')
+            return
+        }
+        showToast(res.message || '操作失败')
+    } catch (e) {
+        showToast(e?.message || '网络错误')
+    } finally {
+        loadingSpaUserId.value = null
+        const i = findUserIndex(user.id)
+        if (i !== -1 && users.value[i].spaStatus === 'updating') {
+            users.value[i].spaStatus = spaBeforeRotate === 'disabled' ? 'disabled' : 'issued'
+        }
+    }
+}
+
+async function onSecondarySpa(user) {
+    const s = user.spaStatus || 'none'
+    if (s === 'none') return
+    loadingSpaUserId.value = user.id
+    try {
+        if (s === 'disabled') {
+            const res = await enableSpaToken(user.id)
+            if (res.code === 200 && Number(res.data) > 0) {
+                setUserSpaStatus(user.id, 'issued')
+                showToast('安全码已启用')
+            } else {
+                showToast(res.message || '启用失败')
+            }
+        } else {
+            const res = await disableSpaToken(user.id)
+            if (res.code === 200 && Number(res.data) > 0) {
+                setUserSpaStatus(user.id, 'disabled')
+                showToast('安全码已禁用')
+            } else {
+                showToast(res.message || '禁用失败')
+            }
+        }
+    } catch (e) {
+        showToast(e?.message || '网络错误')
+    } finally {
+        loadingSpaUserId.value = null
+    }
+}
+
+async function copyToken() {
+    try {
+        await navigator.clipboard.writeText(lastTokenHex.value)
+        showToast('已复制到剪贴板', 2000)
+    } catch {
+        showToast('复制失败，请手动选择复制')
+    }
 }
 </script>
 
@@ -362,6 +547,160 @@ const handleSubmit = () => {
 .status-deleted {
     background: #f5f5f5;
     color: #999;
+}
+
+.data-table th.spa-status-col,
+.data-table td.spa-status-col {
+    width: 96px;
+    white-space: nowrap;
+}
+
+.data-table th.spa-actions-col,
+.data-table td.spa-actions-col {
+    min-width: 200px;
+}
+
+.spa-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 64px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.spa-none {
+    background: #f4f4f5;
+    color: #909399;
+}
+
+.spa-issued {
+    background: #ecfdf5;
+    color: #059669;
+}
+
+.spa-disabled {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.spa-updating {
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.spa-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.spa-btn {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+}
+
+.spa-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.spa-btn-primary {
+    background: #409eff;
+    border-color: #409eff;
+    color: #fff;
+}
+
+.spa-btn-primary:hover:not(:disabled) {
+    background: #66b1ff;
+    border-color: #66b1ff;
+}
+
+.spa-btn-secondary {
+    background: #fff;
+    border-color: #e2e8f0;
+    color: #475569;
+}
+
+.spa-btn-secondary:hover:not(:disabled) {
+    border-color: #409eff;
+    color: #409eff;
+}
+
+.spa-btn-secondary.is-muted {
+    opacity: 0.45;
+}
+
+.token-modal {
+    width: 100%;
+    max-width: 480px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+}
+
+.token-box {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    padding: 4px 0 8px;
+}
+
+.token-hex {
+    flex: 1;
+    display: block;
+    padding: 12px 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 13px;
+    word-break: break-all;
+    color: #0f172a;
+    line-height: 1.5;
+}
+
+.btn-copy {
+    flex-shrink: 0;
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #409eff;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.btn-copy:hover {
+    border-color: #409eff;
+    background: #f0f9ff;
+}
+
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: 32px;
+    transform: translateX(-50%);
+    z-index: 1100;
+    padding: 10px 18px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.92);
+    color: #fff;
+    font-size: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    pointer-events: none;
+    max-width: min(90vw, 420px);
+    text-align: center;
 }
 
 .data-table td.empty-cell {

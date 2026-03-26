@@ -5,7 +5,6 @@ import UserManagement from './views/UserManagement.vue'
 import ResourceManagement from './views/ResourceManagement.vue'
 import UserGroup from './views/UserGroup.vue'
 import ResourceGroup from './views/ResourceGroup.vue'
-import PermissionConfig from './views/PermissionConfig.vue'
 import DataImport from './views/DataImport.vue'
 import Login from './views/Login.vue'
 import Callback from './views/Callback.vue'
@@ -32,8 +31,7 @@ const routes = [
       { path: 'resources', component: ResourceManagement },
       { path: 'user-groups', component: UserGroup },
       { path: 'resource-groups', component: ResourceGroup },
-      { path: 'permissions', component: PermissionConfig },
-      { path: 'permission-approval', component: PermissionApproval },
+      { path: 'permissions', component: PermissionApproval },
       { path: 'import', component: DataImport }
     ]
   }

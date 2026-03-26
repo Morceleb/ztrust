@@ -104,8 +104,8 @@
                         </svg>
                     </div>
                     <div class="action-text">
-                        <div class="action-title">权限配置</div>
-                        <div class="action-desc">配置用户组与资源组权限</div>
+                        <div class="action-title">权限审批</div>
+                        <div class="action-desc">审批用户资源权限申请</div>
                     </div>
                 </div>
             </div>

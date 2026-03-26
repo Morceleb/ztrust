@@ -124,7 +124,7 @@
             </div>
         </div>
 
-        <!-- URL管理弹窗 -->
+                        <!-- URL管理弹窗 -->
         <div class="modal-overlay" v-if="showUrlModal" @click.self="showUrlModal = false">
             <div class="modal modal-lg">
                 <div class="modal-header">
@@ -164,6 +164,28 @@
                 </div>
             </div>
         </div>
+
+        <!-- 删除确认弹窗 -->
+        <div class="modal-overlay" v-if="showDeleteModal" @click.self="cancelDelete">
+            <div class="confirm-dialog">
+                <div class="confirm-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                </div>
+                <h3 class="confirm-title">确认删除</h3>
+                <p class="confirm-message">
+                    确定要删除资源「<strong>{{ deleteTarget?.name }}</strong>」吗？<br/>
+                    <span class="confirm-sub">此操作不可恢复</span>
+                </p>
+                <div class="confirm-footer">
+                    <button class="btn btn-modal-ghost" @click="cancelDelete">取消</button>
+                    <button class="btn btn-modal-danger" @click="confirmDelete">确认删除</button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -173,6 +195,8 @@ import { ref, computed } from 'vue'
 const searchKeyword = ref('')
 const showModal = ref(false)
 const showUrlModal = ref(false)
+const showDeleteModal = ref(false)
+const deleteTarget = ref(null)
 const modalMode = ref('add')
 const currentResource = ref(null)
 const currentUrls = ref([])
@@ -265,9 +289,20 @@ const handleEdit = (resource) => {
 }
 
 const handleDelete = (resource) => {
-    if (confirm(`确定删除资源 "${resource.name}" 吗？`)) {
-        resources.value = resources.value.filter(r => r.id !== resource.id)
+    deleteTarget.value = resource
+    showDeleteModal.value = true
+}
+
+const cancelDelete = () => {
+    showDeleteModal.value = false
+    deleteTarget.value = null
+}
+
+const confirmDelete = () => {
+    if (deleteTarget.value) {
+        resources.value = resources.value.filter(r => r.id !== deleteTarget.value.id)
     }
+    cancelDelete()
 }
 
 const handleSubmit = () => {
@@ -409,4 +444,114 @@ const saveUrls = () => {
 .btn-icon.delete { background: #fff2f0; color: #f56c6c; }
 .btn-icon.delete:hover { background: #ffccc7; }
 .empty-urls { text-align: center; padding: 40px; color: #909399; }
+
+/* 删除确认弹窗 */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 24px;
+}
+
+.confirm-dialog {
+    width: 100%;
+    max-width: 400px;
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    padding: 36px 32px 28px;
+    text-align: center;
+    animation: dialog-in 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes dialog-in {
+    from { opacity: 0; transform: scale(0.88) translateY(8px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.confirm-icon {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 18px;
+    background: linear-gradient(135deg, #fff5f5, #fff);
+    border: 1.5px solid #fee2e2;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ef4444;
+}
+
+.confirm-title {
+    margin: 0 0 10px;
+    font-size: 19px;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+}
+
+.confirm-message {
+    margin: 0 0 28px;
+    font-size: 14px;
+    color: #475569;
+    line-height: 1.65;
+}
+
+.confirm-message strong {
+    color: #0f172a;
+}
+
+.confirm-sub {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.confirm-footer {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.btn-modal-ghost {
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #475569;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.btn-modal-ghost:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+    color: #0f172a;
+}
+
+.btn-modal-danger {
+    border: none;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+    transition: background 0.2s, box-shadow 0.2s;
+}
+
+.btn-modal-danger:hover {
+    background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+}
 </style>
