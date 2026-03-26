@@ -501,6 +501,14 @@ async function copyToken() {
     background: #f5f7fa;
 }
 
+.data-table tbody tr {
+    height: 56px;
+}
+
+.data-table td {
+    vertical-align: middle;
+}
+
 .user-avatar {
     width: 32px;
     height: 32px;
@@ -593,9 +601,9 @@ async function copyToken() {
 
 .spa-actions {
     display: flex;
-    flex-wrap: wrap;
     gap: 8px;
     align-items: center;
+    white-space: nowrap;
 }
 
 .spa-btn {
