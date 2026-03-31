@@ -26,29 +26,52 @@
                 <thead>
                     <tr>
                         <th width="60">序号</th>
-                        <th>资源ID</th>
+                        <th>图标</th>
                         <th>资源名称</th>
                         <th>资源URL</th>
-                        <th>资源是否可用</th>
+                        <th class="avail-col">是否可用</th>
+                        <th>创建时间</th>
+                        <th width="120">操作</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="(resource, index) in pagedResources" :key="resource.id">
                         <td>{{ (currentPage - 1) * pageSize + index + 1 }}</td>
-                        <td>{{ resource.id }}</td>
-                        <td>{{ resource.name }}</td>
                         <td>
-                            <span class="url-tag">{{ resource.url }}</span>
+                            <div class="resource-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                                </svg>
+                            </div>
                         </td>
-                        <td>
+                        <td>{{ resource.name }}</td>
+                        <td>{{ resource.url }}</td>
+                        <td class="avail-col">
                             <span
-                                class="avail-tag"
-                                :class="resource.available ? 'avail-yes' : 'avail-no'"
+                                class="status-badge"
+                                :class="resource.available ? 'status-active' : 'status-unavailable'"
                             >{{ resource.available ? '可用' : '不可用' }}</span>
+                        </td>
+                        <td>{{ resource.created_at }}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="action-btn action-edit" @click="handleEdit(resource)" title="编辑">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                    </svg>
+                                </button>
+                                <button class="action-btn action-delete" @click="handleDelete(resource)" title="删除">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"/>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    </svg>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     <tr v-if="filteredResources.length === 0">
-                        <td colspan="5" class="empty-cell">
+                        <td colspan="7" class="empty-cell">
                             <div class="empty-state">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -93,21 +116,11 @@
                             <input type="text" v-model="formData.name" class="field-input" :class="{ 'field-error': formErrors.name }" placeholder="请输入资源名称，如：VPN服务器" />
                             <span class="field-error-text" v-if="formErrors.name">{{ formErrors.name }}</span>
                         </div>
-                        <div class="form-field form-field-full" v-if="modalMode === 'add'">
+                        <div class="form-field form-field-full">
                             <label>资源URL <span class="required">*</span></label>
                             <input type="text" v-model="formData.url" class="field-input" :class="{ 'field-error': formErrors.url }" placeholder="请输入IP或域名，如：192.168.1.1" />
-                            <span class="field-hint">添加资源时必须输入资源URL（IP地址或域名）</span>
+                            <span class="field-hint" v-if="modalMode === 'add'">添加资源时必须输入资源URL（IP地址或域名）</span>
                             <span class="field-error-text" v-if="formErrors.url">{{ formErrors.url }}</span>
-                        </div>
-                        <div class="form-field form-field-full">
-                            <label>资源类型</label>
-                            <select v-model="formData.type" class="field-input field-select">
-                                <option value="">请选择资源类型</option>
-                                <option value="服务器">服务器</option>
-                                <option value="数据库">数据库</option>
-                                <option value="应用系统">应用系统</option>
-                                <option value="网络设备">网络设备</option>
-                            </select>
                         </div>
                         <div class="form-field form-field-full">
                             <label>资源是否可用</label>
@@ -178,7 +191,6 @@ const resources = ref([
         id: 1,
         name: '公司VPN服务器',
         url: '192.168.1.100',
-        type: '服务器',
         available: true,
         created_at: '2026-01-15 10:00:00',
         updated_at: '2026-01-15 10:00:00'
@@ -187,7 +199,6 @@ const resources = ref([
         id: 2,
         name: '财务数据库',
         url: '192.168.1.50',
-        type: '数据库',
         available: true,
         created_at: '2026-02-01 14:30:00',
         updated_at: '2026-02-01 14:30:00'
@@ -196,7 +207,6 @@ const resources = ref([
         id: 3,
         name: '人力资源系统',
         url: '192.168.1.80',
-        type: '应用系统',
         available: false,
         created_at: '2026-02-20 09:00:00',
         updated_at: '2026-02-20 09:00:00'
@@ -205,7 +215,6 @@ const resources = ref([
         id: 4,
         name: '核心交换机',
         url: '192.168.1.1',
-        type: '网络设备',
         available: true,
         created_at: '2026-03-01 08:30:00',
         updated_at: '2026-03-01 08:30:00'
@@ -215,7 +224,6 @@ const resources = ref([
 const formData = ref({
     name: '',
     url: '',
-    type: '',
     available: true
 })
 
@@ -244,7 +252,7 @@ const closeModal = () => {
 
 const handleAdd = () => {
     modalMode.value = 'add'
-    formData.value = { name: '', url: '', type: '', available: true }
+    formData.value = { name: '', url: '', available: true }
     formErrors.value = {}
     showModal.value = true
 }
@@ -253,8 +261,7 @@ const handleEdit = (resource) => {
     modalMode.value = 'edit'
     formData.value = {
         name: resource.name,
-        url: '',
-        type: resource.type,
+        url: resource.url || '',
         available: resource.available !== false
     }
     formErrors.value = {}
@@ -285,11 +292,9 @@ const handleSubmit = () => {
     if (!formData.value.name || formData.value.name.trim() === '') {
         formErrors.value.name = '请输入资源名称'
     }
-    if (modalMode.value === 'add') {
-        const url = (formData.value.url || '').trim()
-        if (!url) {
-            formErrors.value.url = '请输入资源URL'
-        }
+    const url = (formData.value.url || '').trim()
+    if (!url) {
+        formErrors.value.url = '请输入资源URL'
     }
     if (Object.keys(formErrors.value).length > 0) return
 
@@ -300,7 +305,6 @@ const handleSubmit = () => {
             id: newId,
             name: formData.value.name.trim(),
             url: formData.value.url.trim(),
-            type: formData.value.type || '',
             available: formData.value.available === true,
             created_at: now,
             updated_at: now
@@ -312,7 +316,7 @@ const handleSubmit = () => {
             resources.value[idx] = {
                 ...resources.value[idx],
                 name: formData.value.name.trim(),
-                type: formData.value.type,
+                url,
                 available: formData.value.available === true,
                 updated_at: now
             }
@@ -430,24 +434,37 @@ const handleSubmit = () => {
     background: #f5f7fa;
 }
 
-.url-tag {
-    display: inline-flex;
-    align-items: center;
-    max-width: 200px;
-    padding: 4px 10px;
-    background: #f0f9ff;
-    color: #0369a1;
-    border-radius: 4px;
-    font-size: 12px;
-    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    box-sizing: border-box;
+.data-table tbody tr {
+    height: 56px;
 }
 
-/* 资源是否可用：浅底 + 描边 + 圆角（与 UserManagement 的 status-badge 一致） */
-.avail-tag {
+.data-table td {
+    vertical-align: middle;
+}
+
+.data-table th.avail-col,
+.data-table td.avail-col {
+    width: 96px;
+    text-align: left;
+    padding-left: 10px;
+}
+
+.resource-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.resource-icon svg {
+    color: #fff;
+}
+
+.status-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -455,21 +472,53 @@ const handleSubmit = () => {
     padding: 4px 12px;
     border-radius: 4px;
     font-size: 12px;
-    font-weight: 500;
-    line-height: 1.4;
-    box-sizing: border-box;
 }
 
-.avail-yes {
-    color: #52c41a;
+.status-active {
     background: #f6ffed;
-    border: 1px solid #b7eb8f;
+    color: #52c41a;
 }
 
-.avail-no {
-    color: #f5222d;
+.status-unavailable {
     background: #fff1f0;
-    border: 1px solid #ffa39e;
+    color: #f5222d;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 6px;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-edit {
+    background: #e6f7ff;
+    color: #1890ff;
+}
+
+.action-edit:hover {
+    background: #1890ff;
+    color: #fff;
+}
+
+.action-delete {
+    background: #fff1f0;
+    color: #ff4d4f;
+}
+
+.action-delete:hover {
+    background: #ff4d4f;
+    color: #fff;
 }
 
 .data-table td.empty-cell {
