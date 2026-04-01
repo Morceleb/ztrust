@@ -25,8 +25,8 @@
                         <div class="group-desc">ID: {{ group.id }}</div>
                     </div>
                     <div class="group-actions">
-                        <button class="action-btn edit" @click="handleEdit(group)">编辑</button>
-                        <button class="action-btn match" @click="manageMatches(group)">匹配管理</button>
+                        <button class="action-btn add-res" @click="openAddResourceModal(group)">添加资源</button>
+                        <button class="action-btn manage" @click="openManageResourceModal(group)">管理资源</button>
                         <button class="action-btn delete" @click="handleDelete(group)">删除</button>
                     </div>
                 </div>
@@ -50,11 +50,11 @@
             </div>
         </div>
 
-        <!-- 创建/编辑弹窗 -->
+        <!-- 创建资源组弹窗 -->
         <div class="modal-overlay" v-if="showModal" @click.self="showModal = false">
             <div class="modal">
                 <div class="modal-header">
-                    <h3>{{ modalMode === 'add' ? '创建资源组' : '编辑资源组' }}</h3>
+                    <h3>创建资源组</h3>
                     <button class="modal-close" @click="showModal = false">&times;</button>
                 </div>
                 <div class="modal-body">
@@ -70,53 +70,150 @@
             </div>
         </div>
 
-        <!-- 资源匹配管理弹窗 -->
-        <div class="modal-overlay" v-if="showMatchModal" @click.self="showMatchModal = false">
-            <div class="modal modal-lg">
+        <!-- 添加资源弹窗 -->
+        <div class="modal-overlay" v-if="showAddResourceModal" @click.self="showAddResourceModal = false">
+            <div class="add-resource-modal">
                 <div class="modal-header">
-                    <h3>资源匹配管理 - {{ currentGroup?.name }}</h3>
-                    <button class="modal-close" @click="showMatchModal = false">&times;</button>
+                    <div class="modal-title-wrap">
+                        <span class="modal-title-accent accent-add"></span>
+                        <h3 class="modal-title">添加资源</h3>
+                    </div>
+                    <button class="modal-close" @click="showAddResourceModal = false" aria-label="关闭">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
                 </div>
-                <div class="modal-body">
-                    <div class="match-toolbar">
-                        <button class="btn btn-primary btn-sm" @click="addMatch">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <div class="modal-body modal-body-fixed">
+                    <div class="pool-header">
+                        <span class="pool-title">可添加的资源</span>
+                        <span class="pool-count">{{ filteredPoolResources.length }} / {{ availablePoolResources.length }} 个</span>
+                    </div>
+                    <div class="pool-search">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                        <input
+                            type="text"
+                            v-model="poolSearchKeyword"
+                            placeholder="搜索可添加的资源..."
+                            class="pool-search-input"
+                        />
+                    </div>
+                    <div class="resource-pool resource-pool-fixed">
+                        <div class="resource-pool-list">
+                            <div
+                                v-for="res in filteredPoolResources"
+                                :key="res.id"
+                                class="pool-item"
+                                :class="{ selected: selectedResourceMap[res.id] !== undefined }"
+                                @click="toggleResourceSelection(res.id)"
+                            >
+                                <span class="pool-checkbox" @click.stop="toggleResourceSelection(res.id)">
+                                    <svg v-if="selectedResourceMap[res.id] !== undefined" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                </span>
+                                <span class="pool-item-name" @click.stop="toggleResourceSelection(res.id)">{{ res.name }}</span>
+                                <select
+                                    :value="selectedResourceMap[res.id] !== undefined ? selectedResourceMap[res.id] : 1"
+                                    class="pool-item-level"
+                                    @click.stop
+                                    @change="setResourceLevel(res.id, $event)"
+                                >
+                                    <option value="1">1级</option>
+                                    <option value="2">2级</option>
+                                    <option value="3">3级</option>
+                                    <option value="4">4级</option>
+                                </select>
+                            </div>
+                            <div v-if="filteredPoolResources.length === 0" class="pool-empty">
+                                {{ poolSearchKeyword ? '未找到匹配的资源' : '暂无可添加的资源，所有资源已在此组中' }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pool-actions">
+                        <div class="pool-selected-info">
+                            已选中 <strong>{{ selectedCount }}</strong> 项资源
+                        </div>
+                        <button
+                            type="button"
+                            class="btn-add-resources"
+                            :disabled="selectedCount === 0"
+                            @click="addSelectedResources"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
-                            添加资源匹配
+                            添加选中资源 ({{ selectedCount }})
                         </button>
                     </div>
-                    <div class="match-list">
-                        <div class="match-header">
-                            <span class="col-resource">选择资源</span>
-                            <span class="col-level">生效权限等级</span>
-                            <span class="col-action">操作</span>
-                        </div>
-                        <div class="match-item" v-for="(match, idx) in currentMatches" :key="idx">
-                            <select v-model="match.resourceId" class="resource-select">
-                                <option value="">请选择资源</option>
-                                <option v-for="res in availableResources" :key="res.id" :value="res.id">{{ res.name }}</option>
-                            </select>
-                            <select v-model="match.effectiveLevel" class="level-select">
+                </div>
+            </div>
+        </div>
+
+        <!-- 管理资源弹窗 -->
+        <div class="modal-overlay" v-if="showManageResourceModal" @click.self="showManageResourceModal = false">
+            <div class="manage-resource-modal">
+                <div class="modal-header">
+                    <div class="modal-title-wrap">
+                        <span class="modal-title-accent accent-manage"></span>
+                        <h3 class="modal-title">管理资源</h3>
+                    </div>
+                    <button class="modal-close" @click="showManageResourceModal = false" aria-label="关闭">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body modal-body-fixed">
+                    <div class="manage-list manage-list-fixed">
+                        <div
+                            v-for="(match, idx) in currentMatches"
+                            :key="match.resourceId"
+                            class="manage-item"
+                        >
+                            <div class="manage-item-info">
+                                <span class="manage-item-name">{{ match.resourceName }}</span>
+                                <span class="manage-item-id">ID: {{ match.resourceId }}</span>
+                            </div>
+                            <select
+                                v-model.number="match.effectiveLevel"
+                                class="manage-item-level"
+                                @change="markAsModified"
+                            >
                                 <option value="1">1级</option>
                                 <option value="2">2级</option>
                                 <option value="3">3级</option>
                                 <option value="4">4级</option>
                             </select>
-                            <button class="btn-icon delete" @click="removeMatch(idx)" title="删除">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <button
+                                type="button"
+                                class="btn-remove"
+                                @click="removeResourceFromGroup(idx)"
+                                title="从组中移除"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                                 </svg>
                             </button>
                         </div>
-                        <div v-if="currentMatches.length === 0" class="empty-matches">
-                            暂无资源匹配，请点击添加
+                        <div v-if="currentMatches.length === 0" class="manage-empty">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                            </svg>
+                            <p>尚未添加任何资源到此组</p>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn" @click="showMatchModal = false">取消</button>
-                    <button class="btn btn-primary" @click="saveMatches">保存</button>
+                    <div class="footer-info">
+                        <span class="resource-count">共 {{ currentMatches.length }} 项资源</span>
+                    </div>
+                    <div class="footer-actions">
+                        <button class="btn-modal btn-modal-ghost" @click="handleCancelManage">取消</button>
+                        <button class="btn-modal btn-modal-primary" @click="saveManageChanges">保存修改</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -152,10 +249,12 @@ const searchKeyword = ref('')
 const showModal = ref(false)
 const showDeleteModal = ref(false)
 const deleteTarget = ref(null)
-const showMatchModal = ref(false)
-const modalMode = ref('add')
+const showAddResourceModal = ref(false)
+const showManageResourceModal = ref(false)
 const currentGroup = ref(null)
 const currentMatches = ref([])
+const selectedResourceMap = ref({})
+const poolSearchKeyword = ref('')
 
 const availableResources = ref([
     { id: 1, name: '公司堡垒机' },
@@ -165,6 +264,8 @@ const availableResources = ref([
     { id: 5, name: '员工手册' },
     { id: 6, name: '客户管理系统' }
 ])
+
+const hasModify = ref(false)
 
 const groups = ref([
     {
@@ -200,20 +301,27 @@ const filteredGroups = computed(() => {
     return groups.value.filter(g => g.name.toLowerCase().includes(searchKeyword.value.toLowerCase()))
 })
 
+// 可添加的资源池（排除已在此组中的）
+const availablePoolResources = computed(() => {
+    const matchedIds = new Set(currentMatches.value.map(m => m.resourceId))
+    return availableResources.value.filter(res => !matchedIds.has(res.id))
+})
+
+// 根据搜索关键词过滤可添加的资源
+const filteredPoolResources = computed(() => {
+    if (!poolSearchKeyword.value) return availablePoolResources.value
+    return availablePoolResources.value.filter(res =>
+        res.name.toLowerCase().includes(poolSearchKeyword.value.toLowerCase())
+    )
+})
+
 const levelText = (level) => {
     const map = { 1: '1级', 2: '2级', 3: '3级', 4: '4级' }
     return map[level] || level
 }
 
 const handleAdd = () => {
-    modalMode.value = 'add'
     formData.value = { name: '' }
-    showModal.value = true
-}
-
-const handleEdit = (group) => {
-    modalMode.value = 'edit'
-    formData.value = { ...group }
     showModal.value = true
 }
 
@@ -235,47 +343,102 @@ const confirmDelete = () => {
 }
 
 const handleSubmit = () => {
-    if (modalMode.value === 'add') {
-        const newId = Math.max(...groups.value.map(g => g.id), 0) + 1
-        groups.value.push({ id: newId, name: formData.value.name, matchedResources: [] })
-    } else {
-        const idx = groups.value.findIndex(g => g.id === formData.value.id)
-        if (idx !== -1) groups.value[idx].name = formData.value.name
-    }
+    if (!formData.value.name || !formData.value.name.trim()) return
+    const newId = Math.max(...groups.value.map(g => g.id), 0) + 1
+    groups.value.push({ id: newId, name: formData.value.name.trim(), matchedResources: [] })
     showModal.value = false
 }
 
-const manageMatches = (group) => {
+const openAddResourceModal = (group) => {
     currentGroup.value = group
     currentMatches.value = group.matchedResources ? [...group.matchedResources.map(m => ({ ...m }))] : []
-    showMatchModal.value = true
+    selectedResourceMap.value = {}
+    poolSearchKeyword.value = ''
+    showAddResourceModal.value = true
 }
 
-const addMatch = () => {
-    currentMatches.value.push({ resourceId: '', effectiveLevel: 1 })
+const openManageResourceModal = (group) => {
+    currentGroup.value = group
+    currentMatches.value = group.matchedResources ? [...group.matchedResources.map(m => ({ ...m }))] : []
+    hasModify.value = false
+    showManageResourceModal.value = true
 }
 
-const removeMatch = (idx) => {
+const toggleResourceSelection = (resourceId) => {
+    const map = { ...selectedResourceMap.value }
+    if (map[resourceId] !== undefined) {
+        delete map[resourceId]
+    } else {
+        map[resourceId] = 1
+    }
+    selectedResourceMap.value = map
+}
+
+const setResourceLevel = (resourceId, event) => {
+    const map = { ...selectedResourceMap.value }
+    if (map[resourceId] !== undefined) {
+        map[resourceId] = Number(event.target.value)
+    }
+    selectedResourceMap.value = map
+}
+
+const selectedCount = computed(() => Object.keys(selectedResourceMap.value).length)
+
+const addSelectedResources = () => {
+    const map = selectedResourceMap.value
+    if (!Object.keys(map).length) return
+
+    Object.entries(map).forEach(([idStr, level]) => {
+        const id = Number(idStr)
+        const res = availableResources.value.find(r => r.id === id)
+        if (res && !currentMatches.value.some(m => m.resourceId === id)) {
+            currentMatches.value.push({
+                resourceId: res.id,
+                resourceName: res.name,
+                effectiveLevel: level
+            })
+        }
+    })
+
+    selectedResourceMap.value = {}
+    saveGroupResources()
+}
+
+const removeResourceFromGroup = (idx) => {
     currentMatches.value.splice(idx, 1)
+    hasModify.value = true
 }
 
-const saveMatches = () => {
-    const validMatches = currentMatches.value
-        .filter(m => m.resourceId)
-        .map(m => {
-            const res = availableResources.value.find(r => r.id === m.resourceId)
-            return {
-                resourceId: m.resourceId,
-                resourceName: res ? res.name : '',
-                effectiveLevel: m.effectiveLevel
-            }
-        })
+const updateLevel = (match) => {
+    hasModify.value = true
+}
 
+const markAsModified = () => {
+    hasModify.value = true
+}
+
+const saveManageChanges = () => {
+    saveGroupResources()
+    hasModify.value = false
+    showManageResourceModal.value = false
+}
+
+const handleCancelManage = () => {
+    if (hasModify.value) {
+        if (confirm('您有未保存的修改，确定要关闭吗？')) {
+            showManageResourceModal.value = false
+        }
+    } else {
+        showManageResourceModal.value = false
+    }
+}
+
+const saveGroupResources = () => {
+    if (!currentGroup.value) return
     const idx = groups.value.findIndex(g => g.id === currentGroup.value.id)
     if (idx !== -1) {
-        groups.value[idx].matchedResources = validMatches
+        groups.value[idx].matchedResources = [...currentMatches.value]
     }
-    showMatchModal.value = false
 }
 </script>
 
@@ -301,8 +464,10 @@ const saveMatches = () => {
 .action-btn { padding: 4px 10px; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; transition: all 0.3s; }
 .action-btn.edit { background: #e6f7ff; color: #1890ff; }
 .action-btn.edit:hover { background: #bae7ff; }
-.action-btn.match { background: #f0f5ff; color: #666ee8; }
-.action-btn.match:hover { background: #e0e8ff; }
+.action-btn.add-res { background: #f0f5ff; color: #666ee8; }
+.action-btn.add-res:hover { background: #e0e8ff; }
+.action-btn.manage { background: #e6f7ff; color: #409eff; }
+.action-btn.manage:hover { background: #bae7ff; }
 .action-btn.delete { background: #fff2f0; color: #f56c6c; }
 .action-btn.delete:hover { background: #ffccc7; }
 .group-resources { margin-top: 12px; padding-top: 12px; border-top: 1px solid #ebeef5; }
@@ -341,6 +506,636 @@ const saveMatches = () => {
 .btn-icon.delete:hover { background: #ffccc7; }
 .empty-matches { text-align: center; padding: 40px; color: #909399; }
 
+/* 添加资源弹窗 */
+.add-resource-modal {
+    width: 100%;
+    max-width: 580px;
+    height: 460px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: modal-in 0.2s ease;
+}
+
+/* 管理资源弹窗 */
+.manage-resource-modal {
+    width: 100%;
+    max-width: 580px;
+    height: 460px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: modal-in 0.2s ease;
+}
+
+@keyframes modal-in {
+    from { opacity: 0; transform: scale(0.96) translateY(8px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px 24px;
+    background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.modal-title-accent {
+    width: 4px;
+    height: 40px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, #6666ff, #9999ff);
+}
+
+.accent-add {
+    background: linear-gradient(180deg, #6666ff, #9999ff);
+}
+
+.accent-manage {
+    background: linear-gradient(180deg, #409eff, #66b1ff);
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+}
+
+.modal-subtitle {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.modal-close {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 10px;
+    background: #f1f5f9;
+    color: #64748b;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.modal-close:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.modal-body {
+    padding: 20px 24px;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.modal-body-fixed {
+    padding: 20px 24px;
+    overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* 管理资源弹窗内部 */
+.manage-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.manage-list {
+    height: 360px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    padding: 8px;
+}
+
+.manage-list-fixed {
+    height: 360px;
+}
+
+.manage-list::-webkit-scrollbar,
+.manage-list {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.manage-list::-webkit-scrollbar {
+    display: none;
+}
+
+.manage-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #f9fafb;
+    margin-bottom: 6px;
+    border: 1px solid #f0f0f0;
+    transition: all 0.2s;
+}
+
+.manage-item:last-child {
+    margin-bottom: 0;
+}
+
+.manage-item:hover {
+    border-color: #d1d5db;
+    background: #fff;
+}
+
+.manage-item-name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1f2937;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.manage-item-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.manage-item-id {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.manage-item-level {
+    padding: 5px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 12px;
+    background: #fff;
+    min-width: 70px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.manage-item-level:hover,
+.manage-item-level:focus {
+    border-color: #409eff;
+}
+
+.manage-empty {
+    padding: 48px 16px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+.manage-empty svg {
+    margin-bottom: 12px;
+    color: #d1d5db;
+}
+
+.manage-empty p {
+    margin: 0;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-top: 1px solid #ebeef5;
+    background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
+}
+
+.footer-info {
+    display: flex;
+    align-items: center;
+}
+
+.resource-count {
+    font-size: 13px;
+    color: #64748b;
+    background: #f3f4f6;
+    padding: 4px 12px;
+    border-radius: 12px;
+}
+
+.footer-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-modal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 96px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-modal-ghost {
+    border: 1.5px solid #e2e8f0;
+    background: #fff;
+    color: #64748b;
+}
+
+.btn-modal-ghost:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+    color: #0f172a;
+}
+
+.btn-modal-primary {
+    border: none;
+    background: linear-gradient(135deg, #409eff 0%, #3a8ee6 100%);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(64, 158, 255, 0.35);
+}
+
+.btn-modal-primary:hover {
+    background: linear-gradient(135deg, #66b1ff 0%, #409eff 100%);
+    box-shadow: 0 6px 20px rgba(64, 158, 255, 0.45);
+    transform: translateY(-1px);
+}
+
+/* 资源池区域 */
+.resource-pool-area {
+    display: flex;
+    flex-direction: column;
+}
+
+.pool-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.pool-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.pool-count {
+    font-size: 12px;
+    color: #9ca3af;
+    background: #f3f4f6;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.pool-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 6px 12px;
+    margin-bottom: 10px;
+}
+
+.pool-search svg {
+    color: #9ca3af;
+    flex-shrink: 0;
+}
+
+.pool-search-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: 13px;
+    color: #374151;
+}
+
+.pool-search-input::placeholder {
+    color: #9ca3af;
+}
+
+.resource-pool {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
+    overflow: hidden;
+}
+
+.resource-pool-fixed {
+    height: 160px;
+}
+
+.resource-pool-list {
+    height: 100%;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+/* 隐藏原生滚动条样式，但保留滑动功能 */
+.resource-pool-list::-webkit-scrollbar,
+.selected-list::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+}
+
+.resource-pool-list,
+.selected-list {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.pool-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pool-item:hover {
+    background: #f9fafb;
+}
+
+.pool-item.selected {
+    background: #eff6ff;
+}
+
+.pool-checkbox {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #d1d5db;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    background: #fff;
+}
+
+.pool-item.selected .pool-checkbox {
+    background: #409eff;
+    border-color: #409eff;
+    color: white;
+}
+
+.pool-item-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1f2937;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+}
+
+.pool-item-level {
+    padding: 4px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 12px;
+    background: #fff;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+    flex-shrink: 0;
+}
+
+.pool-item-level:hover,
+.pool-item-level:focus {
+    border-color: #6666ff;
+}
+
+.pool-empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+.pool-actions {
+    margin-top: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pool-selected-info {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.pool-selected-info strong {
+    color: #6666ff;
+    font-weight: 600;
+}
+
+.level-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.level-label {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.level-select {
+    padding: 8px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 13px;
+    background: #fff;
+    min-width: 100px;
+}
+
+.btn-add-resources {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #6666ff, #9999ff);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(102, 102, 255, 0.3);
+}
+
+.btn-add-resources:hover:not(:disabled) {
+    background: linear-gradient(135deg, #5555ee, #8888ff);
+    box-shadow: 0 4px 12px rgba(102, 102, 255, 0.4);
+}
+
+.btn-add-resources:disabled {
+    background: #d1d5db;
+    color: #9ca3af;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* 已选择资源区域 - 占 1/3 */
+.selected-resources-area {
+    flex: 1;
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #f3f4f6;
+    border-radius: 12px;
+    background: #fafafa;
+}
+
+.selected-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #ebeef5;
+    background: #fff;
+    border-radius: 12px 12px 0 0;
+}
+
+.selected-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.selected-count {
+    font-size: 12px;
+    color: #9ca3af;
+    background: #f3f4f6;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.selected-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.selected-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #fff;
+    margin-bottom: 6px;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s;
+}
+
+.selected-item:last-child {
+    margin-bottom: 0;
+}
+
+.selected-item:hover {
+    border-color: #d1d5db;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.selected-item-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1f2937;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.level-select-inline {
+    padding: 6px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 12px;
+    background: #fff;
+    min-width: 70px;
+}
+
+.btn-remove {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    background: #fff1f0;
+    color: #f56c6c;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-remove:hover {
+    background: #ffccc7;
+    color: #fff;
+}
+
+.selected-empty {
+    padding: 24px 16px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 24px;
+    border-top: 1px solid #ebeef5;
+    background: #fafafa;
+}
+
+/* 删除确认弹窗 */
 .delete-confirm-overlay {
     position: fixed;
     inset: 0;

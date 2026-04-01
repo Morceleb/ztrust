@@ -99,41 +99,81 @@
             <div class="add-resource-modal" @click.stop>
                 <div class="modal-header">
                     <div class="modal-title-wrap">
-                        <span class="modal-title-accent"></span>
-                        <h3 class="modal-title">{{ modalMode === 'add' ? '添加资源' : '编辑资源' }}</h3>
-                        <p class="modal-subtitle">{{ modalMode === 'add' ? '填写资源信息，创建新的资源项' : '修改资源基本信息' }}</p>
+                        <div class="modal-icon-wrap" :class="modalMode === 'add' ? 'icon-add' : 'icon-edit'">
+                            <svg v-if="modalMode === 'add'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                        </div>
+                        <div class="modal-title-text">
+                            <h3 class="modal-title">{{ modalMode === 'add' ? '添加资源' : '编辑资源' }}</h3>
+                            <p class="modal-subtitle">{{ modalMode === 'add' ? '填写资源信息，创建新的资源项' : '修改资源基本信息' }}</p>
+                        </div>
                     </div>
                     <button type="button" class="modal-close" @click="closeModal" aria-label="关闭">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M18 6L6 18M6 6l12 12"/>
                         </svg>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-grid">
-                        <div class="form-field form-field-full">
-                            <label>资源名称 <span class="required">*</span></label>
-                            <input type="text" v-model="formData.name" class="field-input" :class="{ 'field-error': formErrors.name }" placeholder="请输入资源名称，如：VPN服务器" />
-                            <span class="field-error-text" v-if="formErrors.name">{{ formErrors.name }}</span>
+                    <div class="form-card">
+                        <div class="form-field-group">
+                            <div class="form-field">
+                                <label>资源名称 <span class="required">*</span></label>
+                                <div class="input-wrapper">
+                                    <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                                    </svg>
+                                    <input type="text" v-model="formData.name" class="field-input" :class="{ 'field-error': formErrors.name }" placeholder="请输入资源名称，如：VPN服务器" />
+                                </div>
+                                <span class="field-error-text" v-if="formErrors.name">{{ formErrors.name }}</span>
+                            </div>
                         </div>
-                        <div class="form-field form-field-full">
-                            <label>资源URL <span class="required">*</span></label>
-                            <input type="text" v-model="formData.url" class="field-input" :class="{ 'field-error': formErrors.url }" placeholder="请输入IP或域名，如：192.168.1.1" />
-                            <span class="field-hint" v-if="modalMode === 'add'">添加资源时必须输入资源URL（IP地址或域名）</span>
-                            <span class="field-error-text" v-if="formErrors.url">{{ formErrors.url }}</span>
+                        <div class="form-field-group">
+                            <div class="form-field">
+                                <label>资源URL <span class="required">*</span></label>
+                                <div class="input-wrapper">
+                                    <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                                    </svg>
+                                    <input type="text" v-model="formData.url" class="field-input" :class="{ 'field-error': formErrors.url }" placeholder="请输入IP或域名，如：192.168.1.1" />
+                                </div>
+                                <span class="field-hint" v-if="modalMode === 'add'">添加资源时必须输入资源URL（IP地址或域名）</span>
+                                <span class="field-error-text" v-if="formErrors.url">{{ formErrors.url }}</span>
+                            </div>
                         </div>
-                        <div class="form-field form-field-full">
-                            <label>资源是否可用</label>
-                            <select v-model="formData.available" class="field-input field-select">
-                                <option :value="true">可用</option>
-                                <option :value="false">不可用</option>
-                            </select>
+                        <div class="form-field-group">
+                            <div class="form-field">
+                                <label>资源状态</label>
+                                <div class="toggle-wrapper">
+                                    <div class="toggle-switch" :class="{ active: formData.available }" @click="formData.available = !formData.available">
+                                        <div class="toggle-knob"></div>
+                                    </div>
+                                    <span class="toggle-label" :class="formData.available ? 'label-active' : 'label-inactive'">
+                                        {{ formData.available ? '可用' : '不可用' }}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn-modal btn-modal-ghost" @click="closeModal">取消</button>
-                    <button type="button" class="btn-modal btn-modal-primary" @click="handleSubmit">{{ modalMode === 'add' ? '确定添加' : '保存修改' }}</button>
+                    <button type="button" class="btn-modal btn-modal-ghost" @click="closeModal">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                        取消
+                    </button>
+                    <button type="button" class="btn-modal btn-modal-primary" @click="handleSubmit">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        {{ modalMode === 'add' ? '确定添加' : '保存修改' }}
+                    </button>
                 </div>
             </div>
         </div>
@@ -603,49 +643,73 @@ const handleSubmit = () => {
 
 .add-resource-modal {
     width: 100%;
-    max-width: 520px;
+    max-width: 480px;
     background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    border-radius: 20px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.04);
     overflow: hidden;
+    animation: modal-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modal-in {
+    from { opacity: 0; transform: scale(0.9) translateY(12px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .modal-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     gap: 16px;
-    padding: 22px 24px 18px;
+    padding: 24px 28px 20px;
     background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid #f1f5f9;
 }
 
 .modal-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 14px;
     min-width: 0;
 }
 
-.modal-title-accent {
-    display: block;
-    width: 36px;
-    height: 4px;
-    border-radius: 2px;
-    background: linear-gradient(90deg, #409eff, #66b1ff);
-    margin-bottom: 10px;
+.modal-icon-wrap {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s;
+}
+
+.modal-icon-wrap.icon-add {
+    background: linear-gradient(135deg, #e0f2fe, #dbeafe);
+    color: #3b82f6;
+}
+
+.modal-icon-wrap.icon-edit {
+    background: linear-gradient(135deg, #fef3c7, #fef9c3);
+    color: #f59e0b;
+}
+
+.modal-title-text {
+    min-width: 0;
 }
 
 .modal-title {
     margin: 0;
     font-size: 18px;
-    font-weight: 600;
+    font-weight: 700;
     color: #0f172a;
     letter-spacing: -0.02em;
 }
 
 .modal-subtitle {
-    margin: 6px 0 0;
+    margin: 4px 0 0;
     font-size: 13px;
-    color: #64748b;
-    line-height: 1.45;
+    color: #94a3b8;
 }
 
 .modal-close {
@@ -669,29 +733,37 @@ const handleSubmit = () => {
 }
 
 .modal-body {
-    padding: 20px 24px 8px;
+    padding: 24px 28px 8px;
 }
 
-.form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px 20px;
+.form-card {
+    background: linear-gradient(180deg, #fafbfc 0%, #fff 100%);
+    border: 1px solid #f1f5f9;
+    border-radius: 16px;
+    padding: 20px;
+}
+
+.form-field-group {
+    padding: 0 0 4px;
+}
+
+.form-field-group + .form-field-group {
+    border-top: 1px solid #f1f5f9;
+    padding-top: 16px;
+    margin-top: 12px;
 }
 
 .form-field {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-}
-
-.form-field-full {
-    grid-column: 1 / -1;
+    gap: 8px;
 }
 
 .form-field label {
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     color: #475569;
+    letter-spacing: 0.01em;
 }
 
 .form-field label .required {
@@ -699,11 +771,24 @@ const handleSubmit = () => {
     margin-left: 2px;
 }
 
+.input-wrapper {
+    position: relative;
+}
+
+.input-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    pointer-events: none;
+}
+
 .field-input {
     width: 100%;
-    padding: 10px 14px;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
+    padding: 11px 14px 11px 40px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
     font-size: 14px;
     color: #0f172a;
     background: #fff;
@@ -736,39 +821,79 @@ const handleSubmit = () => {
     color: #94a3b8;
 }
 
-.field-select {
-    cursor: pointer;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    padding-right: 36px;
+.toggle-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
+
+.toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.25s;
+}
+
+.toggle-switch.active {
+    background: linear-gradient(90deg, #409eff, #66b1ff);
+}
+
+.toggle-knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.toggle-switch.active .toggle-knob {
+    transform: translateX(20px);
+}
+
+.toggle-label {
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.label-active { color: #409eff; }
+.label-inactive { color: #94a3b8; }
 
 .modal-footer {
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    gap: 12px;
-    padding: 16px 24px 20px;
-    background: #f8fafc;
-    border-top: 1px solid #e2e8f0;
+    gap: 10px;
+    padding: 18px 28px 24px;
+    background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+    border-top: 1px solid #f1f5f9;
 }
 
 .btn-modal {
-    min-width: 96px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 108px;
     padding: 10px 20px;
-    border-radius: 10px;
+    border-radius: 12px;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
+    transition: all 0.2s;
 }
 
 .btn-modal-ghost {
-    border: 1px solid #e2e8f0;
+    border: 1.5px solid #e2e8f0;
     background: #fff;
-    color: #475569;
+    color: #64748b;
 }
 
 .btn-modal-ghost:hover {
@@ -779,14 +904,15 @@ const handleSubmit = () => {
 
 .btn-modal-primary {
     border: none;
-    background: linear-gradient(180deg, #409eff 0%, #3a8ee6 100%);
+    background: linear-gradient(135deg, #409eff 0%, #3a8ee6 100%);
     color: #fff;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 4px 14px rgba(64, 158, 255, 0.35);
 }
 
 .btn-modal-primary:hover {
-    background: linear-gradient(180deg, #66b1ff 0%, #409eff 100%);
-    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.35);
+    background: linear-gradient(135deg, #66b1ff 0%, #409eff 100%);
+    box-shadow: 0 6px 20px rgba(64, 158, 255, 0.45);
+    transform: translateY(-1px);
 }
 
 .btn-modal-danger {
@@ -880,8 +1006,21 @@ const handleSubmit = () => {
 }
 
 @media (max-width: 540px) {
-    .form-grid {
-        grid-template-columns: 1fr;
+    .add-resource-modal {
+        max-width: 100%;
+        border-radius: 16px;
+    }
+
+    .modal-header {
+        padding: 20px 20px 16px;
+    }
+
+    .modal-body {
+        padding: 16px 20px 8px;
+    }
+
+    .modal-footer {
+        padding: 16px 20px 20px;
     }
 }
 </style>
