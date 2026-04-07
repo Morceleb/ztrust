@@ -2,8 +2,9 @@
     <div class="settings-page">
         <header class="page-header">
             <button type="button" class="back-btn" @click="handleBack" aria-label="返回">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7" />
                 </svg>
             </button>
             <h1 class="page-title">设置</h1>
@@ -47,22 +48,12 @@
                     <h2 class="modal-title">接入设置</h2>
                     <div class="modal-form">
                         <div class="form-group">
-                            <input
-                                v-model="accessAddressInput"
-                                type="text"
-                                class="form-input"
-                                placeholder="请输入接入地址"
-                            />
+                            <input v-model="accessAddressInput" type="text" class="form-input" placeholder="请输入接入地址" />
                             <span class="input-icon dropdown-icon">▼</span>
                             <span class="input-icon shield-icon">🛡</span>
                         </div>
                         <div class="form-group">
-                            <input
-                                v-model="securityCode"
-                                type="password"
-                                class="form-input"
-                                placeholder="请输入安全码"
-                            />
+                            <input v-model="securityCode" type="password" class="form-input" placeholder="请输入安全码" />
                             <span class="input-icon info-icon">ⓘ</span>
                         </div>
                         <button type="button" class="confirm-btn" @click="handleConfirmAccess">
@@ -80,7 +71,7 @@ import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const accessAddress = ref('https://vpn.seu.edu.cn')
+const accessAddress = ref(localStorage.getItem('companyAddress') || 'https://vpn.seu.edu.cn')
 const autoStart = ref(true)
 const version = ref('V2.4.10.30')
 const versionTip = ref('当前已为最新版本')
@@ -139,6 +130,7 @@ const handleBack = () => {
     border-radius: 8px;
     transition: background 0.2s, color 0.2s;
 }
+
 .back-btn:hover {
     background: #f1f5f9;
     color: #1e293b;
@@ -154,6 +146,7 @@ const handleBack = () => {
 .settings-page .settings-section {
     padding: 0 24px 32px;
 }
+
 .settings-section:first-of-type {
     padding-top: 24px;
 }

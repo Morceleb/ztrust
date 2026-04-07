@@ -89,7 +89,7 @@ const handleCardClick = (item) => {
 
 // 直接访问（GET）
 const directAccess = (resourceId) => {
-    window.open(`/api/auth/access/${resourceId}`, '_blank')
+    window.open(`${localStorage.getItem('companyAddress')}/auth/access/${resourceId}`, '_blank')
 }
 
 // 关闭模态框
@@ -121,9 +121,9 @@ const submitPost = async () => {
     try {
         // 使用封装后的 request（axios）
         const response = await request.post(`/auth/access/${resourceId}`, body)
-
+        console.log('请求成功：', response.data)
         // 成功后打开新页面
-        window.open(`/api/auth/access/${resourceId}`, '_blank')
+        window.open(`${localStorage.getItem('companyAddress')}/auth/access/${resourceId}`, '_blank')
 
     } catch (error) {
         const status = error.response?.status || '未知'

@@ -21,7 +21,7 @@ onMounted(() => {
 
 
 
-  start(10000);
+  // start(10000);
 });
 
 

@@ -1,11 +1,8 @@
 <template>
-    <div
-        class="layout-container"
-        :class="{
-            'workbench-collapsed': !isExpanded || $route.path === '/settings' || $route.path === '/personal_info' || $route.path === '/terminal_management' || $route.path === '/apply_permission',
-            'main-tight': $route.path === '/personal_info' || $route.path === '/terminal_management' || $route.path === '/apply_permission'
-        }"
-    >
+    <div class="layout-container" :class="{
+        'workbench-collapsed': !isExpanded || $route.path === '/settings' || $route.path === '/personal_info' || $route.path === '/terminal_management' || $route.path === '/apply_permission',
+        'main-tight': $route.path === '/personal_info' || $route.path === '/terminal_management' || $route.path === '/apply_permission'
+    }">
         <aside class="sidebar">
             <div class="logo">
                 <div class="logo-icon-bg">
@@ -21,19 +18,25 @@
                 <ul>
                     <li class="nav-item" :class="{ active: $route.path === '/' }">
                         <router-link to="/" class="nav-link">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-                                <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="7" />
+                                <rect x="14" y="3" width="7" height="7" />
+                                <rect x="14" y="14" width="7" height="7" />
+                                <rect x="3" y="14" width="7" height="7" />
                             </svg>
                             <span>工作台</span>
                         </router-link>
                     </li>
                     <li class="nav-item" :class="{ active: $route.path === '/settings' }">
                         <router-link to="/settings" class="nav-link">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3" />
+                                <path
+                                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                             </svg>
                             <span>设置</span>
                         </router-link>
@@ -43,21 +46,14 @@
 
             <!-- 下载客户端：仅图标居中，悬停显示「下载客户端」 -->
             <div class="sidebar-bottom">
-                <div
-                    class="download-client-wrapper"
-                    @mouseenter="showDownloadTooltip = true"
-                    @mouseleave="showDownloadTooltip = false"
-                >
-                    <button
-                        type="button"
-                        class="download-client-btn"
-                        title="下载客户端"
-                        @click="handleDownloadClient"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
+                <div class="download-client-wrapper" @mouseenter="showDownloadTooltip = true"
+                    @mouseleave="showDownloadTooltip = false">
+                    <button type="button" class="download-client-btn" title="下载客户端" @click="handleDownloadClient">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
                         </svg>
                     </button>
                     <Transition name="download-tooltip">
@@ -68,11 +64,7 @@
             </div>
 
             <!-- 当前登录用户信息（悬停显示下拉菜单，后端接入后替换 currentUser 数据源即可） -->
-            <div
-                class="user-profile-wrapper"
-                @mouseenter="showUserMenu = true"
-                @mouseleave="showUserMenu = false"
-            >
+            <div class="user-profile-wrapper" @mouseenter="showUserMenu = true" @mouseleave="showUserMenu = false">
                 <div class="user-profile">
                     <div class="avatar-wrapper" :title="currentUser.name">
                         <span class="avatar-initial">{{ userInitial }}</span>
@@ -88,19 +80,42 @@
                         </div>
                         <div class="user-menu-divider"></div>
                         <div class="user-menu-item" @click="handlePersonalInfo">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                <circle cx="12" cy="7" r="4" />
+                            </svg>
                             <span>个人信息</span>
                         </div>
                         <div class="user-menu-item" @click="handleApplyPermission">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3" />
+                                <path
+                                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                            </svg>
                             <span>申请权限</span>
                         </div>
                         <div class="user-menu-item" @click="handleTerminalManagement">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                                <line x1="8" y1="21" x2="16" y2="21" />
+                                <line x1="12" y1="17" x2="12" y2="21" />
+                            </svg>
                             <span>终端管理</span>
                         </div>
                         <div class="user-menu-item" @click="handleLogout">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                <polyline points="16 17 21 12 16 7" />
+                                <line x1="21" y1="12" x2="9" y2="12" />
+                            </svg>
                             <span>注销登录</span>
                         </div>
                     </div>
@@ -108,26 +123,21 @@
             </div>
         </aside>
 
-        <aside v-if="$route.path !== '/settings' && $route.path !== '/personal_info' && $route.path !== '/terminal_management' && $route.path !== '/apply_permission'" class="workbench" :class="{ collapsed: !isExpanded }">
+        <aside
+            v-if="$route.path !== '/settings' && $route.path !== '/personal_info' && $route.path !== '/terminal_management' && $route.path !== '/apply_permission'"
+            class="workbench" :class="{ collapsed: !isExpanded }">
             <button @click="toggleWorkbench" class="toggle-btn" title="切换侧边栏">
-                <svg 
-                    class="arrow-icon" 
-                    :class="{ 'icon-rotated': !isExpanded }"
-                    xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" 
-                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M15 18l-6-6 6-6"/>
+                <svg class="arrow-icon" :class="{ 'icon-rotated': !isExpanded }" xmlns="http://www.w3.org/2000/svg"
+                    width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 18l-6-6 6-6" />
                 </svg>
             </button>
 
             <div class="workbench-content">
                 <div class="content-header">资源列表</div>
-                <div 
-                    v-for="resource in resources" 
-                    :key="resource.type ?? 'all'" 
-                    class="resource-item" 
-                    :class="{ active: selectedCategory === resource.type }"
-                    @click="selectCategory(resource.type)"
-                >
+                <div v-for="resource in resources" :key="resource.type ?? 'all'" class="resource-item"
+                    :class="{ active: selectedCategory === resource.type }" @click="selectCategory(resource.type)">
                     <span class="dot"></span>
                     <span class="resource-text">{{ resource.name }}</span>
                 </div>
@@ -150,11 +160,12 @@
                     </div>
                     <div class="logout-modal-body">
                         <div class="logout-modal-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
-                                stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"/>
-                                <line x1="12" y1="8" x2="12" y2="12"/>
-                                <line x1="12" y1="16" x2="12.01" y2="16"/>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                                fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="12" y1="8" x2="12" y2="12" />
+                                <line x1="12" y1="16" x2="12.01" y2="16" />
                             </svg>
                         </div>
                         <span class="logout-modal-text">确定注销登录账号?</span>
@@ -172,6 +183,10 @@
 <script setup>
 import { ref, computed, provide } from 'vue'
 import { useRouter } from 'vue-router'
+import request from '@/utils/request'
+import store from '@/store'
+
+
 
 const isExpanded = ref(true)
 const showUserMenu = ref(false)
@@ -192,7 +207,9 @@ const handleLogout = () => {
 
 const confirmLogout = () => {
     showLogoutModal.value = false
-    // 后续接入后端时在此调用登出接口并清理 token
+    request.post('/auth/logout')
+    localStorage.clear()
+    store.dispatch('auth/logout')
     router.push('/login')
 }
 
@@ -246,17 +263,19 @@ const toggleWorkbench = () => {
 
 .sidebar {
     width: 92px;
-    background: #36435b; /* 参考图二：灰蓝侧边栏 */
+    background: #36435b;
+    /* 参考图二：灰蓝侧边栏 */
     color: rgba(248, 250, 252, 0.92);
     display: flex;
     flex-direction: column;
-    z-index: 20; /* 确保层级高于 workbench */
-    box-shadow: 3px 0 10px rgba(0,0,0,0.12);
+    z-index: 20;
+    /* 确保层级高于 workbench */
+    box-shadow: 3px 0 10px rgba(0, 0, 0, 0.12);
 }
 
 .layout-container.workbench-collapsed .sidebar {
-    
-    box-shadow: 2px 0 8px rgba(0,0,0,0.2); 
+
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.2);
 }
 
 .logo {
@@ -307,7 +326,7 @@ const toggleWorkbench = () => {
 }
 
 .nav-item:hover .nav-link {
-    background: rgba(255,255,255,0.08);
+    background: rgba(255, 255, 255, 0.08);
     color: #f1f5f9;
 }
 
@@ -522,12 +541,14 @@ const toggleWorkbench = () => {
 
 
 .workbench {
-    width: 160px; /* 稍微加宽一点，更透气 */
+    width: 160px;
+    /* 稍微加宽一点，更透气 */
     background: #ffffff;
     border-right: none;
     display: flex;
     flex-direction: column;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* 使用贝塞尔曲线使动画更高级 */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* 使用贝塞尔曲线使动画更高级 */
     position: relative;
     z-index: 10;
 }
@@ -545,22 +566,25 @@ const toggleWorkbench = () => {
 /* --- 切换按钮美化 --- */
 .toggle-btn {
     position: absolute;
-    left: 100%; /* 紧贴右侧 */
-    top: 50%; /* 垂直居中 */
-    transform: translateY(-50%) translateX(-50%); /* 初始状态：压在边线上 */
-    
+    left: 100%;
+    /* 紧贴右侧 */
+    top: 50%;
+    /* 垂直居中 */
+    transform: translateY(-50%) translateX(-50%);
+    /* 初始状态：压在边线上 */
+
     /* 尺寸与形状 */
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    
+
     /* 颜色与边框 */
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    
+
     /* 阴影让其浮起来 */
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-    
+
     /* 交互设置 */
     cursor: pointer;
     display: flex;
@@ -569,7 +593,7 @@ const toggleWorkbench = () => {
     color: #64748b;
     z-index: 50;
     transition: all 0.3s ease;
-    
+
     /* 移除默认按钮样式 */
     padding: 0;
     outline: none;
@@ -578,7 +602,8 @@ const toggleWorkbench = () => {
 /* 按钮悬浮态 */
 .toggle-btn:hover {
     background: #f8fafc;
-    color: #3b82f6; /* 悬浮变为品牌色 */
+    color: #3b82f6;
+    /* 悬浮变为品牌色 */
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
     transform: translateY(-50%) translateX(-50%) scale(1.1);
 }
@@ -595,17 +620,19 @@ const toggleWorkbench = () => {
 
 
 .workbench.collapsed .toggle-btn {
-    
-    box-shadow: 2px 0 6px rgba(0,0,0,0.1);
+
+    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
 }
 
 /* --- 内容区域 --- */
 .workbench-content {
     flex: 1;
     padding: 16px 8px;
-    transition: opacity 0.2s; /* 内容淡入淡出 */
+    transition: opacity 0.2s;
+    /* 内容淡入淡出 */
     opacity: 1;
-    width: 160px; /* 强制宽度，防止折叠时文字换行导致的跳动 */
+    width: 160px;
+    /* 强制宽度，防止折叠时文字换行导致的跳动 */
 }
 
 /* 资源列表：与图三一致，标题中灰常规字重，列表项常规字重，选中项深蓝加粗 */
@@ -664,11 +691,13 @@ const toggleWorkbench = () => {
 
 .main-content {
     flex: 1;
-    background: #f1f5f9; 
+    background: #f1f5f9;
     position: relative;
     overflow: visible;
-    padding: 0 16px 0 16px; /* 左右留白一致，模仿图二 */
-    border-top: none; /* 去除资源列表顶部线条 */
+    padding: 0 16px 0 16px;
+    /* 左右留白一致，模仿图二 */
+    border-top: none;
+    /* 去除资源列表顶部线条 */
 }
 
 .layout-container.main-tight .main-content {
