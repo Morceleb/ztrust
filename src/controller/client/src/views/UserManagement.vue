@@ -11,15 +11,6 @@
                     </svg>
                 </button>
             </div>
-            <div class="toolbar-actions">
-                <button class="btn btn-primary" @click="handleAdd">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="5" x2="12" y2="19"/>
-                        <line x1="5" y1="12" x2="19" y2="12"/>
-                    </svg>
-                    添加用户
-                </button>
-            </div>
         </div>
 
         <!-- 数据表格 -->
@@ -104,56 +95,6 @@
             </div>
         </div>
 
-        <!-- 添加用户弹窗 -->
-        <div class="modal-overlay" v-if="showModal" @click.self="closeModal">
-            <div class="add-user-modal" @click.stop>
-                <div class="modal-header">
-                    <div class="modal-title-wrap">
-                        <span class="modal-title-accent"></span>
-                        <h3 class="modal-title">添加用户</h3>
-                        <p class="modal-subtitle">填写账号信息，系统默认头像由用户后续自行设置</p>
-                    </div>
-                    <button type="button" class="modal-close" @click="closeModal" aria-label="关闭">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 6L6 18M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-grid">
-                        <div class="form-field">
-                            <label>用户名 <span class="required">*</span></label>
-                            <input type="text" v-model="formData.username" class="field-input" placeholder="请输入用户名" autocomplete="off" />
-                        </div>
-                        <div class="form-field">
-                            <label>密码 <span class="required">*</span></label>
-                            <input type="password" v-model="formData.password" class="field-input" placeholder="请输入密码" autocomplete="new-password" />
-                        </div>
-                        <div class="form-field">
-                            <label>邮箱</label>
-                            <input type="email" v-model="formData.email" class="field-input" placeholder="name@example.com" />
-                        </div>
-                        <div class="form-field">
-                            <label>手机</label>
-                            <input type="text" v-model="formData.phone" class="field-input" placeholder="11 位手机号" />
-                        </div>
-                        <div class="form-field form-field-full">
-                            <label>状态</label>
-                            <select v-model="formData.status" class="field-input field-select">
-                                <option value="active">正常</option>
-                                <option value="frozen">冻结</option>
-                                <option value="deleted">已删除</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn-modal btn-modal-ghost" @click="closeModal">取消</button>
-                    <button type="button" class="btn-modal btn-modal-primary" @click="handleSubmit">确定添加</button>
-                </div>
-            </div>
-        </div>
-
         <!-- 发放/更新成功：展示安全码 -->
         <div class="modal-overlay" v-if="showTokenModal" @click.self="showTokenModal = false">
             <div class="token-modal" @click.stop>
@@ -187,17 +128,20 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { issueSpaToken, disableSpaToken, enableSpaToken } from '@/api/spaAdmin.js'
+import { ref, computed, onMounted } from 'vue'
+import { listUsers, issueSpaToken as apiIssue, disableSpaToken as apiDisable, enableSpaToken as apiEnable } from '@/api/user.js'
 
+const loading = ref(false)
 const searchKeyword = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
-const showModal = ref(false)
+const totalCount = ref(0)
+
 const showTokenModal = ref(false)
 const lastTokenHex = ref('')
 const toastMessage = ref('')
 const loadingSpaUserId = ref(null)
+const users = ref([])
 
 let toastTimer = null
 function showToast(msg, ms = 3200) {
@@ -206,69 +150,33 @@ function showToast(msg, ms = 3200) {
     toastTimer = setTimeout(() => { toastMessage.value = '' }, ms)
 }
 
-const users = ref([
-    { id: 1, username: 'admin', password: '******', email: 'admin@company.com', phone: '13800138000', avatar: '', status: 'active', created_at: '2026-01-01 10:00:00', updated_at: '2026-01-01 10:00:00', spaStatus: 'none' },
-    { id: 2, username: 'zhangsan', password: '******', email: 'zhangsan@company.com', phone: '13800138001', avatar: '', status: 'active', created_at: '2026-02-15 14:30:00', updated_at: '2026-02-15 14:30:00', spaStatus: 'none' },
-    { id: 3, username: 'lisi', password: '******', email: 'lisi@company.com', phone: '13800138002', avatar: '', status: 'frozen', created_at: '2026-03-01 09:00:00', updated_at: '2026-03-10 16:00:00', spaStatus: 'none' }
-])
-
-const formData = ref({
-    username: '',
-    password: '',
-    email: '',
-    phone: '',
-    avatar: '',
-    status: 'active'
-})
-
-const statusText = (status) => {
-    const map = { active: '正常', frozen: '冻结', deleted: '已删除' }
-    return map[status] || status
+async function fetchUsers() {
+    loading.value = true
+    try {
+        const res = await listUsers({ page: currentPage.value, pageSize: pageSize.value, keyword: searchKeyword.value || undefined })
+        if (res.code === 200 && res.data) {
+            // 标准结构：{ code: 200, data: { list: [...], total: N } }
+            users.value = Array.isArray(res.data.list) ? res.data.list : (Array.isArray(res.data) ? res.data : [])
+            totalCount.value = res.data.total || users.value.length
+        } else if (Array.isArray(res)) {
+            // 后端直接返回数组：[{...}, {...}]
+            users.value = res
+            totalCount.value = res.length
+        }
+    } catch (e) {
+        showToast(e?.message || '加载用户列表失败')
+    } finally {
+        loading.value = false
+    }
 }
 
-const filteredUsers = computed(() => {
-    if (!searchKeyword.value) return users.value
-    const keyword = searchKeyword.value.toLowerCase()
-    return users.value.filter(user =>
-        user.username.toLowerCase().includes(keyword) ||
-        user.email.toLowerCase().includes(keyword)
-    )
+onMounted(() => {
+    fetchUsers()
 })
-
-const pagedUsers = computed(() => {
-    const list = filteredUsers.value
-    const start = (currentPage.value - 1) * pageSize.value
-    return list.slice(start, start + pageSize.value)
-})
-
-const totalCount = computed(() => filteredUsers.value.length)
-const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) || 1)
 
 const handleSearch = () => {
     currentPage.value = 1
-}
-
-const closeModal = () => {
-    showModal.value = false
-}
-
-const handleAdd = () => {
-    formData.value = { username: '', password: '', email: '', phone: '', avatar: '', status: 'active' }
-    showModal.value = true
-}
-
-const handleSubmit = () => {
-    const now = new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\//g, '-')
-    const newId = Math.max(...users.value.map(u => u.id), 0) + 1
-    users.value.push({
-        ...formData.value,
-        avatar: '',
-        id: newId,
-        created_at: now,
-        updated_at: now,
-        spaStatus: 'none'
-    })
-    closeModal()
+    fetchUsers()
 }
 
 function findUserIndex(id) {
@@ -318,7 +226,7 @@ async function onPrimarySpa(user) {
     loadingSpaUserId.value = user.id
     if (rotate) setUserSpaStatus(user.id, 'updating')
     try {
-        const res = await issueSpaToken(user.id, rotate)
+        const res = await apiIssue(user.id, rotate)
         if (res.code === 200 && typeof res.data === 'string' && res.data) {
             lastTokenHex.value = res.data
             showTokenModal.value = true
@@ -349,7 +257,7 @@ async function onSecondarySpa(user) {
     loadingSpaUserId.value = user.id
     try {
         if (s === 'disabled') {
-            const res = await enableSpaToken(user.id)
+            const res = await apiEnable(user.id)
             if (res.code === 200 && Number(res.data) > 0) {
                 setUserSpaStatus(user.id, 'issued')
                 showToast('安全码已启用')
@@ -357,7 +265,7 @@ async function onSecondarySpa(user) {
                 showToast(res.message || '启用失败')
             }
         } else {
-            const res = await disableSpaToken(user.id)
+            const res = await apiDisable(user.id)
             if (res.code === 200 && Number(res.data) > 0) {
                 setUserSpaStatus(user.id, 'disabled')
                 showToast('安全码已禁用')
@@ -380,6 +288,28 @@ async function copyToken() {
         showToast('复制失败，请手动选择复制')
     }
 }
+
+const statusText = (status) => {
+    const map = { active: '正常', frozen: '冻结', deleted: '已删除' }
+    return map[status] || status
+}
+
+const filteredUsers = computed(() => {
+    if (!searchKeyword.value) return users.value
+    const keyword = searchKeyword.value.toLowerCase()
+    return users.value.filter(user =>
+        (user.username || '').toLowerCase().includes(keyword) ||
+        (user.email || '').toLowerCase().includes(keyword)
+    )
+})
+
+const pagedUsers = computed(() => {
+    const list = filteredUsers.value
+    const start = (currentPage.value - 1) * pageSize.value
+    return list.slice(start, start + pageSize.value)
+})
+
+const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) || 1)
 </script>
 
 <style scoped>
@@ -424,42 +354,6 @@ async function copyToken() {
 
 .search-btn:hover {
     color: #409eff;
-}
-
-.toolbar-actions {
-    display: flex;
-    gap: 12px;
-}
-
-.btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 10px 16px;
-    border: 1px solid #dcdfe6;
-    border-radius: 6px;
-    background: white;
-    color: #606266;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.btn:hover {
-    border-color: #409eff;
-    color: #409eff;
-}
-
-.btn-primary {
-    background: #409eff;
-    border-color: #409eff;
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #66b1ff;
-    border-color: #66b1ff;
-    color: white;
 }
 
 .table-container {
@@ -777,196 +671,5 @@ async function copyToken() {
 .page-num {
     color: #606266;
     font-size: 14px;
-}
-
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.45);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 24px;
-}
-
-.add-user-modal {
-    width: 100%;
-    max-width: 520px;
-    background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
-    overflow: hidden;
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 16px;
-    padding: 22px 24px 18px;
-    background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
-    border-bottom: 1px solid #e2e8f0;
-}
-
-.modal-title-wrap {
-    min-width: 0;
-}
-
-.modal-title-accent {
-    display: block;
-    width: 36px;
-    height: 4px;
-    border-radius: 2px;
-    background: linear-gradient(90deg, #409eff, #66b1ff);
-    margin-bottom: 10px;
-}
-
-.modal-title {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: #0f172a;
-    letter-spacing: -0.02em;
-}
-
-.modal-subtitle {
-    margin: 6px 0 0;
-    font-size: 13px;
-    color: #64748b;
-    line-height: 1.45;
-}
-
-.modal-close {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border: none;
-    border-radius: 10px;
-    background: #f1f5f9;
-    color: #64748b;
-    cursor: pointer;
-    transition: background 0.2s, color 0.2s;
-}
-
-.modal-close:hover {
-    background: #e2e8f0;
-    color: #0f172a;
-}
-
-.modal-body {
-    padding: 20px 24px 8px;
-}
-
-.form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px 20px;
-}
-
-.form-field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.form-field-full {
-    grid-column: 1 / -1;
-}
-
-.form-field label {
-    font-size: 13px;
-    font-weight: 500;
-    color: #475569;
-}
-
-.form-field label .required {
-    color: #f56c6c;
-    margin-left: 2px;
-}
-
-.field-input {
-    width: 100%;
-    padding: 10px 14px;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    font-size: 14px;
-    color: #0f172a;
-    background: #fff;
-    outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
-    box-sizing: border-box;
-}
-
-.field-input::placeholder {
-    color: #94a3b8;
-}
-
-.field-input:focus {
-    border-color: #409eff;
-    box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.12);
-}
-
-.field-select {
-    cursor: pointer;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    padding-right: 36px;
-}
-
-.modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 12px;
-    padding: 16px 24px 20px;
-    background: #f8fafc;
-    border-top: 1px solid #e2e8f0;
-}
-
-.btn-modal {
-    min-width: 96px;
-    padding: 10px 20px;
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
-}
-
-.btn-modal-ghost {
-    border: 1px solid #e2e8f0;
-    background: #fff;
-    color: #475569;
-}
-
-.btn-modal-ghost:hover {
-    border-color: #cbd5e1;
-    background: #f8fafc;
-    color: #0f172a;
-}
-
-.btn-modal-primary {
-    border: none;
-    background: linear-gradient(180deg, #409eff 0%, #3a8ee6 100%);
-    color: #fff;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-}
-
-.btn-modal-primary:hover {
-    background: linear-gradient(180deg, #66b1ff 0%, #409eff 100%);
-    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.35);
-}
-
-@media (max-width: 540px) {
-    .form-grid {
-        grid-template-columns: 1fr;
-    }
 }
 </style>

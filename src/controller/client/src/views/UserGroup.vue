@@ -346,12 +346,19 @@
                 </div>
             </div>
         </div>
+        <!-- 轻提示 -->
+        <div class="toast" v-if="toastMessage">{{ toastMessage }}</div>
     </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import {
+    listRoleGroups, saveRoleGroup, assignUsersToRoleGroup
+} from '@/api/roleGroup.js'
+import { listUsers as apiListUsers } from '@/api/user.js'
 
+const loading = ref(false)
 const searchKeyword = ref('')
 const showAddModal = ref(false)
 const showResourcesModal = ref(false)
@@ -360,6 +367,9 @@ const showDeleteModal = ref(false)
 const deleteTarget = ref(null)
 const resourceSearchKeyword = ref('')
 const memberSearchKeyword = ref('')
+const allUsers = ref([])
+const groups = ref([])
+const roleGroupUsers = ref({})
 
 const levelOptions = [
     { value: 1, label: '1级' },
@@ -367,48 +377,6 @@ const levelOptions = [
     { value: 3, label: '3级' },
     { value: 4, label: '4级' }
 ]
-
-const resourceGroups = ref([
-    { id: 1, name: '核心资源' },
-    { id: 2, name: '普通资源' },
-    { id: 3, name: '公开资源' },
-    { id: 4, name: '受限资源' }
-])
-
-const allUsers = ref([
-    { id: 1, username: 'admin', email: 'admin@company.com' },
-    { id: 2, username: 'zhangsan', email: 'zhangsan@company.com' },
-    { id: 3, username: 'lisi', email: 'lisi@company.com' },
-    { id: 4, username: 'wangwu', email: 'wangwu@company.com' }
-])
-
-const groups = ref([
-    {
-        id: 1,
-        name: '管理员',
-        resourceGroups: ['核心资源', '普通资源', '公开资源', '受限资源'],
-        members: [
-            { userId: 1, username: 'admin', level: 4 }
-        ]
-    },
-    {
-        id: 2,
-        name: '运维人员',
-        resourceGroups: ['核心资源', '普通资源'],
-        members: [
-            { userId: 2, username: 'zhangsan', level: 3 },
-            { userId: 3, username: 'lisi', level: 2 }
-        ]
-    },
-    {
-        id: 3,
-        name: '普通用户',
-        resourceGroups: ['公开资源'],
-        members: [
-            { userId: 4, username: 'wangwu', level: 1 }
-        ]
-    }
-])
 
 const emptyForm = () => ({
     id: undefined,
@@ -422,9 +390,54 @@ const emptyForm = () => ({
 
 const formData = ref(emptyForm())
 
+let toastTimer = null
+const toastMessage = ref('')
+function showToast(msg, ms = 3200) {
+    toastMessage.value = msg
+    if (toastTimer) clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => { toastMessage.value = '' }, ms)
+}
+
+onMounted(async () => {
+    await Promise.all([fetchRoleGroups(), fetchAllUsers()])
+})
+
+async function fetchRoleGroups() {
+    loading.value = true
+    try {
+        const res = await listRoleGroups()
+        if (res.code === 200) {
+            // 支持标准结构和直接返回数组
+            groups.value = Array.isArray(res.data) ? res.data : (res.data?.list || [])
+            if (groups.value.length === 0 && Array.isArray(res)) groups.value = res
+        } else if (Array.isArray(res)) {
+            groups.value = res
+        }
+    } catch (e) {
+        showToast('加载角色组列表失败')
+    } finally {
+        loading.value = false
+    }
+}
+
+async function fetchAllUsers() {
+    try {
+        const res = await apiListUsers({ page: 1, pageSize: 1000 })
+        if (res.code === 200) {
+            const list = Array.isArray(res.data?.list) ? res.data.list : (Array.isArray(res.data) ? res.data : [])
+            if (list.length === 0 && Array.isArray(res)) allUsers.value = res.map(u => ({ id: u.id, username: u.username || u.name || '', email: u.email || '' }))
+            else allUsers.value = list.map(u => ({ id: u.id, username: u.username || u.name || '', email: u.email || '' }))
+        } else if (Array.isArray(res)) {
+            allUsers.value = res.map(u => ({ id: u.id, username: u.username || u.name || '', email: u.email || '' }))
+        }
+    } catch (e) {
+        showToast('加载用户列表失败')
+    }
+}
+
 const filteredGroups = computed(() => {
     if (!searchKeyword.value) return groups.value
-    return groups.value.filter(g => g.name.toLowerCase().includes(searchKeyword.value.toLowerCase()))
+    return groups.value.filter(g => (g.name || '').toLowerCase().includes(searchKeyword.value.toLowerCase()))
 })
 
 const availableResourceGroups = computed(() => {
@@ -435,7 +448,7 @@ const availableResourceGroups = computed(() => {
 const filteredAvailableResourceGroups = computed(() => {
     if (!resourceSearchKeyword.value) return availableResourceGroups.value
     return availableResourceGroups.value.filter(rg =>
-        rg.name.toLowerCase().includes(resourceSearchKeyword.value.toLowerCase())
+        (rg.name || '').toLowerCase().includes(resourceSearchKeyword.value.toLowerCase())
     )
 })
 
@@ -446,19 +459,18 @@ const getResourceGroupId = (name) => {
 
 const availableUsersForForm = computed(() => {
     const ids = new Set((formData.value.members || []).map(m => m.userId))
-    return allUsers.value.filter(u => !ids.has(u.id) && u.id !== 1)
+    return allUsers.value.filter(u => !ids.has(u.id))
 })
 
 const filteredAvailableUsers = computed(() => {
     if (!memberSearchKeyword.value) return availableUsersForForm.value
     const keyword = memberSearchKeyword.value.toLowerCase()
     return availableUsersForForm.value.filter(u =>
-        u.username.toLowerCase().includes(keyword) ||
-        (u.email && u.email.toLowerCase().includes(keyword))
+        (u.username || '').toLowerCase().includes(keyword) ||
+        (u.email || '').toLowerCase().includes(keyword)
     )
 })
 
-// 创建角色组
 const handleAdd = () => {
     formData.value = emptyForm()
     showAddModal.value = true
@@ -468,19 +480,37 @@ const closeAddModal = () => {
     showAddModal.value = false
 }
 
-const handleAddSubmit = () => {
+const handleAddSubmit = async () => {
     if (!formData.value.name?.trim()) return
-    const newId = Math.max(...groups.value.map(g => g.id), 0) + 1
-    groups.value.push({
-        id: newId,
-        name: formData.value.name.trim(),
-        resourceGroups: [],
-        members: []
-    })
-    closeAddModal()
+    try {
+        const res = await saveRoleGroup({ name: formData.value.name.trim() })
+        if (res.code === 200) {
+            showToast('角色组创建成功')
+            await fetchRoleGroups()
+            closeAddModal()
+        } else {
+            showToast(res.message || '创建失败')
+        }
+    } catch (e) {
+        showToast(e?.message || '网络错误')
+    }
 }
 
-// 编辑访问资源
+const handleDelete = (group) => {
+    deleteTarget.value = group
+    showDeleteModal.value = true
+}
+
+const cancelDelete = () => {
+    showDeleteModal.value = false
+    deleteTarget.value = null
+}
+
+const confirmDelete = async () => {
+    showToast('删除接口未提供，请联系后端实现')
+    cancelDelete()
+}
+
 const handleEditResources = (group) => {
     formData.value = {
         id: group.id,
@@ -525,14 +555,10 @@ const removeResource = (idx) => {
 }
 
 const handleResourcesSubmit = () => {
-    const idx = groups.value.findIndex(g => g.id === formData.value.id)
-    if (idx !== -1) {
-        groups.value[idx].resourceGroups = [...formData.value.resourceGroups]
-    }
+    showToast('角色组资源绑定请使用「权限配置」页面')
     closeResourcesModal()
 }
 
-// 编辑组成员
 const handleEditMembers = (group) => {
     formData.value = {
         id: group.id,
@@ -577,35 +603,32 @@ const removeMember = (idx) => {
     formData.value.members.splice(idx, 1)
 }
 
-const handleMembersSubmit = () => {
-    const idx = groups.value.findIndex(g => g.id === formData.value.id)
-    if (idx !== -1) {
-        groups.value[idx].members = (formData.value.members || []).map(m => ({
-            userId: m.userId,
-            username: m.username,
-            level: Math.min(4, Math.max(1, Number(m.level) || 1))
-        }))
+const handleMembersSubmit = async () => {
+    if (!formData.value.id) return
+    try {
+        const userIds = (formData.value.members || []).map(m => m.userId)
+        const res = await assignUsersToRoleGroup({
+            role_group_id: formData.value.id,
+            user_ids: userIds
+        })
+        if (res.code === 200) {
+            showToast('组成员保存成功')
+            await fetchRoleGroups()
+            closeMembersModal()
+        } else {
+            showToast(res.message || '保存失败')
+        }
+    } catch (e) {
+        showToast(e?.message || '网络错误')
     }
-    closeMembersModal()
 }
 
-// 删除
-const handleDelete = (group) => {
-    deleteTarget.value = group
-    showDeleteModal.value = true
-}
-
-const cancelDelete = () => {
-    showDeleteModal.value = false
-    deleteTarget.value = null
-}
-
-const confirmDelete = () => {
-    if (deleteTarget.value) {
-        groups.value = groups.value.filter(g => g.id !== deleteTarget.value.id)
-    }
-    cancelDelete()
-}
+const resourceGroups = ref([
+    { id: 1, name: '核心资源' },
+    { id: 2, name: '普通资源' },
+    { id: 3, name: '公开资源' },
+    { id: 4, name: '受限资源' }
+])
 </script>
 
 <style scoped>

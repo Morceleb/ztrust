@@ -243,8 +243,13 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import {
+    listResourceGroups, saveResourceGroup, bindResourcesToGroup
+} from '@/api/resourceGroup.js'
+import { listResources as apiListResources } from '@/api/resource.js'
 
+const loading = ref(false)
 const searchKeyword = ref('')
 const showModal = ref(false)
 const showDeleteModal = ref(false)
@@ -255,50 +260,60 @@ const currentGroup = ref(null)
 const currentMatches = ref([])
 const selectedResourceMap = ref({})
 const poolSearchKeyword = ref('')
-
-const availableResources = ref([
-    { id: 1, name: '公司堡垒机' },
-    { id: 2, name: 'VPN控制台' },
-    { id: 3, name: '财务数据库' },
-    { id: 4, name: '核心服务器' },
-    { id: 5, name: '员工手册' },
-    { id: 6, name: '客户管理系统' }
-])
-
+const availableResources = ref([])
+const groups = ref([])
 const hasModify = ref(false)
-
-const groups = ref([
-    {
-        id: 1,
-        name: '核心资源',
-        matchedResources: [
-            { resourceId: 1, resourceName: '公司堡垒机', effectiveLevel: 4 },
-            { resourceId: 3, resourceName: '财务数据库', effectiveLevel: 4 },
-            { resourceId: 4, resourceName: '核心服务器', effectiveLevel: 3 }
-        ]
-    },
-    {
-        id: 2,
-        name: '普通资源',
-        matchedResources: [
-            { resourceId: 2, resourceName: 'VPN控制台', effectiveLevel: 2 },
-            { resourceId: 6, resourceName: '客户管理系统', effectiveLevel: 2 }
-        ]
-    },
-    {
-        id: 3,
-        name: '公开资源',
-        matchedResources: [
-            { resourceId: 5, resourceName: '员工手册', effectiveLevel: 1 }
-        ]
-    }
-])
 
 const formData = ref({ name: '' })
 
+let toastTimer = null
+const toastMessage = ref('')
+function showToast(msg, ms = 3200) {
+    toastMessage.value = msg
+    if (toastTimer) clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => { toastMessage.value = '' }, ms)
+}
+
+onMounted(async () => {
+    await Promise.all([fetchGroups(), fetchAllResources()])
+})
+
+async function fetchGroups() {
+    loading.value = true
+    try {
+        const res = await listResourceGroups()
+        if (res.code === 200) {
+            // 支持标准结构和直接返回数组
+            groups.value = Array.isArray(res.data) ? res.data : (res.data?.list || [])
+            if (groups.value.length === 0 && Array.isArray(res)) groups.value = res
+        } else if (Array.isArray(res)) {
+            groups.value = res
+        }
+    } catch (e) {
+        showToast('加载资源组列表失败')
+    } finally {
+        loading.value = false
+    }
+}
+
+async function fetchAllResources() {
+    try {
+        const res = await apiListResources({ page: 1, pageSize: 1000 })
+        if (res.code === 200) {
+            const list = Array.isArray(res.data?.list) ? res.data.list : (Array.isArray(res.data) ? res.data : [])
+            if (list.length === 0 && Array.isArray(res)) availableResources.value = res.map(r => ({ id: r.id, name: r.name || '' }))
+            else availableResources.value = list.map(r => ({ id: r.id, name: r.name || '' }))
+        } else if (Array.isArray(res)) {
+            availableResources.value = res.map(r => ({ id: r.id, name: r.name || '' }))
+        }
+    } catch (e) {
+        showToast('加载资源列表失败')
+    }
+}
+
 const filteredGroups = computed(() => {
     if (!searchKeyword.value) return groups.value
-    return groups.value.filter(g => g.name.toLowerCase().includes(searchKeyword.value.toLowerCase()))
+    return groups.value.filter(g => (g.name || '').toLowerCase().includes(searchKeyword.value.toLowerCase()))
 })
 
 // 可添加的资源池（排除已在此组中的）
@@ -311,7 +326,7 @@ const availablePoolResources = computed(() => {
 const filteredPoolResources = computed(() => {
     if (!poolSearchKeyword.value) return availablePoolResources.value
     return availablePoolResources.value.filter(res =>
-        res.name.toLowerCase().includes(poolSearchKeyword.value.toLowerCase())
+        (res.name || '').toLowerCase().includes(poolSearchKeyword.value.toLowerCase())
     )
 })
 
@@ -335,18 +350,25 @@ const cancelDelete = () => {
     deleteTarget.value = null
 }
 
-const confirmDelete = () => {
-    if (deleteTarget.value) {
-        groups.value = groups.value.filter(g => g.id !== deleteTarget.value.id)
-    }
+const confirmDelete = async () => {
+    showToast('删除接口未提供，请联系后端实现')
     cancelDelete()
 }
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
     if (!formData.value.name || !formData.value.name.trim()) return
-    const newId = Math.max(...groups.value.map(g => g.id), 0) + 1
-    groups.value.push({ id: newId, name: formData.value.name.trim(), matchedResources: [] })
-    showModal.value = false
+    try {
+        const res = await saveResourceGroup({ name: formData.value.name.trim() })
+        if (res.code === 200) {
+            showToast('资源组创建成功')
+            await fetchGroups()
+            showModal.value = false
+        } else {
+            showToast(res.message || '创建失败')
+        }
+    } catch (e) {
+        showToast(e?.message || '网络错误')
+    }
 }
 
 const openAddResourceModal = (group) => {
@@ -409,16 +431,12 @@ const removeResourceFromGroup = (idx) => {
     hasModify.value = true
 }
 
-const updateLevel = (match) => {
-    hasModify.value = true
-}
-
 const markAsModified = () => {
     hasModify.value = true
 }
 
-const saveManageChanges = () => {
-    saveGroupResources()
+const saveManageChanges = async () => {
+    await saveGroupResources()
     hasModify.value = false
     showManageResourceModal.value = false
 }
@@ -433,11 +451,24 @@ const handleCancelManage = () => {
     }
 }
 
-const saveGroupResources = () => {
+const saveGroupResources = async () => {
     if (!currentGroup.value) return
-    const idx = groups.value.findIndex(g => g.id === currentGroup.value.id)
-    if (idx !== -1) {
-        groups.value[idx].matchedResources = [...currentMatches.value]
+    try {
+        const res = await bindResourcesToGroup({
+            resource_group_id: currentGroup.value.id,
+            resources: currentMatches.value.map(m => ({
+                resource_id: m.resourceId,
+                important_level: m.effectiveLevel
+            }))
+        })
+        if (res.code === 200) {
+            showToast('资源组资源保存成功')
+            await fetchGroups()
+        } else {
+            showToast(res.message || '保存失败')
+        }
+    } catch (e) {
+        showToast(e?.message || '网络错误')
     }
 }
 </script>
