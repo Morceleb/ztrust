@@ -1,5 +1,7 @@
 <template>
     <div class="resource-group-page">
+        <!-- Toast 提示 -->
+        <div class="toast" v-if="toastMessage">{{ toastMessage }}</div>
         <div class="toolbar">
             <div class="search-box">
                 <input type="text" v-model="searchKeyword" placeholder="搜索资源组..." class="search-input" />
@@ -25,6 +27,7 @@
                         <div class="group-desc">ID: {{ group.id }}</div>
                     </div>
                     <div class="group-actions">
+                        <button class="action-btn edit" @click="handleEdit(group)">编辑</button>
                         <button class="action-btn add-res" @click="openAddResourceModal(group)">添加资源</button>
                         <button class="action-btn manage" @click="openManageResourceModal(group)">管理资源</button>
                         <button class="action-btn delete" @click="handleDelete(group)">删除</button>
@@ -50,11 +53,11 @@
             </div>
         </div>
 
-        <!-- 创建资源组弹窗 -->
+        <!-- 创建/编辑资源组弹窗 -->
         <div class="modal-overlay" v-if="showModal" @click.self="showModal = false">
             <div class="modal">
                 <div class="modal-header">
-                    <h3>创建资源组</h3>
+                    <h3>{{ editingGroup ? '编辑资源组' : '创建资源组' }}</h3>
                     <button class="modal-close" @click="showModal = false">&times;</button>
                 </div>
                 <div class="modal-body">
@@ -245,7 +248,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import {
-    listResourceGroups, saveResourceGroup, bindResourcesToGroup
+    listResourceGroups, saveResourceGroup, bindResourcesToGroup, deleteResourceGroup
 } from '@/api/resourceGroup.js'
 import { listResources as apiListResources } from '@/api/resource.js'
 
@@ -263,6 +266,7 @@ const poolSearchKeyword = ref('')
 const availableResources = ref([])
 const groups = ref([])
 const hasModify = ref(false)
+const editingGroup = ref(null)
 
 const formData = ref({ name: '' })
 
@@ -284,10 +288,21 @@ async function fetchGroups() {
         const res = await listResourceGroups()
         if (res.code === 200) {
             // 支持标准结构和直接返回数组
-            groups.value = Array.isArray(res.data) ? res.data : (res.data?.list || [])
-            if (groups.value.length === 0 && Array.isArray(res)) groups.value = res
+            const list = Array.isArray(res.data) ? res.data : (res.data?.list || [])
+            if (list.length === 0 && Array.isArray(res)) {
+                groups.value = res
+            } else {
+                // 为每个组添加 matchedResources 字段，避免模板中访问 undefined
+                groups.value = list.map(g => ({
+                    ...g,
+                    matchedResources: Array.isArray(g.matchedResources) ? g.matchedResources : []
+                }))
+            }
         } else if (Array.isArray(res)) {
-            groups.value = res
+            groups.value = res.map(g => ({
+                ...g,
+                matchedResources: Array.isArray(g.matchedResources) ? g.matchedResources : []
+            }))
         }
     } catch (e) {
         showToast('加载资源组列表失败')
@@ -336,7 +351,14 @@ const levelText = (level) => {
 }
 
 const handleAdd = () => {
+    editingGroup.value = null
     formData.value = { name: '' }
+    showModal.value = true
+}
+
+const handleEdit = (group) => {
+    editingGroup.value = group
+    formData.value = { name: group.name }
     showModal.value = true
 }
 
@@ -351,20 +373,37 @@ const cancelDelete = () => {
 }
 
 const confirmDelete = async () => {
-    showToast('删除接口未提供，请联系后端实现')
+    if (!deleteTarget.value) {
+        cancelDelete()
+        return
+    }
+    try {
+        const res = await deleteResourceGroup(deleteTarget.value.id)
+        if (res.code === 200) {
+            showToast('资源组删除成功')
+            await fetchGroups()
+        } else {
+            showToast(res.message || '删除失败')
+        }
+    } catch (e) {
+        showToast(e?.message || '网络错误')
+    }
     cancelDelete()
 }
 
 const handleSubmit = async () => {
     if (!formData.value.name || !formData.value.name.trim()) return
     try {
-        const res = await saveResourceGroup({ name: formData.value.name.trim() })
+        const data = editingGroup.value
+            ? { id: editingGroup.value.id, name: formData.value.name.trim() }
+            : { name: formData.value.name.trim() }
+        const res = await saveResourceGroup(data)
         if (res.code === 200) {
-            showToast('资源组创建成功')
+            showToast(editingGroup.value ? '资源组更新成功' : '资源组创建成功')
             await fetchGroups()
             showModal.value = false
         } else {
-            showToast(res.message || '创建失败')
+            showToast(res.message || '操作失败')
         }
     } catch (e) {
         showToast(e?.message || '网络错误')
@@ -453,14 +492,13 @@ const handleCancelManage = () => {
 
 const saveGroupResources = async () => {
     if (!currentGroup.value) return
+    const payload = {
+        group_id: currentGroup.value.id,
+        resources: currentMatches.value.map(m => m.resourceId)
+    }
+    console.log('发送数据:', JSON.stringify(payload, null, 2))
     try {
-        const res = await bindResourcesToGroup({
-            resource_group_id: currentGroup.value.id,
-            resources: currentMatches.value.map(m => ({
-                resource_id: m.resourceId,
-                important_level: m.effectiveLevel
-            }))
-        })
+        const res = await bindResourcesToGroup(payload)
         if (res.code === 200) {
             showToast('资源组资源保存成功')
             await fetchGroups()
@@ -1272,5 +1310,22 @@ const saveGroupResources = async () => {
 .btn-modal-danger:hover {
     background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
     box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+}
+
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: 32px;
+    transform: translateX(-50%);
+    z-index: 1100;
+    padding: 10px 18px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.92);
+    color: #fff;
+    font-size: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    pointer-events: none;
+    max-width: min(90vw, 420px);
+    text-align: center;
 }
 </style>

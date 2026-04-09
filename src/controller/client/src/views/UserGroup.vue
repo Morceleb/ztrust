@@ -48,9 +48,9 @@
                     </div>
                 </div>
                 <div class="group-resources">
-                    <div class="resource-title">可访问资源组 ({{ group.resourceGroups.length }})</div>
+                    <div class="resource-title">可访问资源组 ({{ (group.resourceGroups || []).length }})</div>
                     <div class="resource-tags">
-                        <span class="resource-tag" v-for="rg in group.resourceGroups" :key="rg">{{ rg }}</span>
+                        <span class="resource-tag" v-for="(rg, idx) in (group.resourceGroups || [])" :key="idx">{{ rg }}</span>
                     </div>
                 </div>
                 <div class="group-members-preview">
@@ -406,15 +406,15 @@ async function fetchRoleGroups() {
     loading.value = true
     try {
         const res = await listRoleGroups()
+        console.log('角色组数据:', res)
         if (res.code === 200) {
-            // 支持标准结构和直接返回数组
             groups.value = Array.isArray(res.data) ? res.data : (res.data?.list || [])
-            if (groups.value.length === 0 && Array.isArray(res)) groups.value = res
         } else if (Array.isArray(res)) {
             groups.value = res
         }
     } catch (e) {
         showToast('加载角色组列表失败')
+        console.error('加载角色组失败:', e)
     } finally {
         loading.value = false
     }

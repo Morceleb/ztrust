@@ -31,3 +31,12 @@ export async function bindResourcesToGroup(data) {
     return normalizeError(err)
   }
 }
+
+export async function deleteResourceGroup(id) {
+  try {
+    const res = await apiClient.delete(`/policy/admin/resource-group/delete/${id}`)
+    return res.data
+  } catch (err) {
+    return normalizeError(err)
+  }
+}
