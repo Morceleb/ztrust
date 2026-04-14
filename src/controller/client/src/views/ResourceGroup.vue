@@ -24,24 +24,46 @@
                     </div>
                     <div class="group-info">
                         <div class="group-name">{{ group.name }}</div>
-                        <div class="group-desc">ID: {{ group.id }}</div>
-                    </div>
-                    <div class="group-actions">
-                        <button class="action-btn edit" @click="handleEdit(group)">编辑</button>
-                        <button class="action-btn add-res" @click="openAddResourceModal(group)">添加资源</button>
-                        <button class="action-btn manage" @click="openManageResourceModal(group)">管理资源</button>
-                        <button class="action-btn delete" @click="handleDelete(group)">删除</button>
+                        <div class="group-name-actions">
+                            <button class="action-btn edit" @click="handleEdit(group)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                                编辑
+                            </button>
+                            <button class="action-btn add-res" @click="openAddResourceModal(group)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                添加资源
+                            </button>
+                            <button class="action-btn manage" @click="openManageResourceModal(group)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                                </svg>
+                                管理资源
+                            </button>
+                            <button class="action-btn delete" @click="handleDelete(group)">删除</button>
+                        </div>
                     </div>
                 </div>
                 <div class="group-resources">
                     <div class="resource-title">包含资源 ({{ group.matchedResources.length }})</div>
-                    <div class="resource-tags">
-                        <span class="resource-tag" v-for="res in group.matchedResources.slice(0, 5)" :key="res.resourceId">
-                            {{ res.resourceName }}
-                            <span class="level-badge">{{ levelText(res.effectiveLevel) }}</span>
-                        </span>
-                        <span class="resource-more" v-if="group.matchedResources.length > 5">+{{ group.matchedResources.length - 5 }}</span>
+                    <div class="resource-card-list" v-if="group.matchedResources.length">
+                        <div class="resource-card" v-for="res in group.matchedResources.slice(0, 8)" :key="res.resourceId">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                            <span class="resource-card-name">{{ res.resourceName }}</span>
+                            <span class="resource-card-level">{{ levelText(res.effectiveLevel) }}</span>
+                        </div>
+                        <div class="resource-more-card" v-if="group.matchedResources.length > 8">
+                            +{{ group.matchedResources.length - 8 }} 更多
+                        </div>
                     </div>
+                    <div class="resource-empty" v-else>暂未添加资源</div>
                 </div>
             </div>
 
@@ -248,7 +270,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import {
-    listResourceGroups, saveResourceGroup, bindResourcesToGroup, deleteResourceGroup
+    listResourceGroups, saveResourceGroup, bindResourcesToGroup, deleteResourceGroup, getResourceGroupDetail
 } from '@/api/resourceGroup.js'
 import { listResources as apiListResources } from '@/api/resource.js'
 
@@ -286,24 +308,44 @@ async function fetchGroups() {
     loading.value = true
     try {
         const res = await listResourceGroups()
+        let groupList = []
         if (res.code === 200) {
             // 支持标准结构和直接返回数组
             const list = Array.isArray(res.data) ? res.data : (res.data?.list || [])
             if (list.length === 0 && Array.isArray(res)) {
-                groups.value = res
+                groupList = res
             } else {
-                // 为每个组添加 matchedResources 字段，避免模板中访问 undefined
-                groups.value = list.map(g => ({
-                    ...g,
-                    matchedResources: Array.isArray(g.matchedResources) ? g.matchedResources : []
-                }))
+                groupList = list
             }
         } else if (Array.isArray(res)) {
-            groups.value = res.map(g => ({
-                ...g,
-                matchedResources: Array.isArray(g.matchedResources) ? g.matchedResources : []
-            }))
+            groupList = res
         }
+        // 为每个资源组获取详情（包含资源列表）
+        const groupsWithDetails = await Promise.all(
+            groupList.map(async (g) => {
+                try {
+                    const detailRes = await getResourceGroupDetail(g.id)
+                    if (detailRes.code === 200 && detailRes.data) {
+                        // 从详情中提取资源列表（接口返回字段为 resourceList）
+                        const matchedResources = Array.isArray(detailRes.data.resourceList)
+                            ? detailRes.data.resourceList.map(r => ({
+                                resourceId: r.id || r.resourceId,
+                                resourceName: r.name || r.resourceName || '',
+                                effectiveLevel: r.importantLevel || 1
+                            }))
+                            : []
+                        return {
+                            ...g,
+                            matchedResources
+                        }
+                    }
+                } catch (e) {
+                    console.error('获取资源组详情失败:', e)
+                }
+                return { ...g, matchedResources: [] }
+            })
+        )
+        groups.value = groupsWithDetails
     } catch (e) {
         showToast('加载资源组列表失败')
     } finally {
@@ -412,15 +454,34 @@ const handleSubmit = async () => {
 
 const openAddResourceModal = (group) => {
     currentGroup.value = group
+    // 直接使用卡片上已加载的资源数据
     currentMatches.value = group.matchedResources ? [...group.matchedResources.map(m => ({ ...m }))] : []
     selectedResourceMap.value = {}
     poolSearchKeyword.value = ''
     showAddResourceModal.value = true
 }
 
-const openManageResourceModal = (group) => {
+const openManageResourceModal = async (group) => {
     currentGroup.value = group
-    currentMatches.value = group.matchedResources ? [...group.matchedResources.map(m => ({ ...m }))] : []
+    // 重新获取资源组详情，确保数据最新
+    try {
+        const detailRes = await getResourceGroupDetail(group.id)
+        if (detailRes.code === 200 && detailRes.data) {
+            // 从详情中提取资源列表（接口返回字段为 resourceList）
+            const matchedResources = Array.isArray(detailRes.data.resourceList)
+                ? detailRes.data.resourceList.map(r => ({
+                    resourceId: r.id || r.resourceId,
+                    resourceName: r.name || r.resourceName || '',
+                    effectiveLevel: r.importantLevel || 1
+                }))
+                : []
+            currentMatches.value = matchedResources
+        } else {
+            currentMatches.value = group.matchedResources ? [...group.matchedResources.map(m => ({ ...m }))] : []
+        }
+    } catch (e) {
+        currentMatches.value = group.matchedResources ? [...group.matchedResources.map(m => ({ ...m }))] : []
+    }
     hasModify.value = false
     showManageResourceModal.value = true
 }
@@ -437,9 +498,7 @@ const toggleResourceSelection = (resourceId) => {
 
 const setResourceLevel = (resourceId, event) => {
     const map = { ...selectedResourceMap.value }
-    if (map[resourceId] !== undefined) {
-        map[resourceId] = Number(event.target.value)
-    }
+    map[resourceId] = Number(event.target.value)
     selectedResourceMap.value = map
 }
 
@@ -493,8 +552,11 @@ const handleCancelManage = () => {
 const saveGroupResources = async () => {
     if (!currentGroup.value) return
     const payload = {
-        group_id: currentGroup.value.id,
-        resources: currentMatches.value.map(m => m.resourceId)
+        groupId: currentGroup.value.id,
+        resources: currentMatches.value.map(m => ({
+            resourceId: m.resourceId,
+            importantLevel: m.effectiveLevel || 1
+        }))
     }
     console.log('发送数据:', JSON.stringify(payload, null, 2))
     try {
@@ -524,27 +586,86 @@ const saveGroupResources = async () => {
 .group-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
 .group-card { background: #fafafa; border-radius: 12px; padding: 20px; border: 1px solid #ebeef5; transition: all 0.3s; }
 .group-card:hover { border-color: #409eff; box-shadow: 0 4px 12px rgba(64, 158, 255, 0.1); }
-.group-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
-.group-icon { width: 48px; height: 48px; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; flex-shrink: 0; }
-.group-info { flex: 1; min-width: 0; }
-.group-name { font-size: 16px; font-weight: 600; color: #303133; margin-bottom: 4px; }
+.group-header {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    column-gap: 12px;
+    row-gap: 12px;
+    align-items: start;
+    margin-bottom: 16px;
+}
+.group-icon {
+    grid-row: 1;
+    grid-column: 1;
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    flex-shrink: 0;
+}
+.group-info {
+    grid-row: 1;
+    grid-column: 2;
+    min-width: 0;
+}
+.group-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #303133;
+    margin-bottom: 8px;
+    line-height: 1.4;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+}
 .group-desc { font-size: 13px; color: #909399; }
+/* 资源组名称右侧的按钮容器，与名称左对齐，一行显示 */
+.group-name-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    justify-content: flex-start;
+    align-items: center;
+}
 .group-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.action-btn { padding: 4px 10px; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; transition: all 0.3s; }
+.action-btn { display: inline-flex; align-items: center; gap: 3px; padding: 4px 8px; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
 .action-btn.edit { background: #e6f7ff; color: #1890ff; }
-.action-btn.edit:hover { background: #bae7ff; }
-.action-btn.add-res { background: #f0f5ff; color: #666ee8; }
-.action-btn.add-res:hover { background: #e0e8ff; }
+.action-btn.edit:hover { background: #1890ff; color: white; }
+.action-btn.add-res { background: #f0f5ff; color: #6666ff; }
+.action-btn.add-res:hover { background: #6666ff; color: white; }
 .action-btn.manage { background: #e6f7ff; color: #409eff; }
-.action-btn.manage:hover { background: #bae7ff; }
+.action-btn.manage:hover { background: #409eff; color: white; }
 .action-btn.delete { background: #fff2f0; color: #f56c6c; }
-.action-btn.delete:hover { background: #ffccc7; }
+.action-btn.delete:hover { background: #f56c6c; color: white; }
 .group-resources { margin-top: 12px; padding-top: 12px; border-top: 1px solid #ebeef5; }
 .resource-title { font-size: 13px; color: #909399; margin-bottom: 8px; }
 .resource-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .resource-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: white; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 12px; color: #606266; }
 .level-badge { padding: 1px 4px; background: #667eea; color: white; border-radius: 3px; font-size: 10px; }
 .resource-more { display: inline-block; padding: 4px 10px; background: #f5f7fa; border-radius: 4px; font-size: 12px; color: #909399; }
+/* 资源卡片列表样式 */
+.resource-card-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.resource-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #374151;
+    transition: all 0.2s;
+}
+.resource-card:hover { border-color: #409eff; background: #f0f7ff; }
+.resource-card svg { color: #667eea; flex-shrink: 0; }
+.resource-card-name { font-weight: 500; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.resource-card-level { padding: 1px 5px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 4px; font-size: 10px; flex-shrink: 0; }
+.resource-more-card { display: inline-flex; align-items: center; padding: 6px 12px; background: #f5f7fa; border: 1px dashed #d1d5db; border-radius: 8px; font-size: 12px; color: #9ca3af; }
+.resource-empty { font-size: 13px; color: #9ca3af; padding: 4px 0; }
 .empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 0; color: #909399; }
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
 .modal { background: white; border-radius: 12px; width: 480px; max-width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2); }

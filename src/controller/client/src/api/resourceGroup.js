@@ -40,3 +40,12 @@ export async function deleteResourceGroup(id) {
     return normalizeError(err)
   }
 }
+
+export async function getResourceGroupDetail(id) {
+  try {
+    const res = await apiClient.get(`/policy/admin/resource-group/detail/${id}`)
+    return res.data
+  } catch (err) {
+    return normalizeError(err)
+  }
+}

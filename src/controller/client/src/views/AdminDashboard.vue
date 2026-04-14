@@ -132,7 +132,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { listUsers } from '@/api/user.js'
+import { listResources } from '@/api/resource.js'
+import { listRoleGroups } from '@/api/roleGroup.js'
+import { listResourceGroups } from '@/api/resourceGroup.js'
 
 const stats = ref({
     totalUsers: 0,
@@ -142,8 +146,55 @@ const stats = ref({
 })
 
 const recentActivities = ref([
-    { type: 'info', text: '系统初始化完成', time: '2024-01-01 10:00:00' }
+    { type: 'info', text: '系统初始化完成', time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) }
 ])
+
+// 组件挂载时获取统计数据
+onMounted(async () => {
+    try {
+        // 并行获取所有统计数据
+        const [usersRes, resourcesRes, roleGroupsRes, resourceGroupsRes] = await Promise.all([
+            listUsers({ page: 1, pageSize: 1 }),
+            listResources({ page: 1, pageSize: 1 }),
+            listRoleGroups(),
+            listResourceGroups()
+        ])
+
+        // 解析用户总数
+        if (usersRes?.code === 200) {
+            const data = usersRes.data
+            stats.value.totalUsers = data?.total || (Array.isArray(data) ? data.length : 0)
+        } else if (Array.isArray(usersRes)) {
+            stats.value.totalUsers = usersRes.length
+        }
+
+        // 解析资源总数
+        if (resourcesRes?.code === 200) {
+            const data = resourcesRes.data
+            stats.value.totalResources = data?.total || (Array.isArray(data) ? data.length : 0)
+        } else if (Array.isArray(resourcesRes)) {
+            stats.value.totalResources = resourcesRes.length
+        }
+
+        // 解析用户组总数
+        if (roleGroupsRes?.code === 200) {
+            const list = Array.isArray(roleGroupsRes.data) ? roleGroupsRes.data : []
+            stats.value.userGroups = list.length
+        } else if (Array.isArray(roleGroupsRes)) {
+            stats.value.userGroups = roleGroupsRes.length
+        }
+
+        // 解析资源组总数
+        if (resourceGroupsRes?.code === 200) {
+            const list = Array.isArray(resourceGroupsRes.data) ? resourceGroupsRes.data : []
+            stats.value.resourceGroups = list.length
+        } else if (Array.isArray(resourceGroupsRes)) {
+            stats.value.resourceGroups = resourceGroupsRes.length
+        }
+    } catch (e) {
+        console.error('获取统计数据失败:', e)
+    }
+})
 </script>
 
 <style scoped>

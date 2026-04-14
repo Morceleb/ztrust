@@ -14,6 +14,15 @@ export async function listRoleGroups() {
   }
 }
 
+export async function getRoleGroupDetail(id) {
+  try {
+    const res = await apiClient.get(`/policy/admin/role-group/detail/${id}`)
+    return res.data
+  } catch (err) {
+    return normalizeError(err)
+  }
+}
+
 export async function saveRoleGroup(data) {
   try {
     const res = await apiClient.post('/policy/admin/role-group/save', data)
@@ -26,6 +35,15 @@ export async function saveRoleGroup(data) {
 export async function assignUsersToRoleGroup(data) {
   try {
     const res = await apiClient.post('/policy/admin/role-group/assign-users', data)
+    return res.data
+  } catch (err) {
+    return normalizeError(err)
+  }
+}
+
+export async function deleteRoleGroup(id) {
+  try {
+    const res = await apiClient.delete(`/policy/admin/role-group/delete/${id}`)
     return res.data
   } catch (err) {
     return normalizeError(err)

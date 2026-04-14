@@ -35,16 +35,16 @@
                         <td>
                             <div class="user-avatar">
                                 <img v-if="user.avatar" :src="user.avatar" alt="avatar" />
-                                <span v-else class="avatar-placeholder">{{ user.username.charAt(0).toUpperCase() }}</span>
+                                <span v-else class="avatar-placeholder">{{ (user.name || user.username || '?').charAt(0).toUpperCase() }}</span>
                             </div>
                         </td>
-                        <td>{{ user.username }}</td>
+                        <td>{{ user.name || user.username }}</td>
                         <td>{{ user.email }}</td>
                         <td class="phone-col">{{ user.phone }}</td>
                         <td class="status-col">
-                            <span class="status-badge" :class="'status-' + user.status">{{ statusText(user.status) }}</span>
+                            <span class="status-badge" :class="'status-' + getUserStatus(user)">{{ statusText(getUserStatus(user)) }}</span>
                         </td>
-                        <td>{{ user.created_at }}</td>
+                        <td>{{ formatTime(user.createdTime) }}</td>
                         <td class="spa-status-col">
                             <span class="spa-badge" :class="'spa-' + (user.spaStatus || 'none')">{{ spaStatusText(user.spaStatus) }}</span>
                         </td>
@@ -226,7 +226,9 @@ async function onPrimarySpa(user) {
     loadingSpaUserId.value = user.id
     if (rotate) setUserSpaStatus(user.id, 'updating')
     try {
+        console.log('发放安全码请求:', { userId: user.id, rotate })
         const res = await apiIssue(user.id, rotate)
+        console.log('发放安全码响应:', res)
         if (res.code === 200 && typeof res.data === 'string' && res.data) {
             lastTokenHex.value = res.data
             showTokenModal.value = true
@@ -241,6 +243,7 @@ async function onPrimarySpa(user) {
         }
         showToast(res.message || '操作失败')
     } catch (e) {
+        console.error('发放安全码异常:', e)
         showToast(e?.message || '网络错误')
     } finally {
         loadingSpaUserId.value = null
@@ -291,7 +294,18 @@ async function copyToken() {
 
 const statusText = (status) => {
     const map = { active: '正常', frozen: '冻结', deleted: '已删除' }
-    return map[status] || status
+    return map[status] || status || 'active'
+}
+
+const getUserStatus = (user) => {
+    if (user.isDeleted) return 'deleted'
+    if (user.isForbidden) return 'frozen'
+    return 'active'
+}
+
+const formatTime = (time) => {
+    if (!time) return '-'
+    return time.replace('T', ' ').substring(0, 19)
 }
 
 const filteredUsers = computed(() => {
