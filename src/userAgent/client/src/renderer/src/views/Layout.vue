@@ -3,6 +3,7 @@
         'workbench-collapsed': !isExpanded || $route.path === '/settings' || $route.path === '/personal_info' || $route.path === '/terminal_management' || $route.path === '/apply_permission',
         'main-tight': $route.path === '/personal_info' || $route.path === '/terminal_management' || $route.path === '/apply_permission'
     }">
+        <tittleBar class="new-tittle"></tittleBar>
         <aside class="sidebar">
             <div class="logo">
                 <div class="logo-icon-bg">
@@ -124,7 +125,7 @@
         </aside>
 
         <aside
-            v-if="$route.path !== '/settings' && $route.path !== '/personal_info' && $route.path !== '/terminal_management' && $route.path !== '/apply_permission'"
+            v-if="$route.path !== '/settings' && $route.path !== '/personal_info' && $route.path !== '/terminal_management' && $route.path !== '/apply_permission' && $route.path !== '/login'"
             class="workbench" :class="{ collapsed: !isExpanded }">
             <button @click="toggleWorkbench" class="toggle-btn" title="切换侧边栏">
                 <svg class="arrow-icon" :class="{ 'icon-rotated': !isExpanded }" xmlns="http://www.w3.org/2000/svg"
@@ -186,6 +187,7 @@ import { useRouter } from 'vue-router'
 import request from '@/utils/request'
 import store from '@/store'
 
+import tittleBar from '@/components/TittleBar/index.vue'
 
 
 const isExpanded = ref(true)
@@ -252,6 +254,14 @@ const toggleWorkbench = () => {
 
 <style scoped>
 /* 基础重置与布局 */
+
+.new-tittle {
+    position: absolute;
+    width: 100%;
+    right: 0;
+    z-index: 1000;
+}
+
 .layout-container {
     display: flex;
     height: 100vh;
@@ -262,7 +272,6 @@ const toggleWorkbench = () => {
 
 
 .sidebar {
-    width: 92px;
     background: #36435b;
     /* 参考图二：灰蓝侧边栏 */
     color: rgba(248, 250, 252, 0.92);
@@ -303,6 +312,7 @@ const toggleWorkbench = () => {
 .nav-menu {
     flex: 1;
     padding-top: 12px;
+    width: 90px;
 }
 
 .nav-item {
@@ -694,7 +704,7 @@ const toggleWorkbench = () => {
     background: #f1f5f9;
     position: relative;
     overflow: visible;
-    padding: 0 16px 0 16px;
+    padding: 0 16px 0 0;
     /* 左右留白一致，模仿图二 */
     border-top: none;
     /* 去除资源列表顶部线条 */

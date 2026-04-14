@@ -1,35 +1,35 @@
 {
     "resources": [
         {
-            "id": 1,
+            "id": "RES_001",
             "name": "受限网页1",
             "icon": "",
             "type": "web_page",
             "allow_method": "GET"
         },
         {
-            "id": 2,
+            "id": "RES_002",
             "name": "受限GET接口",
             "icon": "",
             "type": "api",
             "allow_method": "GET"
         },
         {
-            "id": 3,
+            "id": "RES_003",
             "name": "受限POST接口",
             "icon": "",
             "type": "api",
             "allow_method": "POST"
         },
         {
-            "id": 4,
+            "id": "RES_004",
             "name": "受限静态资源2",
             "icon": "",
             "type": "static",
             "allow_method": "GET"
         },
         {
-            "id": 5,
+            "id": "RES_005",
             "name": "受限网页2",
             "icon": "https://www.baidu.com/favicon.ico",
             "type": "web_page",

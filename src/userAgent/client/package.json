@@ -1,23 +1,38 @@
 {
-  "name": "front",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "name": "ztrust-new",
+  "version": "1.0.0",
+  "main": "./out/main/index.js",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "dist": "npm run build && electron-builder --win",
+    "build:win": "npm run build && electron-builder --win"
   },
   "dependencies": {
+    "@electron-toolkit/preload": "^3.0.2",
+    "@electron-toolkit/utils": "^4.0.0",
     "axios": "^1.13.2",
     "casdoor-js-sdk": "^0.16.0",
     "casdoor-vue-sdk": "^1.6.0",
+    "concurrently": "^9.2.1",
     "jwt-decode": "^4.0.0",
     "vue": "^3.5.24",
-    "vue-router": "^4.6.3"
+    "vue-router": "^4.6.3",
+    "vuex": "next"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.1",
-    "vite": "^7.2.2"
+    "@electron-toolkit/eslint-config": "^2.1.0",
+    "@electron-toolkit/eslint-config-prettier": "^3.0.0",
+    "@vitejs/plugin-vue": "^6.0.2",
+    "electron": "^39.2.6",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^5.0.0",
+    "eslint": "^9.39.1",
+    "eslint-plugin-vue": "^10.6.2",
+    "prettier": "^3.7.4",
+    "vite": "^7.2.6",
+    "vue": "^3.5.25",
+    "vue-eslint-parser": "^10.2.0"
   }
 }

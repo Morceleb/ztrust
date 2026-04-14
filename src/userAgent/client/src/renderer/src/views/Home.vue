@@ -1,15 +1,5 @@
 <template>
     <div>
-        <!-- <h1>登录测试页面</h1>
-        <form @submit.prevent="handleLogin">
-            用户名：<input type="text" v-model="username" placeholder="请输入用户名" />
-            <br /><br />
-            密码：<input type="password" v-model="password" placeholder="请输入密码" />
-            <br /><br />
-            <button type="submit" :disabled="loading">登录</button>
-        </form> -->
-
-        <!-- 登录状态提示 -->
         <p v-if="flag" style="color: green; margin-top: 20px;">
             登录成功！当前用户：{{ info.user || info.message || '未知用户' }}
         </p>

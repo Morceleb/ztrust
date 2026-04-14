@@ -139,6 +139,6 @@ const submitPost = async () => {
 </script>
 
 <style scoped>
-@import url(./style.css);
+@import url(./index.css);
 /* 保留你原来的样式文件 */
 </style>
