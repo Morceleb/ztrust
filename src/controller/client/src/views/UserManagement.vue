@@ -562,6 +562,118 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
     border-radius: 16px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+}
+
+/* 遮罩层 */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+/* 弹窗头部 */
+.modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 24px 24px 0;
+    gap: 12px;
+}
+
+.modal-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.modal-title-accent {
+    display: block;
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(180deg, #409eff, #66b1ff);
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.modal-subtitle {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #94a3b8;
+    line-height: 1.5;
+}
+
+.modal-close {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    padding: 0;
+}
+
+.modal-close:hover {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+/* 弹窗主体 */
+.modal-body {
+    padding: 20px 24px;
+    overflow-y: auto;
+}
+
+/* 弹窗底部 */
+.modal-footer {
+    padding: 0 24px 24px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* 底部按钮 */
+.btn-modal {
+    padding: 10px 24px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+}
+
+.btn-modal-primary {
+    background: #409eff;
+    border-color: #409eff;
+    color: #fff;
+}
+
+.btn-modal-primary:hover {
+    background: #66b1ff;
+    border-color: #66b1ff;
 }
 
 .token-box {
