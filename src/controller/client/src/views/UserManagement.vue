@@ -54,7 +54,12 @@
                         </td>
                         <td>{{ formatTime(user.createdTime) }}</td>
                         <td class="spa-status-col">
-                            <span class="spa-badge" :class="'spa-' + (user.spaStatus || 'none')">{{ spaStatusText(user.spaStatus) }}</span>
+                            <span
+                                class="spa-badge"
+                                :class="'spa-' + (user.spaStatus || 'none')"
+                            >
+                                {{ spaStatusText(user.spaStatus) }}
+                            </span>
                         </td>
                         <td class="spa-actions-col">
                             <div class="spa-actions">
@@ -127,25 +132,56 @@
         <div class="modal-overlay" v-if="showTokenModal" @click.self="showTokenModal = false">
             <div class="token-modal" @click.stop>
                 <div class="modal-header">
-                    <div class="modal-title-wrap">
-                        <span class="modal-title-accent"></span>
-                        <h3 class="modal-title">安全码已生成</h3>
-                        <p class="modal-subtitle">请复制并安全交付给用户；关闭后需通过「更新安全码」重新轮转</p>
+                    <div class="modal-icon-wrap modal-icon-success">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            <polyline points="9 12 11 14 15 10"/>
+                        </svg>
                     </div>
-                    <button type="button" class="modal-close" @click="showTokenModal = false" aria-label="关闭">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 6L6 18M6 6l12 12"/>
+                    <div class="modal-header-text">
+                        <h3 class="modal-title">{{ tokenModalMode === 'issue' ? '安全码已发放' : '安全码已更新' }}</h3>
+                        <p class="modal-subtitle">{{ tokenModalMode === 'issue' ? '新用户安全码已生成，请复制并安全交付给用户' : '安全码已轮转，旧码已失效，请复制并重新交付' }}</p>
+                    </div>
+                    <button type="button" class="modal-close-btn" @click="showTokenModal = false" aria-label="关闭">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                         </svg>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <div class="token-box">
-                        <code class="token-hex">{{ lastTokenHex }}</code>
-                        <button type="button" class="btn-copy" @click="copyToken">复制</button>
+                    <div class="token-card">
+                        <div class="token-card-header">
+                            <span class="token-card-label">安全码</span>
+                            <button type="button" class="token-copy-btn" @click="copyToken">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                </svg>
+                                复制
+                            </button>
+                        </div>
+                        <div class="token-card-content">
+                            <code class="token-code">{{ lastTokenHex }}</code>
+                        </div>
+                    </div>
+                    <div class="token-tip">
+                        <div class="token-tip-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="8" x2="12" y2="12"/>
+                                <line x1="12" y1="16" x2="12.01" y2="16"/>
+                            </svg>
+                        </div>
+                        <span>请妥善保管此安全码，切勿泄露给他人</span>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn-modal btn-modal-primary" @click="showTokenModal = false">知道了</button>
+                    <button type="button" class="btn-confirm" @click="showTokenModal = false">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        我知道了
+                    </button>
                 </div>
             </div>
         </div>
@@ -315,6 +351,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { listUsers, issueSpaToken as apiIssue, disableSpaToken as apiDisable, enableSpaToken as apiEnable, saveUser as apiSaveUser, deleteUser as apiDeleteUser } from '@/api/user.js'
+import { getSpaStatus } from '@/api/spaAdmin.js'
+import { listRoleGroups, getRoleGroupDetail, assignUsersToRoleGroup } from '@/api/roleGroup.js'
 
 const loading = ref(false)
 const searchKeyword = ref('')
@@ -323,6 +361,7 @@ const pageSize = ref(10)
 const totalCount = ref(0)
 
 const showTokenModal = ref(false)
+const tokenModalMode = ref('issue') // 'issue' | 'rotate'
 const lastTokenHex = ref('')
 const toastMessage = ref('')
 const loadingSpaUserId = ref(null)
@@ -360,16 +399,51 @@ const cancelDelete = () => {
 
 const confirmDelete = async () => {
     if (!deleteTarget.value?.id) return
-    deletingUserId.value = deleteTarget.value.id
+    const userId = deleteTarget.value.id
+    deletingUserId.value = userId
     try {
-        const res = await apiDeleteUser(deleteTarget.value.id)
-        if (res.code === 200) {
-            showToast('用户已删除')
-            cancelDelete()
-            await fetchUsers()
-        } else {
+        // 1. 先获取所有角色组，查找包含该用户的角色组
+        const roleGroupsRes = await listRoleGroups()
+        const groupList = Array.isArray(roleGroupsRes?.data) ? roleGroupsRes.data : (Array.isArray(roleGroupsRes) ? roleGroupsRes : [])
+        const groupsWithUser = await Promise.all(
+            groupList.map(async (group) => {
+                try {
+                    const detailRes = await getRoleGroupDetail(group.id)
+                    if (detailRes.code === 200 && detailRes.data?.members) {
+                        const members = detailRes.data.members
+                        const normalized = members.map(m => ({ userId: m.userId || m.user_id || m.id, username: m.username || m.name || '' }))
+                        return normalized.some(m => m.userId === userId) ? { id: group.id, members: normalized } : null
+                    }
+                } catch (e) {
+                    console.error('获取角色组详情失败:', e)
+                }
+                return null
+            })
+        )
+        const affectedGroups = groupsWithUser.filter(g => g !== null)
+
+        // 2. 删除用户
+        const res = await apiDeleteUser(userId)
+        if (res.code !== 200) {
             showToast(res.message || '删除失败')
+            return
         }
+
+        // 3. 同步更新所有受影响角色组的成员列表（剔除已删除用户）
+        await Promise.all(
+            affectedGroups.map(async (group) => {
+                const remaining = group.members.filter(m => m.userId !== userId).map(m => m.userId)
+                try {
+                    await assignUsersToRoleGroup({ role_group_id: group.id, user_ids: remaining })
+                } catch (e) {
+                    console.error('同步角色组成员失败:', e)
+                }
+            })
+        )
+
+        showToast('用户已删除')
+        cancelDelete()
+        await fetchUsers()
     } catch (e) {
         showToast(e?.message || '网络错误')
     } finally {
@@ -397,11 +471,30 @@ async function fetchUsers() {
             users.value = res
             totalCount.value = res.length
         }
+        // 获取每个用户的安全码状态
+        await fetchSpaStatusAll()
     } catch (e) {
         showToast(e?.message || '加载用户列表失败')
     } finally {
         loading.value = false
     }
+}
+
+async function fetchSpaStatusAll() {
+    if (!users.value.length) return
+    const ids = users.value.map(u => u.id)
+    const results = await Promise.allSettled(ids.map(id => getSpaStatus(id)))
+    results.forEach((result, index) => {
+        const i = findUserIndex(ids[index])
+        if (i === -1) return
+        if (result.status === 'fulfilled' && typeof result.value === 'object' && result.value.code === 200) {
+            // data: -1 未发放, 0 已禁用, 1 已启用
+            const statusMap = { '-1': 'none', '0': 'disabled', '1': 'issued' }
+            users.value[i].spaStatus = statusMap[String(result.value.data)] || 'none'
+        } else {
+            users.value[i].spaStatus = users.value[i].spaStatus || 'none'
+        }
+    })
 }
 
 onMounted(() => {
@@ -443,6 +536,7 @@ const secondarySpaLabel = (user) => {
 const primarySpaDisabled = (user) => {
     const s = user.spaStatus || 'none'
     if (s === 'updating') return true
+    if (s === 'disabled') return true
     return loadingSpaUserId.value === user.id
 }
 
@@ -873,14 +967,195 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
 
 .token-modal {
     width: 100%;
-    max-width: 480px;
+    max-width: 460px;
     background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    border-radius: 20px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.04);
     overflow: hidden;
+    animation: modal-pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modal-pop {
+    from { opacity: 0; transform: scale(0.88) translateY(16px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.token-modal .modal-header {
     display: flex;
-    flex-direction: column;
-    max-height: 90vh;
+    align-items: center;
+    gap: 16px;
+    padding: 24px 24px 20px;
+    background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+    border-bottom: 1px solid #d1fae5;
+}
+
+.modal-icon-success {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+    flex-shrink: 0;
+}
+
+.modal-header-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.modal-header-text .modal-title {
+    margin: 0 0 4px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #064e3b;
+    letter-spacing: -0.02em;
+}
+
+.modal-header-text .modal-subtitle {
+    margin: 0;
+    font-size: 13px;
+    color: #059669;
+    line-height: 1.5;
+}
+
+.modal-close-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.7);
+    color: #64748b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.modal-close-btn:hover {
+    background: #fff;
+    color: #1e293b;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.token-modal .modal-body {
+    padding: 24px;
+}
+
+.token-card {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.token-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #fff;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.token-card-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.token-copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    background: linear-gradient(135deg, #409eff, #3a8ee6);
+    border: none;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.token-copy-btn:hover {
+    background: linear-gradient(135deg, #66b1ff, #409eff);
+    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.token-card-content {
+    padding: 18px 16px;
+}
+
+.token-code {
+    display: block;
+    font-size: 18px;
+    font-weight: 600;
+    font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+    word-break: break-all;
+    color: #0f172a;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+}
+
+.token-tip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+}
+
+.token-tip-icon {
+    color: #d97706;
+    flex-shrink: 0;
+}
+
+.token-tip span {
+    font-size: 13px;
+    color: #92400e;
+    line-height: 1.4;
+}
+
+.token-modal .modal-footer {
+    display: flex;
+    justify-content: center;
+    padding: 16px 24px 24px;
+}
+
+.btn-confirm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 32px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.25s;
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+}
+
+.btn-confirm:hover {
+    background: linear-gradient(135deg, #34d399, #10b981);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
+    transform: translateY(-2px);
 }
 
 /* 遮罩层 */
@@ -919,6 +1194,51 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
     color: #0f172a;
     line-height: 1.5;
 }
+
+.token-display {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.token-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    letter-spacing: 0.02em;
+}
+
+.token-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 4px 4px 4px 4px;
+    transition: border-color 0.2s;
+}
+
+.token-box:focus-within {
+    border-color: #409eff;
+}
+
+.token-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: #fffbeb;
+    border-radius: 8px;
+    color: #d97706;
+    font-size: 13px;
+    margin-top: 12px;
+}
+
+/* 安全码 Token 展示区（发放/更新成功弹窗） */
+/* 原有 .spa-token-section 等已移除，仅保留 token-display（用于发放成功弹窗） */
+
+/* 安全码操作按钮（用于发放成功弹窗） */
 
 .btn-copy {
     flex-shrink: 0;

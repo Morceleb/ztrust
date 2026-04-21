@@ -542,6 +542,7 @@ const addSelectedResources = () => {
 
     selectedResourceMap.value = {}
     saveGroupResources()
+    showAddResourceModal.value = false
 }
 
 const removeResourceFromGroup = (idx) => {

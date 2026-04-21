@@ -683,12 +683,12 @@ const handleEditNameSubmit = async () => {
 }
 
 const handleEditResources = (group) => {
-    // 深拷贝当前资源组权限列表，用于后续对比增删
-    originalResourceGroups.value = (group.resourceGroups || []).map(rg => ({ ...rg }))
+    // 深拷贝当前资源组权限列表，用于后续对比增删（必须用 JSON.parse(JSON.stringify) 确保完全独立的对象）
+    originalResourceGroups.value = (group.resourceGroups || []).map(rg => JSON.parse(JSON.stringify(rg)))
     formData.value = {
         id: group.id,
         name: group.name,
-        resourceGroups: [...originalResourceGroups.value],
+        resourceGroups: (group.resourceGroups || []).map(rg => ({ ...rg, highestLevel: Number(rg.highestLevel) || 1 })),
         selectedResourceNames: [],
         members: [],
         selectedUserIds: []
