@@ -273,6 +273,7 @@ import {
     listResourceGroups, saveResourceGroup, bindResourcesToGroup, deleteResourceGroup, getResourceGroupDetail
 } from '@/api/resourceGroup.js'
 import { listResources as apiListResources } from '@/api/resource.js'
+import { listPermissions, deletePermission } from '@/api/permission.js'
 
 const loading = ref(false)
 const searchKeyword = ref('')
@@ -420,6 +421,25 @@ const confirmDelete = async () => {
         return
     }
     try {
+        // 先删除该资源组与所有角色组的权限绑定
+        try {
+            const permRes = await listPermissions()
+            if (permRes.code === 200 && Array.isArray(permRes.data)) {
+                // 找出与该资源组相关的所有权限记录
+                const relatedPermissions = permRes.data.filter(p => p.resourceGroupId === deleteTarget.value.id)
+                // 逐个删除权限绑定
+                for (const perm of relatedPermissions) {
+                    await deletePermission({
+                        role_group_id: perm.roleGroupId,
+                        resource_group_id: deleteTarget.value.id
+                    })
+                }
+            }
+        } catch (e) {
+            console.error('删除权限绑定失败:', e)
+        }
+
+        // 再删除资源组
         const res = await deleteResourceGroup(deleteTarget.value.id)
         if (res.code === 200) {
             showToast('资源组删除成功')

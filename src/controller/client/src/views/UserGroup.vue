@@ -171,7 +171,10 @@
                                     <span class="pool-item-name" @click.stop="toggleResourceSelection(rg)">{{ rg.name }}</span>
                                     <select
                                         class="resource-level-select"
-                                        v-model.number="rg.selectedLevel"
+                                        :class="{ 'is-disabled': !formData.selectedResourceNames?.some(r => r.id === rg.id) }"
+                                        :value="getResourceSelectedLevel(rg.id)"
+                                        :disabled="!formData.selectedResourceNames?.some(r => r.id === rg.id)"
+                                        @change="onPoolLevelChange(rg.id, Number($event.target.value))"
                                         @click.stop
                                     >
                                         <option value="1">1级</option>
@@ -220,6 +223,7 @@
                                     <select
                                         class="resource-tag-level"
                                         v-model.number="rg.highestLevel"
+                                        @change="console.log('等级变更:', rg.id, rg.highestLevel)"
                                         @click.stop
                                     >
                                         <option value="1">1级</option>
@@ -397,7 +401,7 @@ import { ref, computed, onMounted } from 'vue'
 import {
     listRoleGroups, saveRoleGroup, assignUsersToRoleGroup, deleteRoleGroup, getRoleGroupDetail
 } from '@/api/roleGroup.js'
-import { listPermissions, grantPermission, deletePermission } from '@/api/permission.js'
+import { listPermissions, grantPermission, updatePermission, deletePermission } from '@/api/permission.js'
 import { listResourceGroups, getResourceGroupDetail } from '@/api/resourceGroup.js'
 import { listUsers as apiListUsers } from '@/api/user.js'
 
@@ -408,6 +412,8 @@ const showEditNameModal = ref(false)
 const showResourcesModal = ref(false)
 // 保存编辑资源弹窗打开时的原始资源组列表（用于对比增删）
 const originalResourceGroups = ref([])
+// 存储所有权限关系（用于过滤已分配的资源组）
+const allPermissions = ref([])
 const showMembersModal = ref(false)
 const showDeleteModal = ref(false)
 const deleteTarget = ref(null)
@@ -468,6 +474,8 @@ async function fetchRoleGroups() {
         try {
             const permRes = await listPermissions()
             if (permRes.code === 200 && Array.isArray(permRes.data)) {
+                // 更新全局权限列表
+                allPermissions.value = permRes.data
                 // 收集所有需要查询的资源组ID
                 const resourceGroupIds = [...new Set(permRes.data.map(p => p.resourceGroupId).filter(Boolean))]
                 // 批量获取资源组名称
@@ -484,16 +492,21 @@ async function fetchRoleGroups() {
                         }
                     })
                 )
-                // 构建权限映射
+                // 构建权限映射（只添加仍存在的资源组）
                 permRes.data.forEach(p => {
+                    const rgName = nameMap[p.resourceGroupId]
+                    // 跳过已删除的资源组（nameMap 中不存在或为空）
+                    if (!rgName) {
+                        return
+                    }
                     const roleGroupId = p.roleGroupId
                     if (!permissionsMap[roleGroupId]) {
                         permissionsMap[roleGroupId] = []
                     }
                     permissionsMap[roleGroupId].push({
-                        id: p.id,
+                        id: p.resourceGroupId,
                         resourceGroupId: p.resourceGroupId,
-                        resourceGroupName: nameMap[p.resourceGroupId] || p.resourceGroupName || `资源组${p.resourceGroupId}`,
+                        resourceGroupName: rgName,
                         highestLevel: p.highestLevel || 1
                     })
                 })
@@ -557,8 +570,15 @@ const filteredGroups = computed(() => {
 })
 
 const availableResourceGroups = computed(() => {
-    const ids = new Set((formData.value.resourceGroups || []).map(rg => rg.id))
-    return resourceGroups.value.filter(rg => !ids.has(rg.id))
+    // 获取 formData 中当前已添加的资源组 ID
+    const formIds = new Set((formData.value.resourceGroups || []).map(rg => rg.id))
+    // 获取所有权限关系中该用户组已关联的资源组 ID
+    const permIds = new Set(allPermissions.value
+        .filter(p => p.roleGroupId === formData.value.id || p.role_group_id === formData.value.id)
+        .map(p => p.resourceGroupId ?? p.resource_group_id ?? p.resourceGroup?.id))
+    // 合并两个 ID 集合来过滤
+    const excludeIds = new Set([...formIds, ...permIds])
+    return resourceGroups.value.filter(rg => !excludeIds.has(rg.id))
 })
 
 const filteredAvailableResourceGroups = computed(() => {
@@ -678,6 +698,9 @@ const handleEditResources = (group) => {
 }
 
 const closeResourcesModal = () => {
+    // 关闭弹窗时重置所有临时等级记录和选中状态
+    tempResourceLevels.value = {}
+    formData.value.selectedResourceNames = []
     showResourcesModal.value = false
 }
 
@@ -685,10 +708,26 @@ const toggleResourceSelection = (rg) => {
     if (!formData.value.selectedResourceNames) formData.value.selectedResourceNames = []
     const idx = formData.value.selectedResourceNames.findIndex(r => r.id === rg.id)
     if (idx === -1) {
-        formData.value.selectedResourceNames.push({ ...rg, selectedLevel: rg.selectedLevel || 1 })
+        // 新增：默认等级为 1
+        formData.value.selectedResourceNames.push({ ...rg, selectedLevel: 1 })
+        tempResourceLevels.value[rg.id] = 1
     } else {
         formData.value.selectedResourceNames.splice(idx, 1)
+        // 取消勾选时重置等级
+        delete tempResourceLevels.value[rg.id]
     }
+}
+
+// 获取资源组当前选中的等级
+function getResourceSelectedLevel(resourceGroupId) {
+    return tempResourceLevels.value[resourceGroupId] || 1
+}
+
+// 更新池中源数据的等级，同时同步到临时等级存储
+function onPoolLevelChange(resourceGroupId, level) {
+    tempResourceLevels.value[resourceGroupId] = level
+    const sel = formData.value.selectedResourceNames.find(r => r.id === resourceGroupId)
+    if (sel) sel.selectedLevel = level
 }
 
 const addSelectedResources = () => {
@@ -696,12 +735,15 @@ const addSelectedResources = () => {
     if (!formData.value.resourceGroups) formData.value.resourceGroups = []
     formData.value.selectedResourceNames.forEach(rg => {
         if (!formData.value.resourceGroups.some(g => g.id === rg.id)) {
+            const level = tempResourceLevels.value[rg.id] || rg.selectedLevel || 1
             formData.value.resourceGroups.push({
                 id: rg.id,
                 resourceGroupName: rg.name || rg.resourceGroupName || `资源组${rg.id}`,
-                highestLevel: rg.selectedLevel || 1
+                highestLevel: level
             })
         }
+        // 添加后清除临时等级记录
+        delete tempResourceLevels.value[rg.id]
     })
     formData.value.selectedResourceNames = []
 }
@@ -727,7 +769,7 @@ const handleResourcesSubmit = async () => {
         // 找出需要更新的资源组（等级可能发生变化）
         const toUpdate = (formData.value.resourceGroups || []).filter(rg => {
             const original = originalResourceGroups.value.find(o => o.id === rg.id)
-            return original && original.highestLevel !== rg.highestLevel
+            return original && Number(original.highestLevel) !== Number(rg.highestLevel)
         })
 
         // 删除已移除的资源组权限
@@ -747,7 +789,7 @@ const handleResourcesSubmit = async () => {
             const res = await grantPermission({
                 role_group_id: roleGroupId,
                 resource_group_id: rg.id,
-                highest_level: rg.highestLevel || 1
+                highest_level: Number(rg.highestLevel) || 1
             })
             if (res.code !== 200) {
                 showToast(res.message || `资源组「${rg.resourceGroupName}」绑定失败`, 'error')
@@ -760,7 +802,7 @@ const handleResourcesSubmit = async () => {
             const res = await grantPermission({
                 role_group_id: roleGroupId,
                 resource_group_id: rg.id,
-                highest_level: rg.highestLevel || 1
+                highest_level: Number(rg.highestLevel) || 1
             })
             if (res.code !== 200) {
                 showToast(res.message || `资源组「${rg.resourceGroupName}」更新失败`, 'error')
@@ -771,6 +813,15 @@ const handleResourcesSubmit = async () => {
         showToast('资源组权限更新成功', 'success')
         closeResourcesModal()
         await fetchRoleGroups()
+        // 重新获取权限列表并更新 allPermissions
+        try {
+            const permRes = await listPermissions()
+            if (permRes.code === 200 && Array.isArray(permRes.data)) {
+                allPermissions.value = permRes.data
+            }
+        } catch (e) {
+            console.error('获取权限列表失败:', e)
+        }
     } catch (e) {
         showToast(e?.message || '网络错误', 'error')
     }
@@ -840,6 +891,8 @@ const handleMembersSubmit = async () => {
 }
 
 const resourceGroups = ref([])
+// 临时存储待添加资源的等级（key: resourceGroupId, value: level）
+const tempResourceLevels = ref({})
 
 // 页面加载时获取实际资源组列表
 async function fetchResourceGroups() {
@@ -1662,10 +1715,26 @@ async function fetchResourceGroups() {
     color: #374151;
     margin-left: auto;
     cursor: pointer;
+    width: 64px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239CA3AF' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 24px;
 }
 
-.resource-level-select:hover {
+.resource-level-select:hover:not(:disabled) {
     border-color: #409eff;
+}
+
+.resource-level-select.is-disabled,
+.resource-level-select:disabled {
+    background-color: #f3f4f6;
+    color: #9ca3af;
+    cursor: not-allowed;
+    border-color: #e5e7eb;
 }
 
 .tag-level {

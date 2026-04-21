@@ -11,6 +11,14 @@
                     </svg>
                 </button>
             </div>
+            <div class="toolbar-actions">
+                <button class="btn btn-primary" @click="handleAdd">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    添加人员
+                </button>
+            </div>
         </div>
 
         <!-- 数据表格 -->
@@ -26,7 +34,7 @@
                         <th class="status-col">状态</th>
                         <th>创建时间</th>
                         <th class="spa-status-col">安全码</th>
-                        <th class="spa-actions-col">SPA 操作</th>
+                        <th class="actions-col">操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -66,6 +74,26 @@
                                     @click="onSecondarySpa(user)"
                                 >
                                     {{ secondarySpaLabel(user) }}
+                                </button>
+                                <button class="action-btn action-edit" @click="handleEdit(user)" title="编辑">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                    </svg>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="action-btn action-delete"
+                                    @click="handleDelete(user)"
+                                    title="删除"
+                                    :disabled="deletingUserId === user.id"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"/>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                        <line x1="10" y1="11" x2="10" y2="17"/>
+                                        <line x1="14" y1="11" x2="14" y2="17"/>
+                                    </svg>
                                 </button>
                             </div>
                         </td>
@@ -124,12 +152,169 @@
 
         <!-- 轻提示 -->
         <div class="toast" v-if="toastMessage">{{ toastMessage }}</div>
+
+        <!-- 添加/编辑人员弹窗 -->
+        <div class="modal-overlay" v-if="showUserModal" @click.self="closeUserModal">
+            <div class="add-user-modal" @click.stop>
+                <div class="modal-header">
+                    <div class="modal-title-wrap">
+                        <div class="modal-icon-wrap" :class="userModalMode === 'add' ? 'icon-add' : 'icon-edit'">
+                            <svg v-if="userModalMode === 'add'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                        </div>
+                        <div class="modal-title-text">
+                            <h3 class="modal-title">{{ userModalMode === 'add' ? '添加人员' : '编辑人员' }}</h3>
+                            <p class="modal-subtitle">{{ userModalMode === 'add' ? '填写账号信息，创建新的用户' : '修改用户账号信息' }}</p>
+                        </div>
+                    </div>
+                    <button type="button" class="modal-close" @click="closeUserModal" aria-label="关闭">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body modal-body-user">
+                    <div class="form-card form-card-user">
+                        <div class="form-user-grid">
+                            <div class="form-field-group">
+                                <div class="form-field">
+                                    <label>登录账号 <span class="required">*</span></label>
+                                    <div class="input-wrapper">
+                                        <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                            <circle cx="12" cy="7" r="4"/>
+                                        </svg>
+                                        <input type="text" v-model="userFormData.username" class="field-input" :class="{ 'field-error': userFormErrors.username }" placeholder="字母、数字或下划线" />
+                                    </div>
+                                    <span class="field-error-text" v-if="userFormErrors.username">{{ userFormErrors.username }}</span>
+                                    <span class="field-hint">只能是字母、数字或下划线</span>
+                                </div>
+                            </div>
+                            <div class="form-field-group">
+                                <div class="form-field">
+                                    <label>密码</label>
+                                    <div class="input-wrapper">
+                                        <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                        </svg>
+                                        <input type="password" v-model="userFormData.password" class="field-input" :placeholder="userModalMode === 'add' ? '不填默认为 123456' : '不修改请留空'" />
+                                    </div>
+                                    <span class="field-hint">{{ userModalMode === 'add' ? '不填默认为 123456' : '不修改请留空，将保持原密码' }}</span>
+                                </div>
+                            </div>
+                            <div class="form-field-group">
+                                <div class="form-field">
+                                    <label>邮箱</label>
+                                    <div class="input-wrapper">
+                                        <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                            <polyline points="22,6 12,13 2,6"/>
+                                        </svg>
+                                        <input type="email" v-model="userFormData.email" class="field-input" placeholder="user@example.com" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-field-group">
+                                <div class="form-field">
+                                    <label>手机号</label>
+                                    <div class="input-wrapper">
+                                        <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                                            <line x1="12" y1="18" x2="12.01" y2="18"/>
+                                        </svg>
+                                        <input type="tel" v-model="userFormData.phone" class="field-input" placeholder="13800138000" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-field-group form-field-span-2">
+                                <div class="form-field">
+                                    <label>头像 URL</label>
+                                    <div class="input-wrapper">
+                                        <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                                            <polyline points="21 15 16 10 5 21"/>
+                                        </svg>
+                                        <input type="text" v-model="userFormData.avatar" class="field-input" placeholder="https://example.com/avatar.png" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-field-group form-field-status">
+                                <div class="form-field">
+                                    <label>账号状态</label>
+                                    <div class="status-toggle-wrapper">
+                                        <div
+                                            class="status-toggle"
+                                            :class="{ 'is-frozen': userFormData.status === 'frozen' }"
+                                            @click="userFormData.status = userFormData.status === 'active' ? 'frozen' : 'active'"
+                                        >
+                                            <div class="status-toggle-knob"></div>
+                                        </div>
+                                        <span class="status-toggle-label" :class="{ 'label-frozen': userFormData.status === 'frozen' }">
+                                            {{ userFormData.status === 'active' ? '正常' : '冻结' }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer modal-footer-user">
+                    <button type="button" class="btn-modal btn-modal-ghost" @click="closeUserModal">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                        取消
+                    </button>
+                    <button type="button" class="btn-modal btn-modal-primary" @click="handleUserSubmit" :disabled="submitting">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        {{ submitting ? '提交中...' : (userModalMode === 'add' ? '确定添加' : '保存修改') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 删除确认弹窗 -->
+        <div class="modal-overlay" v-if="showDeleteModal" @click.self="cancelDelete">
+            <div class="delete-confirm-dialog">
+                <div class="delete-confirm-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                </div>
+                <h3 class="delete-confirm-title">确认删除</h3>
+                <p class="delete-confirm-message">
+                    确定要删除用户「<span class="delete-username">{{ deleteTarget?.username || deleteTarget?.name }}</span>」吗？
+                </p>
+                <p class="delete-confirm-hint">此操作不可恢复</p>
+                <div class="delete-confirm-footer">
+                    <button class="delete-btn-cancel" @click="cancelDelete">取消</button>
+                    <button
+                        class="delete-btn-confirm"
+                        @click="confirmDelete"
+                        :disabled="deletingUserId !== null"
+                    >
+                        {{ deletingUserId !== null ? '删除中...' : '确认删除' }}
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { listUsers, issueSpaToken as apiIssue, disableSpaToken as apiDisable, enableSpaToken as apiEnable } from '@/api/user.js'
+import { listUsers, issueSpaToken as apiIssue, disableSpaToken as apiDisable, enableSpaToken as apiEnable, saveUser as apiSaveUser, deleteUser as apiDeleteUser } from '@/api/user.js'
 
 const loading = ref(false)
 const searchKeyword = ref('')
@@ -142,6 +327,55 @@ const lastTokenHex = ref('')
 const toastMessage = ref('')
 const loadingSpaUserId = ref(null)
 const users = ref([])
+
+// 添加/编辑用户弹窗相关
+const showUserModal = ref(false)
+const userModalMode = ref('add')
+const userFormErrors = ref({})
+const submitting = ref(false)
+const userFormData = ref({
+    id: '',
+    username: '',
+    password: '',
+    email: '',
+    phone: '',
+    avatar: '',
+    status: 'active'
+})
+
+// 删除用户相关
+const showDeleteModal = ref(false)
+const deleteTarget = ref(null)
+const deletingUserId = ref(null)
+
+const handleDelete = (user) => {
+    deleteTarget.value = user
+    showDeleteModal.value = true
+}
+
+const cancelDelete = () => {
+    showDeleteModal.value = false
+    deleteTarget.value = null
+}
+
+const confirmDelete = async () => {
+    if (!deleteTarget.value?.id) return
+    deletingUserId.value = deleteTarget.value.id
+    try {
+        const res = await apiDeleteUser(deleteTarget.value.id)
+        if (res.code === 200) {
+            showToast('用户已删除')
+            cancelDelete()
+            await fetchUsers()
+        } else {
+            showToast(res.message || '删除失败')
+        }
+    } catch (e) {
+        showToast(e?.message || '网络错误')
+    } finally {
+        deletingUserId.value = null
+    }
+}
 
 let toastTimer = null
 function showToast(msg, ms = 3200) {
@@ -292,6 +526,88 @@ async function copyToken() {
     }
 }
 
+// 添加人员
+const handleAdd = () => {
+    userModalMode.value = 'add'
+    userFormData.value = {
+        id: '',
+        username: '',
+        password: '',
+        email: '',
+        phone: '',
+        avatar: '',
+        status: 'active'
+    }
+    userFormErrors.value = {}
+    showUserModal.value = true
+}
+
+// 编辑人员
+const handleEdit = (user) => {
+    userModalMode.value = 'edit'
+    userFormData.value = {
+        id: user.id,
+        username: user.username || user.name || '',
+        password: '',
+        email: user.email || '',
+        phone: user.phone || '',
+        avatar: user.avatar || '',
+        status: user.status || 'active'
+    }
+    userFormErrors.value = {}
+    showUserModal.value = true
+}
+
+// 关闭用户弹窗
+const closeUserModal = () => {
+    showUserModal.value = false
+    userFormErrors.value = {}
+}
+
+// 提交用户表单
+const handleUserSubmit = async () => {
+    userFormErrors.value = {}
+
+    if (!userFormData.value.username || userFormData.value.username.trim() === '') {
+        userFormErrors.value.username = '请输入登录账号'
+    } else if (!/^[a-zA-Z0-9_]+$/.test(userFormData.value.username)) {
+        userFormErrors.value.username = '账号只能包含字母、数字或下划线'
+    }
+
+    if (Object.keys(userFormErrors.value).length > 0) return
+
+    submitting.value = true
+    try {
+        // 如果新增时未设置密码，默认为 123456
+        const password = userFormData.value.password?.trim() || '123456'
+        const payload = {
+            ...(userFormData.value.id && { id: userFormData.value.id }),
+            username: userFormData.value.username.trim(),
+            password: password,
+            ...(userFormData.value.email && { email: userFormData.value.email.trim() }),
+            ...(userFormData.value.phone && { phone: userFormData.value.phone.trim() }),
+            ...(userFormData.value.avatar && { avatar: userFormData.value.avatar.trim() }),
+            status: userFormData.value.status
+        }
+
+        console.log('提交用户数据:', payload)
+        const res = await apiSaveUser(payload)
+
+        if (res.code === 200) {
+            showToast(userModalMode.value === 'add' ? '用户添加成功' : '用户信息已更新')
+            closeUserModal()
+            currentPage.value = 1
+            await fetchUsers()
+        } else {
+            showToast(res.message || '操作失败，错误码：' + res.code)
+        }
+    } catch (e) {
+        showToast(e?.message || '网络错误，请检查网络或后端服务')
+    } finally {
+        submitting.value = false
+    }
+}
+
 const statusText = (status) => {
     const map = { active: '正常', frozen: '冻结', deleted: '已删除' }
     return map[status] || status || 'active'
@@ -312,7 +628,7 @@ const filteredUsers = computed(() => {
     if (!searchKeyword.value) return users.value
     const keyword = searchKeyword.value.toLowerCase()
     return users.value.filter(user =>
-        (user.username || '').toLowerCase().includes(keyword) ||
+        (user.username || user.name || '').toLowerCase().includes(keyword) ||
         (user.email || '').toLowerCase().includes(keyword)
     )
 })
@@ -591,98 +907,6 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
     gap: 12px;
 }
 
-.modal-title-wrap {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.modal-title-accent {
-    display: block;
-    width: 4px;
-    height: 20px;
-    background: linear-gradient(180deg, #409eff, #66b1ff);
-    border-radius: 2px;
-    flex-shrink: 0;
-}
-
-.modal-title {
-    margin: 0;
-    font-size: 17px;
-    font-weight: 600;
-    color: #0f172a;
-}
-
-.modal-subtitle {
-    margin: 4px 0 0;
-    font-size: 13px;
-    color: #94a3b8;
-    line-height: 1.5;
-}
-
-.modal-close {
-    flex-shrink: 0;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    border: none;
-    background: transparent;
-    color: #94a3b8;
-    cursor: pointer;
-    transition: background 0.2s, color 0.2s;
-    padding: 0;
-}
-
-.modal-close:hover {
-    background: #f1f5f9;
-    color: #475569;
-}
-
-/* 弹窗主体 */
-.modal-body {
-    padding: 20px 24px;
-    overflow-y: auto;
-}
-
-/* 弹窗底部 */
-.modal-footer {
-    padding: 0 24px 24px;
-    display: flex;
-    justify-content: flex-end;
-}
-
-/* 底部按钮 */
-.btn-modal {
-    padding: 10px 24px;
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    border: 1px solid transparent;
-    transition: background 0.2s, border-color 0.2s, opacity 0.2s;
-}
-
-.btn-modal-primary {
-    background: #409eff;
-    border-color: #409eff;
-    color: #fff;
-}
-
-.btn-modal-primary:hover {
-    background: #66b1ff;
-    border-color: #66b1ff;
-}
-
-.token-box {
-    display: flex;
-    align-items: stretch;
-    gap: 10px;
-    padding: 4px 0 8px;
-}
-
 .token-hex {
     flex: 1;
     display: block;
@@ -797,5 +1021,581 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
 .page-num {
     color: #606266;
     font-size: 14px;
+}
+
+/* 工具栏按钮样式 */
+.toolbar-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: 1px solid #dcdfe6;
+    border-radius: 6px;
+    background: white;
+    color: #606266;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    border-color: #409eff;
+    color: #409eff;
+}
+
+.btn-primary {
+    background: #409eff;
+    border-color: #409eff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #66b1ff;
+    border-color: #66b1ff;
+    color: white;
+}
+
+/* 添加/编辑用户弹窗 */
+.add-user-modal {
+    width: 100%;
+    max-width: 680px;
+    max-height: none;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 28px;
+    box-shadow: 0 28px 72px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    animation: modal-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.add-user-modal .modal-header {
+    padding: 18px 28px 14px;
+    border-radius: 28px 28px 0 0;
+}
+
+.add-user-modal .modal-icon-wrap {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s;
+}
+
+.add-user-modal .modal-icon-wrap.icon-add {
+    background: linear-gradient(135deg, #e0f2fe, #dbeafe);
+    color: #3b82f6;
+}
+
+.add-user-modal .modal-icon-wrap.icon-edit {
+    background: linear-gradient(135deg, #fef3c7, #fef9c3);
+    color: #f59e0b;
+}
+
+.add-user-modal .modal-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.add-user-modal .modal-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+}
+
+.add-user-modal .modal-close {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 10px;
+    background: #f1f5f9;
+    color: #64748b;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.add-user-modal .modal-close:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.add-user-modal .form-card {
+    background: linear-gradient(180deg, #fafbfc 0%, #fff 100%);
+    border: 1px solid #f1f5f9;
+    border-radius: 16px;
+    padding: 20px;
+}
+
+.add-user-modal .form-field-group {
+    padding: 0 0 4px;
+}
+
+.add-user-modal .form-field-group + .form-field-group {
+    border-top: 1px solid #f1f5f9;
+    padding-top: 16px;
+    margin-top: 12px;
+}
+
+.add-user-modal .form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.add-user-modal .form-field label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    letter-spacing: 0.01em;
+}
+
+.add-user-modal .form-field label .required {
+    color: #f56c6c;
+    margin-left: 2px;
+}
+
+.add-user-modal .input-wrapper {
+    position: relative;
+}
+
+.add-user-modal .input-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+.add-user-modal .field-input {
+    width: 100%;
+    padding: 11px 14px 11px 40px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 14px;
+    color: #0f172a;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+}
+
+.add-user-modal .field-input::placeholder {
+    color: #94a3b8;
+}
+
+.add-user-modal .field-input:focus {
+    border-color: #409eff;
+    box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.12);
+}
+
+.add-user-modal .field-error {
+    border-color: #f56c6c !important;
+    box-shadow: 0 0 0 3px rgba(245, 108, 108, 0.12) !important;
+}
+
+.add-user-modal .field-error-text {
+    font-size: 12px;
+    color: #f56c6c;
+}
+
+.add-user-modal .field-hint {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.add-user-modal .select-wrapper {
+    position: relative;
+}
+
+.add-user-modal .select-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+.add-user-modal .field-select {
+    width: 100%;
+    padding: 11px 14px 11px 40px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 14px;
+    color: #0f172a;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394A3B8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+    cursor: pointer;
+}
+
+.add-user-modal .field-select:focus {
+    border-color: #409eff;
+    box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.12);
+}
+
+/* 账号状态开关样式 */
+.form-field-status {
+    padding-top: 16px;
+    margin-top: 4px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.status-toggle-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.status-toggle {
+    position: relative;
+    width: 48px;
+    height: 26px;
+    background: #e2e8f0;
+    border-radius: 13px;
+    cursor: pointer;
+    transition: background 0.25s;
+}
+
+.status-toggle.is-frozen {
+    background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.status-toggle-knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.status-toggle.is-frozen .status-toggle-knob {
+    transform: translateX(22px);
+}
+
+.status-toggle-label {
+    font-size: 15px;
+    font-weight: 600;
+    color: #52c41a;
+    transition: color 0.2s;
+    min-width: 32px;
+}
+
+.status-toggle-label.label-frozen {
+    color: #f59e0b;
+}
+
+.add-user-modal .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    padding: 18px 28px 24px;
+    background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+    border-top: 1px solid #f1f5f9;
+}
+
+.add-user-modal .btn-modal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 108px;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.add-user-modal .btn-modal-ghost {
+    border: 1.5px solid #e2e8f0;
+    background: #fff;
+    color: #64748b;
+}
+
+.add-user-modal .btn-modal-ghost:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+    color: #0f172a;
+}
+
+.add-user-modal .btn-modal-primary {
+    border: none;
+    background: linear-gradient(135deg, #409eff 0%, #3a8ee6 100%);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(64, 158, 255, 0.35);
+}
+
+.add-user-modal .btn-modal-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #66b1ff 0%, #409eff 100%);
+    box-shadow: 0 6px 20px rgba(64, 158, 255, 0.45);
+    transform: translateY(-1px);
+}
+
+.add-user-modal .btn-modal-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+@keyframes modal-in {
+    from { opacity: 0; transform: scale(0.9) translateY(12px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.add-user-modal .modal-title {
+    font-size: 19px;
+}
+
+.add-user-modal .modal-subtitle {
+    margin-top: 4px;
+    font-size: 13px;
+}
+
+.add-user-modal .modal-body-user {
+    padding: 14px 28px 8px;
+}
+
+.add-user-modal .modal-footer-user {
+    padding: 16px 28px 22px;
+    border-radius: 0 0 28px 28px;
+}
+
+.add-user-modal .form-card-user {
+    padding: 16px 18px;
+    border-radius: 18px;
+}
+
+.add-user-modal .form-user-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 22px;
+    align-items: start;
+}
+
+.add-user-modal .form-field-group {
+    padding: 0;
+    margin: 0;
+}
+
+.add-user-modal .form-field-group + .form-field-group {
+    border: none;
+    padding-top: 0;
+    margin-top: 0;
+}
+
+.add-user-modal .form-field {
+    gap: 6px;
+}
+
+.add-user-modal .form-field label {
+    font-size: 13px;
+}
+
+.add-user-modal .field-input {
+    padding: 9px 12px 9px 38px;
+    font-size: 14px;
+    border-radius: 12px;
+}
+
+.add-user-modal .input-icon {
+    left: 12px;
+}
+
+.add-user-modal .field-hint {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+/* 操作列编辑按钮 */
+.action-buttons {
+    display: flex;
+    gap: 6px;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-edit {
+    background: #e6f7ff;
+    color: #1890ff;
+}
+
+.action-edit:hover {
+    background: #1890ff;
+    color: #fff;
+}
+
+.user-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #e2e8f0;
+}
+
+.action-delete {
+    background: #fff1f0;
+    color: #ff4d4f;
+}
+
+.action-delete:hover {
+    background: #ff4d4f;
+    color: #fff;
+}
+
+.action-delete:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.spa-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+/* 删除确认弹窗样式 */
+.delete-confirm-dialog {
+    background: #fff;
+    border-radius: 16px;
+    padding: 32px 28px 24px;
+    width: 360px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    animation: dialogEnter 0.2s ease-out;
+}
+
+@keyframes dialogEnter {
+    from {
+        opacity: 0;
+        transform: scale(0.92);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.delete-confirm-icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 16px;
+    background: linear-gradient(135deg, #fff1f0, #ffebe9);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ff4d4f;
+}
+
+.delete-confirm-title {
+    margin: 0 0 12px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1a1a2e;
+}
+
+.delete-confirm-message {
+    margin: 0 0 6px;
+    font-size: 14px;
+    color: #64748b;
+    line-height: 1.6;
+}
+
+.delete-username {
+    color: #1a1a2e;
+    font-weight: 600;
+}
+
+.delete-confirm-hint {
+    margin: 0 0 24px;
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+.delete-confirm-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.delete-btn-cancel {
+    flex: 1;
+    padding: 10px 20px;
+    background: #f1f5f9;
+    color: #64748b;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.delete-btn-cancel:hover {
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.delete-btn-confirm {
+    flex: 1;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #ff4d4f, #ff7875);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.delete-btn-confirm:hover:not(:disabled) {
+    background: linear-gradient(135deg, #ff7875, #ff4d4f);
+    box-shadow: 0 4px 12px rgba(255, 77, 79, 0.3);
+}
+
+.delete-btn-confirm:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 </style>

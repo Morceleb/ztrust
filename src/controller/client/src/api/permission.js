@@ -23,6 +23,15 @@ export async function grantPermission(data) {
   }
 }
 
+export async function updatePermission(data) {
+  try {
+    const res = await apiClient.put('/policy/admin/permission/update', data)
+    return res.data
+  } catch (err) {
+    return normalizeError(err)
+  }
+}
+
 export async function deletePermission(data) {
   try {
     const res = await apiClient.delete('/policy/admin/permission/delete', {
