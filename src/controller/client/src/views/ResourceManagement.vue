@@ -29,7 +29,7 @@
                         <th>图标</th>
                         <th>资源名称</th>
                         <th>资源类型</th>
-                        <th>资源URL</th>
+                        <th>资源ID</th>
                         <th>允许方法</th>
                         <th class="avail-col">资源状态</th>
                         <th width="120">操作</th>
@@ -54,7 +54,7 @@
                         </td>
                         <td>{{ resource.name }}</td>
                         <td>{{ resource.type || '-' }}</td>
-                        <td>{{ resource.url || '-' }}</td>
+                        <td>{{ resource.resourceId || '-' }}</td>
                         <td>{{ resource.allow_method || '-' }}</td>
                         <td class="avail-col">
                             <span
@@ -145,15 +145,14 @@
                             </div>
                             <div class="form-field-group">
                                 <div class="form-field">
-                                    <label>资源URL <span class="required">*</span></label>
+                                    <label>Resource ID <span class="required">*</span></label>
                                     <div class="input-wrapper">
                                         <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                                         </svg>
-                                        <input type="text" v-model="formData.url" class="field-input" :class="{ 'field-error': formErrors.url }" placeholder="IP 或域名" />
+                                        <input type="text" v-model="formData.resourceId" class="field-input" :class="{ 'field-error': formErrors.resourceId }" placeholder="输入 Resource ID" />
                                     </div>
-                                    <span class="field-hint field-hint-inline" v-if="modalMode === 'add'">须填 IP 或域名</span>
-                                    <span class="field-error-text" v-if="formErrors.url">{{ formErrors.url }}</span>
+                                    <span class="field-error-text" v-if="formErrors.resourceId">{{ formErrors.resourceId }}</span>
                                 </div>
                             </div>
                             <div class="form-field-group form-field-span-2">
@@ -377,7 +376,7 @@ const toggleActive = () => {
 
 const handleAdd = () => {
     modalMode.value = 'add'
-    formData.value = { id: null, name: '', type: '', url: '', icon: '', allow_method: '', is_active: true }
+    formData.value = { id: null, name: '', type: '', resourceId: '', icon: '', allow_method: '', is_active: true }
     formErrors.value = {}
     showModal.value = true
 }
@@ -388,7 +387,7 @@ const handleEdit = (resource) => {
         id: resource.id,
         name: resource.name,
         type: resource.type || '',
-        url: resource.url || '',
+        resourceId: resource.resourceId || resource.url || '',
         icon: resource.icon || '',
         allow_method: resource.allow_method || '',
         is_active: resource.is_active !== false
@@ -437,7 +436,7 @@ const handleSubmit = async () => {
             id: formData.value.id || null,
             name: formData.value.name.trim(),
             type: formData.value.type?.trim() || null,
-            url: formData.value.url?.trim() || null,
+            resourceId: formData.value.resourceId?.trim() || null,
             icon: formData.value.icon?.trim() || null,
             allowMethod: formData.value.allow_method?.trim() || null,
             isActive: formData.value.is_active === true
