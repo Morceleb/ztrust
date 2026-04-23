@@ -153,22 +153,13 @@ const PermissionIcon = {
     ])
 }
 
-const ImportIcon = {
-    render: () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2 }, [
-        h('path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
-        h('polyline', { points: '17 8 12 3 7 8' }),
-        h('line', { x1: 12, y1: 3, x2: 12, y2: 15 })
-    ])
-}
-
 const menuItems = [
     { path: '/dashboard', label: '仪表盘', icon: DashboardIcon },
     { path: '/users', label: '人员管理', icon: UserIcon },
     { path: '/resources', label: '资源管理', icon: ResourceIcon },
     { path: '/user-groups', label: '用户组管理', icon: UserGroupIcon },
     { path: '/resource-groups', label: '资源组管理', icon: ResourceGroupIcon },
-    { path: '/permissions', label: '权限审批', icon: PermissionIcon },
-    { path: '/import', label: '导入数据', icon: ImportIcon }
+    { path: '/permissions', label: '权限审批', icon: PermissionIcon }
 ]
 
 const activeMenu = computed(() => route.path)

@@ -11,6 +11,19 @@
                 </button>
             </div>
             <div class="toolbar-actions">
+                <button class="btn btn-secondary" @click="triggerFileInput">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    导入资源
+                </button>
+                <input
+                    ref="fileInputRef"
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    style="display:none"
+                    @change="handleFileChange"
+                />
                 <button class="btn btn-primary" @click="handleAdd">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -266,6 +279,117 @@
             </div>
         </div>
 
+        <!-- 导入资源预览弹窗 -->
+        <div class="modal-overlay" v-if="showImportModal" @click.self="closeImportModal">
+            <div class="import-modal" @click.stop>
+                <div class="modal-header">
+                    <div class="modal-title-wrap">
+                        <div class="modal-icon-wrap icon-import">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                        </div>
+                        <div class="modal-title-text">
+                            <h3 class="modal-title">导入资源</h3>
+                            <p class="modal-subtitle">共检测到 <strong>{{ importPreviewData.length }}</strong> 条数据，确认后开始导入</p>
+                        </div>
+                    </div>
+                    <button type="button" class="modal-close" @click="closeImportModal" aria-label="关闭">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- 导入错误提示 -->
+                <div class="import-error-banner" v-if="importErrors.length > 0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    <span>{{ importErrors.length }} 条数据格式异常（资源名称未填写），已自动跳过</span>
+                </div>
+
+                <!-- 导入结果 -->
+                <div class="import-result-banner" v-if="importResult !== null">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    <span>导入完成：成功 <strong class="text-success">{{ importResult.success }}</strong> 条，失败 <strong class="text-fail">{{ importResult.failed }}</strong> 条</span>
+                </div>
+
+                <!-- 数据预览区 -->
+                <div class="import-preview-wrap">
+                    <table class="import-preview-table">
+                        <thead>
+                            <tr>
+                                <th>序号</th>
+                                <th>资源名称 *</th>
+                                <th>Resource ID *</th>
+                                <th>资源类型</th>
+                                <th>允许方法</th>
+                                <th v-if="!importResult">状态</th>
+                                <th v-if="importResult">结果</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(row, index) in importPreviewData" :key="index">
+                                <td>{{ index + 1 }}</td>
+                                <td>{{ row.name }}</td>
+                                <td>{{ row.resourceId || '-' }}</td>
+                                <td>{{ row.type || '-' }}</td>
+                                <td>{{ row.allowMethod || '-' }}</td>
+                                <td v-if="!importResult">
+                                    <span class="import-status-ok">待导入</span>
+                                </td>
+                                <td v-if="importResult">
+                                    <span v-if="row._success" class="import-status-ok">成功</span>
+                                    <span v-else class="import-status-fail">{{ row._error || '失败' }}</span>
+                                </td>
+                            </tr>
+                            <tr v-if="importPreviewData.length === 0">
+                                <td colspan="6" class="empty-cell">
+                                    <div class="empty-state">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                                        </svg>
+                                        <p>未检测到有效数据</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="modal-footer modal-footer-import">
+                    <div class="import-format-tip">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                        Excel 格式：资源名称（必填）、Resource ID（必填）、资源类型、允许方法
+                    </div>
+                    <div class="import-footer-btns">
+                        <button type="button" class="btn-modal btn-modal-ghost" @click="closeImportModal">
+                            {{ importResult !== null ? '关闭' : '取消' }}
+                        </button>
+                        <button
+                            type="button"
+                            class="btn-modal btn-modal-primary"
+                            v-if="importResult === null"
+                            :disabled="importing"
+                            @click="confirmImport"
+                        >
+                            <svg v-if="!importing" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            <svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin">
+                                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                            </svg>
+                            {{ importing ? '导入中...' : '确认导入' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- 轻提示 -->
         <div class="toast" v-if="toastMessage">{{ toastMessage }}</div>
@@ -275,6 +399,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { listResources, saveResource, deleteResource } from '@/api/resource.js'
+import * as XLSX from 'xlsx'
 
 const ICON_PRESETS = ['🖥️', '🌐', '🔐', '📁', '⚙️', '🔗', '💾', '📊']
 
@@ -297,6 +422,14 @@ const currentResource = ref(null)
 const toastMessage = ref('')
 const formErrors = ref({})
 const resources = ref([])
+
+// 导入资源相关
+const fileInputRef = ref(null)
+const showImportModal = ref(false)
+const importPreviewData = ref([])
+const importErrors = ref([])
+const importResult = ref(null)
+const importing = ref(false)
 
 let toastTimer = null
 function showToast(msg, ms = 3200) {
@@ -468,6 +601,110 @@ const pagedResources = computed(() => {
 })
 
 const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) || 1)
+
+// 导入资源
+const triggerFileInput = () => {
+    fileInputRef.value?.click()
+}
+
+const handleFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    parseImportFile(file)
+    e.target.value = ''
+}
+
+const parseImportFile = (file) => {
+    importResult.value = null
+    importErrors.value = []
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+        try {
+            const data = new Uint8Array(evt.target.result)
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true })
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+            const json = XLSX.utils.sheet_to_json(firstSheet, { defval: '' })
+
+            const validRows = []
+            const errors = []
+            json.forEach((row, index) => {
+                const name = String(row['资源名称'] || row['name'] || '').trim()
+                if (!name) {
+                    errors.push(index + 1)
+                    return
+                }
+                validRows.push({
+                    name,
+                    resourceId: String(row['Resource ID'] || row['resourceId'] || row['resource_id'] || '').trim(),
+                    type: String(row['资源类型'] || row['type'] || '').trim(),
+                    allowMethod: String(row['允许方法'] || row['allowMethod'] || row['allow_method'] || '').trim()
+                })
+            })
+
+            importErrors.value = errors
+            importPreviewData.value = validRows
+            showImportModal.value = true
+
+            if (validRows.length === 0) {
+                showToast('文件中未检测到有效数据，请检查格式')
+            }
+        } catch (err) {
+            showToast('文件解析失败，请确认是有效的 Excel 或 CSV 文件')
+            console.error('parseImportFile error:', err)
+        }
+    }
+    reader.readAsArrayBuffer(file)
+}
+
+const closeImportModal = () => {
+    showImportModal.value = false
+    importPreviewData.value = []
+    importErrors.value = []
+    importResult.value = null
+    importing.value = false
+}
+
+const confirmImport = async () => {
+    if (!importPreviewData.value.length) return
+    importing.value = true
+    let success = 0
+    let failed = 0
+
+    for (const row of importPreviewData.value) {
+        try {
+            const payload = {
+                name: row.name,
+                resourceId: row.resourceId || null,
+                type: row.type || null,
+                allowMethod: row.allowMethod || null,
+                isActive: true
+            }
+            const res = await saveResource(payload)
+            if (res.code === 200) {
+                row._success = true
+                success++
+            } else {
+                row._success = false
+                row._error = res.message || '导入失败'
+                failed++
+            }
+        } catch {
+            row._success = false
+            row._error = '网络错误'
+            failed++
+        }
+    }
+
+    importResult.value = { success, failed }
+    importing.value = false
+
+    if (success > 0) {
+        showToast(`导入完成：成功 ${success} 条，失败 ${failed} 条`)
+        await fetchResources()
+    } else {
+        showToast('导入失败，请检查数据格式或网络')
+    }
+}
 </script>
 
 <style scoped>
@@ -548,6 +785,17 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
     background: #66b1ff;
     border-color: #66b1ff;
     color: white;
+}
+
+.btn-secondary {
+    background: #fff;
+    border-color: #dcdfe6;
+    color: #606266;
+}
+
+.btn-secondary:hover {
+    border-color: #409eff;
+    color: #409eff;
 }
 
 .table-container {
@@ -1309,5 +1557,260 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
     .modal-footer {
         padding: 16px 20px 20px;
     }
+}
+
+/* 导入弹窗 */
+.import-modal {
+    width: 100%;
+    max-width: 800px;
+    max-height: 85vh;
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 28px 72px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: modal-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.import-modal .modal-header {
+    padding: 20px 24px 16px;
+    flex-shrink: 0;
+}
+
+.import-modal .modal-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.import-modal .modal-icon-wrap {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.import-modal .modal-icon-wrap.icon-import {
+    background: linear-gradient(135deg, #e0f2fe, #dbeafe);
+    color: #3b82f6;
+}
+
+.import-modal .modal-title-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.import-modal .modal-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+}
+
+.import-modal .modal-subtitle {
+    margin: 2px 0 0;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.import-modal .modal-subtitle strong {
+    color: #3b82f6;
+}
+
+.import-modal .modal-close {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 10px;
+    background: #f1f5f9;
+    color: #64748b;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.import-modal .modal-close:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.import-error-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 24px 12px;
+    padding: 10px 14px;
+    background: #fff7e6;
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+    color: #d97706;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.import-result-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 24px 12px;
+    padding: 10px 14px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    color: #166534;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.import-result-banner .text-success {
+    color: #16a34a;
+    font-weight: 700;
+}
+
+.import-result-banner .text-fail {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+.import-preview-wrap {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 24px;
+    min-height: 0;
+}
+
+.import-preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.import-preview-table th {
+    background: #fafafa;
+    color: #606266;
+    font-weight: 600;
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid #ebeef5;
+    position: sticky;
+    top: 0;
+}
+
+.import-preview-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #374151;
+}
+
+.import-preview-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+.import-status-ok {
+    color: #16a34a;
+    font-weight: 600;
+}
+
+.import-status-fail {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+.import-modal .modal-footer-import {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 24px 20px;
+    background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+    border-top: 1px solid #f1f5f9;
+    flex-shrink: 0;
+}
+
+.import-format-tip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #94a3b8;
+    flex: 1;
+}
+
+.import-format-tip strong {
+    color: #475569;
+}
+
+.import-footer-btns {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.import-preview-table td.empty-cell {
+    text-align: center;
+    padding: 32px 16px;
+}
+
+.import-modal .btn-modal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 108px;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.import-modal .btn-modal-ghost {
+    border: 1.5px solid #e2e8f0;
+    background: #fff;
+    color: #64748b;
+}
+
+.import-modal .btn-modal-ghost:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+    color: #0f172a;
+}
+
+.import-modal .btn-modal-primary {
+    border: none;
+    background: linear-gradient(135deg, #409eff 0%, #3a8ee6 100%);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(64, 158, 255, 0.35);
+}
+
+.import-modal .btn-modal-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #66b1ff 0%, #409eff 100%);
+    box-shadow: 0 6px 20px rgba(64, 158, 255, 0.45);
+    transform: translateY(-1px);
+}
+
+.import-modal .btn-modal-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.spin {
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 </style>
