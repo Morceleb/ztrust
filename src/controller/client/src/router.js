@@ -5,16 +5,11 @@ import UserManagement from './views/UserManagement.vue'
 import ResourceManagement from './views/ResourceManagement.vue'
 import UserGroup from './views/UserGroup.vue'
 import ResourceGroup from './views/ResourceGroup.vue'
-import Login from './views/Login.vue'
 import Callback from './views/Callback.vue'
 import PermissionApproval from './views/PermissionApproval.vue'
+import LoginPageSetting from './views/LoginPageSetting.vue'
 
 const routes = [
-  {
-    path: '/login',
-    name: 'Login',
-    component: Login
-  },
   {
     path: '/callback',
     name: 'Callback',
@@ -30,7 +25,8 @@ const routes = [
       { path: 'resources', component: ResourceManagement },
       { path: 'user-groups', component: UserGroup },
       { path: 'resource-groups', component: ResourceGroup },
-      { path: 'permissions', component: PermissionApproval }
+      { path: 'permissions', component: PermissionApproval },
+      { path: 'login-page-setting', component: LoginPageSetting }
     ]
   }
 ]

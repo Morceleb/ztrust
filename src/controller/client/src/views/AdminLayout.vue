@@ -153,13 +153,22 @@ const PermissionIcon = {
     ])
 }
 
+const LoginPageIcon = {
+    render: () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2 }, [
+        h('rect', { x: 3, y: 3, width: 18, height: 18, rx: 2 }),
+        h('path', { d: 'M3 9h18' }),
+        h('path', { d: 'M9 21V9' })
+    ])
+}
+
 const menuItems = [
     { path: '/dashboard', label: '仪表盘', icon: DashboardIcon },
     { path: '/users', label: '人员管理', icon: UserIcon },
     { path: '/resources', label: '资源管理', icon: ResourceIcon },
     { path: '/user-groups', label: '用户组管理', icon: UserGroupIcon },
     { path: '/resource-groups', label: '资源组管理', icon: ResourceGroupIcon },
-    { path: '/permissions', label: '权限审批', icon: PermissionIcon }
+    { path: '/permissions', label: '权限审批', icon: PermissionIcon },
+    { path: '/login-page-setting', label: '登录页面', icon: LoginPageIcon }
 ]
 
 const activeMenu = computed(() => route.path)
