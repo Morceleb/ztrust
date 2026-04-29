@@ -69,7 +69,13 @@
                         <td class="spa-status-col">
                             <span
                                 class="spa-badge"
-                                :class="'spa-' + (user.spaStatus || 'none')"
+                                :class="[
+                                    'spa-' + (user.spaStatus || 'none'),
+                                    { 'spa-clickable': user.spaStatus === 'issued' || user.spaStatus === 'disabled' }
+                                ]"
+                                :title="getSpaStatusTooltip(user.spaStatus)"
+                                @click="onViewTokenCode(user)"
+                                :style="{ cursor: (user.spaStatus === 'issued' || user.spaStatus === 'disabled') ? 'pointer' : 'default' }"
                             >
                                 {{ spaStatusText(user.spaStatus) }}
                             </span>
@@ -443,7 +449,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { listUsers, issueSpaToken as apiIssue, disableSpaToken as apiDisable, enableSpaToken as apiEnable, saveUser as apiSaveUser, deleteUser as apiDeleteUser } from '@/api/user.js'
+import { listUsers, issueSpaToken as apiIssue, disableSpaToken as apiDisable, enableSpaToken as apiEnable, saveUser as apiSaveUser, deleteUser as apiDeleteUser, getTokenCode as apiGetTokenCode } from '@/api/user.js'
 import { getSpaStatus } from '@/api/spaAdmin.js'
 import { listRoleGroups, getRoleGroupDetail, assignUsersToRoleGroup } from '@/api/roleGroup.js'
 import * as XLSX from 'xlsx'
@@ -747,6 +753,28 @@ const secondarySpaDisabled = (user) => {
     if (s === 'none') return true
     if (s === 'updating') return true
     return loadingSpaUserId.value === user.id
+}
+
+const getSpaStatusTooltip = (status) => {
+    if (status === 'none') return '请先发放安全码'
+    if (status === 'issued' || status === 'disabled') return '点击查看安全码'
+    return ''
+}
+
+async function onViewTokenCode(user) {
+    if (user.spaStatus === 'none') return
+    try {
+        const res = await apiGetTokenCode(user.id)
+        if (res.code === 200 && res.data) {
+            lastTokenHex.value = res.data
+            showTokenModal.value = true
+        } else {
+            showToast(res.message || '获取安全码失败')
+        }
+    } catch (e) {
+        console.error('获取安全码异常:', e)
+        showToast('获取安全码失败，请稍后重试')
+    }
 }
 
 async function onPrimarySpa(user) {
@@ -1112,6 +1140,17 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
 .spa-updating {
     background: #eff6ff;
     color: #2563eb;
+}
+
+.spa-clickable {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.spa-clickable:hover {
+    opacity: 0.8;
+    transform: scale(1.02);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .spa-actions {

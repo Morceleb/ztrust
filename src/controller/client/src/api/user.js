@@ -47,6 +47,15 @@ export async function enableSpaToken(userId) {
   }
 }
 
+export async function getTokenCode(userId) {
+  try {
+    const res = await identityClient.get(`/admin/spa/users/${encodeURIComponent(userId)}/token-code`)
+    return res.data
+  } catch (err) {
+    return normalizeError(err)
+  }
+}
+
 /**
  * 保存用户（新增/编辑）
  * @param {Object} userData - 用户数据

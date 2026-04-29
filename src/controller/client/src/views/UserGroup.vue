@@ -13,7 +13,7 @@
         </div>
 
         <div class="group-list">
-            <div class="group-card" v-for="group in filteredGroups" :key="group.id">
+            <div class="group-card" v-for="group in paginatedGroups" :key="group.id">
                 <div class="group-header">
                     <div class="group-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -73,13 +73,32 @@
                 </div>
             </div>
 
-            <div v-if="filteredGroups.length === 0" class="empty-state">
+            <div v-if="paginatedGroups.length === 0 && filteredGroups.length === 0" class="empty-state">
                 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                     <path d="M12 2L2 7l10 5 10-5-10-5z"/>
                     <path d="M2 17l10 5 10-5"/>
                     <path d="M2 12l10 5 10-5"/>
                 </svg>
                 <p>暂无角色组</p>
+            </div>
+        </div>
+
+        <!-- 分页 -->
+        <div class="pagination-bar" v-if="totalPages > 1">
+            <span class="pagination-info">第 {{ currentPage }} / {{ totalPages }} 页，共 {{ totalGroups }} 个角色组</span>
+            <div class="pagination-controls">
+                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage = 1">«</button>
+                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">‹</button>
+                <button
+                    v-for="p in visiblePages"
+                    :key="p"
+                    class="page-btn"
+                    :class="{ active: p === currentPage, ellipsis: p === '...' }"
+                    :disabled="p === '...'"
+                    @click="p !== '...' && (currentPage = p)"
+                >{{ p }}</button>
+                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">›</button>
+                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage = totalPages">»</button>
             </div>
         </div>
 
@@ -397,7 +416,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import {
     listRoleGroups, saveRoleGroup, assignUsersToRoleGroup, deleteRoleGroup, getRoleGroupDetail
 } from '@/api/roleGroup.js'
@@ -432,6 +451,8 @@ const emptyForm = () => ({
 })
 
 const formData = ref(emptyForm())
+const currentPage = ref(1)
+const pageSize = 6
 
 let toastTimer = null
 const toastMessage = ref('')
@@ -567,6 +588,32 @@ async function fetchAllUsers() {
 const filteredGroups = computed(() => {
     if (!searchKeyword.value) return groups.value
     return groups.value.filter(g => (g.name || '').toLowerCase().includes(searchKeyword.value.toLowerCase()))
+})
+
+const totalGroups = computed(() => filteredGroups.value.length)
+const totalPages = computed(() => Math.ceil(totalGroups.value / pageSize) || 1)
+const paginatedGroups = computed(() => {
+    const start = (currentPage.value - 1) * pageSize
+    return filteredGroups.value.slice(start, start + pageSize)
+})
+
+// 搜索关键词变化时重置到第一页
+watch(searchKeyword, () => { currentPage.value = 1 })
+
+// 生成可见页码数组（带省略号）
+const visiblePages = computed(() => {
+    const total = totalPages.value
+    const cur = currentPage.value
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+    const pages = []
+    if (cur <= 4) {
+        pages.push(1, 2, 3, 4, 5, '...', total)
+    } else if (cur >= total - 3) {
+        pages.push(1, '...', total - 4, total - 3, total - 2, total - 1, total)
+    } else {
+        pages.push(1, '...', cur - 1, cur, cur + 1, '...', total)
+    }
+    return pages
 })
 
 const availableResourceGroups = computed(() => {
@@ -919,7 +966,17 @@ async function fetchResourceGroups() {
 .btn-primary { background: #409eff; border-color: #409eff; color: white; }
 .btn-primary:hover { background: #66b1ff; }
 .group-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 20px; }
-.group-card { background: #fafafa; border-radius: 12px; padding: 20px; border: 1px solid #ebeef5; transition: all 0.3s; }
+.group-card {
+    background: #fafafa;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #ebeef5;
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+    height: 220px;
+    overflow: hidden;
+}
 .group-card:hover { border-color: #409eff; box-shadow: 0 4px 12px rgba(64, 158, 255, 0.1); }
 .group-header {
     display: grid;
@@ -927,7 +984,7 @@ async function fetchResourceGroups() {
     column-gap: 12px;
     row-gap: 12px;
     align-items: start;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
 }
 .group-icon {
     grid-row: 1;
@@ -974,16 +1031,91 @@ async function fetchResourceGroups() {
 .action-btn.edit-name { background: #fff7e6; color: #fa8c16; }
 .action-btn.edit-name:hover { background: #ffe7b3; }
 .group-resources,
-.group-members-preview { margin-top: 12px; padding-top: 12px; border-top: 1px solid #ebeef5; }
+.group-members-preview {
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px solid #ebeef5;
+    flex-shrink: 0;
+}
 .resource-title { font-size: 13px; color: #909399; margin-bottom: 8px; }
-.resource-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.resource-tags {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    gap: 6px;
+}
 .resource-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: white; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 12px; color: #606266; }
 .resource-level { font-style: normal; font-size: 11px; color: #f56c6c; font-weight: 500; }
-.member-preview-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.member-preview-tags {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    gap: 6px;
+}
 .member-preview-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #f0f5ff; border: 1px solid #d6e4ff; border-radius: 4px; font-size: 12px; color: #303133; }
 .member-preview-tag em { font-style: normal; font-size: 11px; color: #409eff; }
 .member-preview-empty { font-size: 12px; color: #c0c4cc; }
 .empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 0; color: #909399; }
+
+/* 分页 */
+.pagination-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding: 12px 4px;
+    gap: 12px;
+}
+
+.pagination-info {
+    font-size: 13px;
+    color: #909399;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.page-btn {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: white;
+    color: #606266;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.page-btn:hover:not(:disabled):not(.ellipsis) {
+    border-color: #409eff;
+    color: #409eff;
+}
+
+.page-btn.active {
+    background: #409eff;
+    border-color: #409eff;
+    color: white;
+    font-weight: 600;
+}
+
+.page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.page-btn.ellipsis {
+    border-color: transparent;
+    background: transparent;
+    cursor: default;
+}
 
 /* 弹窗样式 */
 .modal-overlay {
