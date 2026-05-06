@@ -161,6 +161,13 @@ const LoginPageIcon = {
     ])
 }
 
+const LoginPreviewIcon = {
+    render: () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2 }, [
+        h('path', { d: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z' }),
+        h('circle', { cx: 12, cy: 12, r: 3 })
+    ])
+}
+
 const menuItems = [
     { path: '/dashboard', label: '仪表盘', icon: DashboardIcon },
     { path: '/users', label: '人员管理', icon: UserIcon },
@@ -168,7 +175,8 @@ const menuItems = [
     { path: '/user-groups', label: '用户组管理', icon: UserGroupIcon },
     { path: '/resource-groups', label: '资源组管理', icon: ResourceGroupIcon },
     { path: '/permissions', label: '权限审批', icon: PermissionIcon },
-    { path: '/login-page-setting', label: '登录页面', icon: LoginPageIcon }
+    { path: '/login-page-setting', label: '登录页面', icon: LoginPageIcon },
+    { path: '/login-preview-test', label: '登录预览', icon: LoginPreviewIcon }
 ]
 
 const activeMenu = computed(() => route.path)

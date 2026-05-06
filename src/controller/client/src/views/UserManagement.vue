@@ -12,11 +12,16 @@
                 </button>
             </div>
             <div class="toolbar-actions">
-                <button class="btn btn-secondary" @click="triggerFileInput">
+                <button class="btn btn-secondary import-btn-with-tip" @click="triggerFileInput">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                     </svg>
                     导入人员
+                    <div class="import-tooltip">
+                        <div class="import-tooltip-title">导入说明</div>
+                        <div class="import-tooltip-row"><span class="import-tooltip-label">字段要求：</span><span>用户名、邮箱、手机、密码（不填默认为 123456）</span></div>
+                        <div class="import-tooltip-row"><span class="import-tooltip-label">格式要求：</span><span>用户名仅支持英文字母、数字、下划线；邮箱需符合标准格式；手机需为纯数字，长度 7-15 位</span></div>
+                    </div>
                 </button>
                 <input
                     ref="fileInputRef"
@@ -1602,6 +1607,65 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
 .btn:hover {
     border-color: #409eff;
     color: #409eff;
+}
+
+.import-btn-with-tip {
+    position: relative;
+}
+
+.import-tooltip {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: -80px;
+    z-index: 100;
+    display: none;
+    width: 320px;
+    padding: 14px 16px;
+    background: white;
+    border: 1px solid #e4e7ed;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+    text-align: left;
+}
+
+.import-btn-with-tip:hover .import-tooltip {
+    display: block;
+}
+
+.import-tooltip::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 100px;
+    width: 10px;
+    height: 10px;
+    background: white;
+    border-top: 1px solid #e4e7ed;
+    border-left: 1px solid #e4e7ed;
+    transform: rotate(45deg);
+}
+
+.import-tooltip-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #303133;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ebeef5;
+}
+
+.import-tooltip-row {
+    display: flex;
+    font-size: 12px;
+    line-height: 1.8;
+    color: #606266;
+}
+
+.import-tooltip-label {
+    color: #409eff;
+    font-weight: 500;
+    min-width: 70px;
+    flex-shrink: 0;
 }
 
 .btn-primary {

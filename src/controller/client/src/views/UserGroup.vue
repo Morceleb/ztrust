@@ -974,7 +974,7 @@ async function fetchResourceGroups() {
     transition: all 0.3s;
     display: flex;
     flex-direction: column;
-    height: 220px;
+    height: 215px;
     overflow: hidden;
 }
 .group-card:hover { border-color: #409eff; box-shadow: 0 4px 12px rgba(64, 158, 255, 0.1); }
@@ -1032,28 +1032,73 @@ async function fetchResourceGroups() {
 .action-btn.edit-name:hover { background: #ffe7b3; }
 .group-resources,
 .group-members-preview {
-    margin-top: 6px;
-    padding-top: 8px;
+    margin-top: 4px;
+    padding-top: 6px;
     border-top: 1px solid #ebeef5;
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
-.resource-title { font-size: 13px; color: #909399; margin-bottom: 8px; }
+.resource-title { font-size: 13px; color: #909399; margin-bottom: 6px; }
 .resource-tags {
     display: flex;
-    flex-wrap: nowrap;
-    overflow: hidden;
-    gap: 6px;
+  flex-wrap: wrap; /* 改为 wrap：允许放不下的元素掉到下一行 */
+  align-content: flex-start; /* 确保多行排列时从顶部开始对齐 */
+  overflow: hidden; /* 隐藏掉到第二行的元素 */
+  gap: 6px;
+  height: 28px; /* 将 min-height 替换为固定的 height，设定为刚好一行标签的高度 */
 }
-.resource-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: white; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 12px; color: #606266; }
+.resource-tags:empty::after {
+  content: '暂无可访问资源组';
+  display: block;
+  color: #c0c4cc;
+  font-size: 12px;
+  line-height: 26px;
+}
+.resource-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 1px solid #bfdbfe;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #1e40af;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .resource-level { font-style: normal; font-size: 11px; color: #f56c6c; font-weight: 500; }
 .member-preview-tags {
     display: flex;
-    flex-wrap: nowrap;
-    overflow: hidden;
-    gap: 6px;
+  flex-wrap: wrap; /* 改为 wrap */
+  align-content: flex-start;
+  overflow: hidden;
+  gap: 6px;
+  height: 28px; /* 固定为一行的高度 */
 }
-.member-preview-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #f0f5ff; border: 1px solid #d6e4ff; border-radius: 4px; font-size: 12px; color: #303133; }
-.member-preview-tag em { font-style: normal; font-size: 11px; color: #409eff; }
+.member-preview-tags:empty::after {
+  content: '暂无组成员';
+  display: block;
+  color: #c0c4cc;
+  font-size: 12px;
+  line-height: 26px;
+}
+.member-preview-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border: 1px solid #bbf7d0;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #166534;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.member-preview-tag em { font-style: normal; font-size: 11px; color: #4ade80; }
 .member-preview-empty { font-size: 12px; color: #c0c4cc; }
 .empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 0; color: #909399; }
 
@@ -1559,22 +1604,23 @@ async function fetchResourceGroups() {
 .member-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    padding: 12px;
+    gap: 6px;
+    padding: 8px;
 }
 
 .member-tag {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 10px 6px 8px;
+    padding: 5px 12px;
     background: linear-gradient(135deg, #f0fdf4, #dcfce7);
     border: 1px solid #bbf7d0;
-    border-radius: 8px;
-    font-size: 13px;
+    border-radius: 20px;
+    font-size: 12px;
     font-weight: 500;
     color: #166534;
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .member-tag:hover {
@@ -1897,16 +1943,19 @@ async function fetchResourceGroups() {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
-    background: white;
-    border: 1px solid #dcdfe6;
-    border-radius: 6px;
-    font-size: 13px;
-    color: #606266;
+    padding: 5px 12px;
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border: 1px solid #bfdbfe;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #1e40af;
+    transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .selected-tag svg {
-    color: #909399;
+    color: #3b82f6;
     flex-shrink: 0;
 }
 
@@ -1980,22 +2029,23 @@ async function fetchResourceGroups() {
 .selected-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    padding: 12px;
+    gap: 6px;
+    padding: 8px;
 }
 
 .selected-tag {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 10px 6px 12px;
+    padding: 5px 12px;
     background: linear-gradient(135deg, #eff6ff, #dbeafe);
     border: 1px solid #bfdbfe;
-    border-radius: 8px;
-    font-size: 13px;
+    border-radius: 20px;
+    font-size: 12px;
     font-weight: 500;
     color: #1e40af;
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .selected-tag svg {

@@ -8,6 +8,7 @@ import ResourceGroup from './views/ResourceGroup.vue'
 import Callback from './views/Callback.vue'
 import PermissionApproval from './views/PermissionApproval.vue'
 import LoginPageSetting from './views/LoginPageSetting.vue'
+import LoginPreviewTest from './views/LoginPreviewTest.vue'
 
 const routes = [
   {
@@ -26,7 +27,8 @@ const routes = [
       { path: 'user-groups', component: UserGroup },
       { path: 'resource-groups', component: ResourceGroup },
       { path: 'permissions', component: PermissionApproval },
-      { path: 'login-page-setting', component: LoginPageSetting }
+      { path: 'login-page-setting', component: LoginPageSetting },
+      { path: 'login-preview-test', component: LoginPreviewTest }
     ]
   }
 ]

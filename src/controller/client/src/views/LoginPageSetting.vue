@@ -1,17 +1,41 @@
 <template>
     <div class="login-page-setting">
+      <!-- Toast 提示 -->
+      <Transition name="toast-fade">
+        <div v-if="toast.show" class="toast-notification" :class="toast.type">
+          <div class="toast-icon">
+            <svg v-if="toast.type === 'success'" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <span class="toast-message">{{ toast.message }}</span>
+        </div>
+      </Transition>
+
       <div class="setting-panel">
         <div class="setting-header">
           <div class="header-action-row">
             <span class="label-text">登录项 <span class="help-icon">?</span> :</span>
             <div class="action-btns">
-              <button class="btn-primary">添加</button>
+              <button class="btn-primary" @click="handleSave" :disabled="loading">保存</button>
+              <button class="btn-secondary">添加</button>
               <button class="btn-secondary">添加自定义项</button>
             </div>
           </div>
         </div>
-  
-        <div class="setting-table">
+
+        <div v-if="loading" class="table-loading">
+          <span>加载中...</span>
+        </div>
+        <div v-else-if="loadError" class="table-loading error">
+          <span>加载失败: {{ loadError }}</span>
+        </div>
+        <div v-else class="setting-table">
           <div class="table-head">
             <span class="col-name">名称</span>
             <span class="col-toggle">是否可见</span>
@@ -56,7 +80,7 @@
           </div>
         </div>
       </div>
-  
+
       <div class="preview-panel">
         <div class="preview-label-bar">
           <span class="preview-label-text">预览效果</span>
@@ -82,7 +106,7 @@
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#512da8" stroke-width="2" stroke-linejoin="round"/>
                   </svg>
                 </div>
-                <span class="preview-logo-text">Casdoor</span>
+                <span class="preview-logo-text">{{ getItem('logo').customLabel || 'Casdoor' }}</span>
               </div>
   
               <div v-if="getItem('username').enabled" class="login-username">
@@ -122,7 +146,7 @@
               </div>
   
               <div v-if="getItem('loginButton').enabled" class="login-button-box">
-                <button class="login-button">{{ getItem('loginButton').label }}</button>
+                <button class="login-button">{{ getItem('loginButton').customLabel || getItem('loginButton').label }}</button>
               </div>
   
               <div v-if="getItem('provider').enabled" class="preview-provider-box">
@@ -147,9 +171,23 @@
   </template>
   
   <script setup>
-  import { reactive } from 'vue'
-  
-  const itemsArr = reactive([
+  import { reactive, ref } from 'vue'
+  import { getLoginItems, saveLoginItems } from '@/api/loginItems.js'
+
+  const loading = ref(true)
+  const loadError = ref('')
+
+  const toast = ref({ show: false, type: 'success', message: '' })
+  let toastTimer = null
+
+  const showToast = (message, type = 'success') => {
+    if (toastTimer) clearTimeout(toastTimer)
+    toast.value = { show: true, type, message }
+    toastTimer = setTimeout(() => { toast.value.show = false }, 2500)
+  }
+
+  // 默认配置（当接口无数据时兜底）
+  const defaultItems = [
     { key: 'backButton', label: '返回按钮', enabled: true, customLabel: '', placeholder: '', cssContent: '.back-button { top: 65px; left: 15px; position: absolute; } .back-inner-button{}' },
     { key: 'logo', label: 'Logo', enabled: true, customLabel: '', placeholder: '', cssContent: '.login-logo-box {}' },
     { key: 'username', label: '用户名', enabled: true, customLabel: '', placeholder: '用户名、Email或手机号', cssContent: '.login-username {} .login-username-input{}' },
@@ -158,9 +196,153 @@
     { key: 'loginButton', label: '登录按钮', enabled: true, customLabel: '', placeholder: '', cssContent: '.login-button-box { margin-bottom: 5px; } .login-button { width: 100%; }' },
     { key: 'provider', label: '提供商', enabled: true, customLabel: '', placeholder: '', cssContent: '.provider-img { width: 30px; margin: 5px; } .provider-big-img { margin-bottom: 10px; }', ruleOptions: ['大图标', '小图标'] },
     { key: 'signupLink', label: '注册链接', enabled: true, customLabel: '立即注册', placeholder: '', cssContent: '.login-signup-link { margin-bottom: 24px; display: flex; justify-content: end; }' }
-  ])
-  
+  ]
+
+  const itemsArr = reactive([])
+
   const getItem = (key) => itemsArr.find(i => i.key === key) || {}
+
+  // name → key 的反向映射
+  const nameToKey = {
+    'back-button': 'backButton',
+    'login-logo': 'logo',
+    'username': 'username',
+    'password': 'password',
+    'forget-password': 'forgetPassword',
+    'login-button': 'loginButton',
+    'provider': 'provider',
+    'signup-link': 'signupLink'
+  }
+
+  // key → name 的正向映射
+  const keyToName = {
+    backButton: 'back-button',
+    logo: 'login-logo',
+    username: 'username',
+    password: 'password',
+    forgetPassword: 'forget-password',
+    loginButton: 'login-button',
+    provider: 'provider',
+    signupLink: 'signup-link'
+  }
+
+  // key → type 的映射
+  const keyToType = {
+    backButton: 'button',
+    logo: 'image',
+    username: 'text',
+    password: 'password',
+    forgetPassword: 'link',
+    loginButton: 'button',
+    provider: 'button',
+    signupLink: 'link'
+  }
+
+  // 根据 defaultItems 的默认值填充缺失字段
+  const fillDefaults = (key) => {
+    const def = defaultItems.find(d => d.key === key)
+    return def ? { ...def } : null
+  }
+
+  // 将后端返回的数组转为内部格式
+  const parseApiResponse = (apiItems) => {
+    if (!Array.isArray(apiItems) || apiItems.length === 0) return
+
+    for (const apiItem of apiItems) {
+      const key = nameToKey[apiItem.name]
+      if (!key) continue
+
+      const existing = itemsArr.find(i => i.key === key)
+      if (existing) {
+        // 用后端数据覆盖已有项
+        existing.enabled = !!apiItem.visible
+        existing.customLabel = apiItem.label || ''
+        existing.cssContent = apiItem.cssCode || ''
+      } else {
+        // 插入新项
+        const def = fillDefaults(key)
+        itemsArr.push({
+          key,
+          label: def?.label || key,
+          enabled: !!apiItem.visible,
+          customLabel: apiItem.label || '',
+          placeholder: def?.placeholder || '',
+          cssContent: apiItem.cssCode || def?.cssContent || '',
+          ruleOptions: def?.ruleOptions
+        })
+      }
+    }
+  }
+
+  // 注入 CSS 到预览区
+  const injectCSS = (cssCodes) => {
+    const existing = document.getElementById('login-preview-dynamic-css')
+    if (existing) existing.remove()
+
+    const combined = cssCodes.filter(Boolean).join('\n')
+    if (!combined) return
+
+    const style = document.createElement('style')
+    style.id = 'login-preview-dynamic-css'
+    style.textContent = combined
+    document.head.appendChild(style)
+  }
+
+  // 初始化：从 GET 接口加载真实数据
+  const initFromAPI = async () => {
+    try {
+      const res = await getLoginItems()
+      console.log('GET /config/login-items 返回:', res)
+
+      let apiItems = []
+      if (res?.code === 0 || res?.code === 200) {
+        apiItems = res.data || []
+      } else if (Array.isArray(res)) {
+        apiItems = res
+      }
+
+      if (apiItems.length > 0) {
+        // 用后端数据初始化
+        parseApiResponse(apiItems)
+        injectCSS(apiItems.map(i => i.cssCode).filter(Boolean))
+      } else {
+        // 无数据则用默认配置
+        defaultItems.forEach(d => itemsArr.push({ ...d }))
+      }
+    } catch (err) {
+      loadError.value = err.message
+      console.error('加载登录配置失败:', err)
+      defaultItems.forEach(d => itemsArr.push({ ...d }))
+    } finally {
+      loading.value = false
+    }
+  }
+
+  initFromAPI()
+
+  // 保存配置
+  const handleSave = async () => {
+    try {
+      const payload = itemsArr.map(item => ({
+        name: keyToName[item.key] || item.key,
+        visible: item.enabled,
+        cssCode: item.cssContent,
+        label: item.customLabel || item.label,
+        type: keyToType[item.key] || 'text'
+      }))
+
+      const result = await saveLoginItems(payload)
+      console.log('保存接口返回:', result)
+      if (result?.code === 0 || result?.code === 200) {
+        showToast('保存成功', 'success')
+      } else {
+        showToast(result?.msg || result?.message || '保存失败', 'error')
+      }
+    } catch (err) {
+      console.error('保存失败:', err)
+      showToast('保存失败: ' + (err.message || '网络错误'), 'error')
+    }
+  }
   </script>
   
   <style scoped>
@@ -194,9 +376,67 @@
   .help-icon { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; border: 1px solid #409eff; color: #409eff; font-size: 10px; margin-left: 4px; cursor: pointer; }
   .action-btns { display: flex; gap: 10px; }
   .btn-primary { background: #5c35b8; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  .btn-primary:disabled { background: #a89cc8; cursor: not-allowed; }
+
+  /* Toast 通知 */
+  .toast-notification {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 99999;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    min-width: 200px;
+    max-width: 360px;
+  }
+
+  .toast-notification.success {
+    background: #f0f9eb;
+    color: #67c23a;
+    border: 1px solid #c2e7b0;
+  }
+
+  .toast-notification.error {
+    background: #fef0f0;
+    color: #f56c6c;
+    border: 1px solid #fbc4c4;
+  }
+
+  .toast-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .toast-message { flex: 1; }
+
+  .toast-fade-enter-active,
+  .toast-fade-leave-active {
+    transition: all 0.3s ease;
+  }
+
+  .toast-fade-enter-from,
+  .toast-fade-leave-to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
   .btn-secondary { background: #8b5cf6; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; }
   
   .setting-table { width: 100%; flex: 1; overflow-y: auto; overflow-x: hidden; }
+
+  .table-loading {
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px; font-size: 14px; color: #909399;
+  }
+  .table-loading.error { color: #f56c6c; }
   
   .table-head, .table-row {
     display: grid; 
