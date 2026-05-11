@@ -17,6 +17,31 @@
         </div>
       </Transition>
 
+      <Transition name="modal">
+        <div v-if="cssEditor.visible" class="modal-overlay" @click.self="closeCssEditor">
+          <div class="css-editor-modal">
+            <div class="css-editor-header">
+              <span class="css-editor-title">编辑 CSS — {{ cssEditor.item?.label }}</span>
+              <button class="css-editor-close" @click="closeCssEditor">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="css-editor-body">
+              <textarea
+                class="css-textarea"
+                v-model="cssEditor.code"
+                placeholder="请输入 CSS 代码..."
+                spellcheck="false"
+              ></textarea>
+            </div>
+            <div class="css-editor-footer">
+              <button class="css-btn css-btn-cancel" @click="closeCssEditor">取消</button>
+              <button class="css-btn css-btn-save" @click="saveCssCode">保存</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+
       <div class="setting-panel">
         <div class="setting-header">
           <div class="header-action-row">
@@ -46,7 +71,7 @@
             <span class="col-ops">操作</span>
           </div>
   
-          <div v-for="(item, index) in itemsArr" :key="item.key" class="table-row">
+          <div v-for="(item, index) in sortedItems" :key="index" class="table-row">
             <div class="col-name">
               <select v-model="item.key" class="ui-select">
                 <option :value="item.key">{{ item.label }}</option>
@@ -62,7 +87,9 @@
               <input type="text" class="ui-input" v-model="item.customLabel" />
             </div>
             <div class="col-class">
-              <input type="text" class="ui-input css-input" v-model="item.cssContent" />
+              <div class="css-preview" :title="item.cssContent ? '点击修改CSS' : '点击添加CSS'" @click="openCssEditor(item)">
+                <span class="css-text">{{ item.cssContent || '（未设置）' }}</span>
+              </div>
             </div>
             <div class="col-input">
               <input type="text" class="ui-input" v-model="item.placeholder" />
@@ -73,8 +100,8 @@
               </select>
             </div>
             <div class="col-ops">
-              <button class="op-btn" title="上移"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg></button>
-              <button class="op-btn" title="下移"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+              <button class="op-btn" title="上移" @click="moveUp(index)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg></button>
+              <button class="op-btn" title="下移" @click="moveDown(index)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
               <button class="op-btn" title="删除"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
             </div>
           </div>
@@ -85,84 +112,88 @@
         <div class="preview-label-bar">
           <span class="preview-label-text">预览效果</span>
         </div>
-        
+
         <div class="preview-body">
           <div class="preview-device">
-            
+
             <div class="preview-login-box">
-              
+
               <div class="box-bottom-bar"></div>
-  
-              <div v-if="getItem('backButton').enabled" class="back-button">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="19" y1="12" x2="5" y2="12"></line>
-                  <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-              </div>
-  
-              <div v-if="getItem('logo').enabled" class="login-logo-box">
-                <div class="casdoor-logo-img">
-                  <svg viewBox="0 0 24 24" fill="#512da8" xmlns="http://www.w3.org/2000/svg" width="40" height="40">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#512da8" stroke-width="2" stroke-linejoin="round"/>
+
+              <template v-for="item in sortedItems" :key="item.key">
+
+                <div v-if="item.key === 'backButton' && item.enabled" class="back-button">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
                   </svg>
                 </div>
-                <span class="preview-logo-text">{{ getItem('logo').customLabel || 'Casdoor' }}</span>
-              </div>
-  
-              <div v-if="getItem('username').enabled" class="login-username">
-                <div class="login-username-input">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="field-icon">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
-                  <span class="field-placeholder">{{ getItem('username').placeholder || '用户名、Email或手机号' }}</span>
-                </div>
-              </div>
-  
-              <div v-if="getItem('password').enabled" class="login-password">
-                <div class="login-password-input">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="field-icon">
-                    <rect x="3" y="11" width="18" height="11" rx="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                  <span class="field-placeholder">{{ getItem('password').placeholder || '密码' }}</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="eye-icon">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <line x1="3" y1="3" x2="21" y2="21" />
-                  </svg>
-                </div>
-              </div>
-  
-              <div v-if="getItem('forgetPassword').enabled" class="login-forget-password">
-                <label class="preview-remember">
-                  <div class="preview-check-box">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
+
+                <div v-if="item.key === 'logo' && item.enabled" class="login-logo-box">
+                  <div class="casdoor-logo-img">
+                    <svg viewBox="0 0 24 24" fill="#512da8" xmlns="http://www.w3.org/2000/svg" width="40" height="40">
+                      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#512da8" stroke-width="2" stroke-linejoin="round"/>
                     </svg>
                   </div>
-                  <span>下次自动登录</span>
-                </label>
-                <span class="preview-forget-link">{{ getItem('forgetPassword').label }}</span>
-              </div>
-  
-              <div v-if="getItem('loginButton').enabled" class="login-button-box">
-                <button class="login-button">{{ getItem('loginButton').customLabel || getItem('loginButton').label }}</button>
-              </div>
-  
-              <div v-if="getItem('provider').enabled" class="preview-provider-box">
-                <button class="provider-button">
-                  <div class="provider-img-circle">
-                    <span>A</span>
+                  <span class="preview-logo-text">{{ item.customLabel || 'Casdoor' }}</span>
+                </div>
+
+                <div v-if="item.key === 'username' && item.enabled" class="login-username">
+                  <div class="login-username-input">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="field-icon">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    <span class="field-placeholder">{{ item.placeholder || '用户名、Email或手机号' }}</span>
                   </div>
-                  <span class="provider-text">自家身份验证登录</span>
-                </button>
-              </div>
-  
-              <div v-if="getItem('signupLink').enabled" class="login-signup-link">
-                <span>没有账号？</span>
-                <span class="signup-text">{{ getItem('signupLink').label || '立即注册' }}</span>
-              </div>
-  
+                </div>
+
+                <div v-if="item.key === 'password' && item.enabled" class="login-password">
+                  <div class="login-password-input">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="field-icon">
+                      <rect x="3" y="11" width="18" height="11" rx="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                    <span class="field-placeholder">{{ item.placeholder || '密码' }}</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="eye-icon">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <line x1="3" y1="3" x2="21" y2="21" />
+                    </svg>
+                  </div>
+                </div>
+
+                <div v-if="item.key === 'forgetPassword' && item.enabled" class="login-forget-password">
+                  <label class="preview-remember">
+                    <div class="preview-check-box">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                    <span>下次自动登录</span>
+                  </label>
+                  <span class="preview-forget-link">{{ item.customLabel || item.label }}</span>
+                </div>
+
+                <div v-if="item.key === 'loginButton' && item.enabled" class="login-button-box">
+                  <button class="login-button">{{ item.customLabel || item.label }}</button>
+                </div>
+
+                <div v-if="item.key === 'provider' && item.enabled" class="preview-provider-box">
+                  <button class="provider-button">
+                    <div class="provider-img-circle">
+                      <span>A</span>
+                    </div>
+                    <span class="provider-text">自家身份验证登录</span>
+                  </button>
+                </div>
+
+                <div v-if="item.key === 'signupLink' && item.enabled" class="login-signup-link">
+                  <span>没有账号？</span>
+                  <span class="signup-text">{{ item.customLabel || '立即注册' }}</span>
+                </div>
+
+              </template>
+
             </div>
           </div>
         </div>
@@ -171,7 +202,7 @@
   </template>
   
   <script setup>
-  import { reactive, ref } from 'vue'
+  import { reactive, ref, computed } from 'vue'
   import { getLoginItems, saveLoginItems } from '@/api/loginItems.js'
 
   const loading = ref(true)
@@ -179,6 +210,8 @@
 
   const toast = ref({ show: false, type: 'success', message: '' })
   let toastTimer = null
+
+  const cssEditor = ref({ visible: false, item: null, code: '' })
 
   const showToast = (message, type = 'success') => {
     if (toastTimer) clearTimeout(toastTimer)
@@ -188,19 +221,43 @@
 
   // 默认配置（当接口无数据时兜底）
   const defaultItems = [
-    { key: 'backButton', label: '返回按钮', enabled: true, customLabel: '', placeholder: '', cssContent: '.back-button { top: 65px; left: 15px; position: absolute; } .back-inner-button{}' },
-    { key: 'logo', label: 'Logo', enabled: true, customLabel: '', placeholder: '', cssContent: '.login-logo-box {}' },
-    { key: 'username', label: '用户名', enabled: true, customLabel: '', placeholder: '用户名、Email或手机号', cssContent: '.login-username {} .login-username-input{}' },
-    { key: 'password', label: '密码', enabled: true, customLabel: '', placeholder: '密码', cssContent: '.login-password {} .login-password-input{}' },
-    { key: 'forgetPassword', label: '忘记密码？', enabled: true, customLabel: '', placeholder: '', cssContent: '.login-forget-password { display: inline-flex; justify-content: space-between; width: 320px; margin-bottom: 25px; }', ruleOptions: ['下次自动登录 - 真', '下次自动登录 - 假'] },
-    { key: 'loginButton', label: '登录按钮', enabled: true, customLabel: '', placeholder: '', cssContent: '.login-button-box { margin-bottom: 5px; } .login-button { width: 100%; }' },
-    { key: 'provider', label: '提供商', enabled: true, customLabel: '', placeholder: '', cssContent: '.provider-img { width: 30px; margin: 5px; } .provider-big-img { margin-bottom: 10px; }', ruleOptions: ['大图标', '小图标'] },
-    { key: 'signupLink', label: '注册链接', enabled: true, customLabel: '立即注册', placeholder: '', cssContent: '.login-signup-link { margin-bottom: 24px; display: flex; justify-content: end; }' }
+    { key: 'backButton', label: '返回按钮', enabled: true, customLabel: '', placeholder: '', sortOrder: 1, cssContent: '.back-button { top: 65px; left: 15px; position: absolute; } .back-inner-button{}' },
+    { key: 'logo', label: 'Logo', enabled: true, customLabel: '', placeholder: '', sortOrder: 2, cssContent: '.login-logo-box {}' },
+    { key: 'username', label: '用户名', enabled: true, customLabel: '', placeholder: '用户名、Email或手机号', sortOrder: 3, cssContent: '.login-username {} .login-username-input{}' },
+    { key: 'password', label: '密码', enabled: true, customLabel: '', placeholder: '密码', sortOrder: 4, cssContent: '.login-password {} .login-password-input{}' },
+    { key: 'forgetPassword', label: '忘记密码？', enabled: true, customLabel: '', placeholder: '', sortOrder: 5, cssContent: '.login-forget-password { display: inline-flex; justify-content: space-between; width: 320px; margin-bottom: 25px; }', ruleOptions: ['下次自动登录 - 真', '下次自动登录 - 假'] },
+    { key: 'loginButton', label: '登录按钮', enabled: true, customLabel: '', placeholder: '', sortOrder: 6, cssContent: '.login-button-box { margin-bottom: 5px; } .login-button { width: 100%; }' },
+    { key: 'provider', label: '提供商', enabled: true, customLabel: '', placeholder: '', sortOrder: 7, cssContent: '.provider-img { width: 30px; margin: 5px; } .provider-big-img { margin-bottom: 10px; }', ruleOptions: ['大图标', '小图标'] },
+    { key: 'signupLink', label: '注册链接', enabled: true, customLabel: '立即注册', placeholder: '', sortOrder: 8, cssContent: '.login-signup-link { margin-bottom: 24px; display: flex; justify-content: end; }' }
   ]
 
   const itemsArr = reactive([])
 
   const getItem = (key) => itemsArr.find(i => i.key === key) || {}
+
+  const sortedItems = computed(() =>
+    [...itemsArr].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+  )
+
+  const moveUp = (index) => {
+    const list = sortedItems.value
+    const curr = list[index]
+    const prev = list[index - 1]
+    if (!curr || !prev) return
+    const tmp = curr.sortOrder
+    curr.sortOrder = prev.sortOrder
+    prev.sortOrder = tmp
+  }
+
+  const moveDown = (index) => {
+    const list = sortedItems.value
+    const curr = list[index]
+    const next = list[index + 1]
+    if (!curr || !next) return
+    const tmp = curr.sortOrder
+    curr.sortOrder = next.sortOrder
+    next.sortOrder = tmp
+  }
 
   // name → key 的反向映射
   const nameToKey = {
@@ -258,6 +315,7 @@
         existing.enabled = !!apiItem.visible
         existing.customLabel = apiItem.label || ''
         existing.cssContent = apiItem.cssCode || ''
+        if (apiItem.placeholder != null) existing.sortOrder = parseInt(apiItem.placeholder)
       } else {
         // 插入新项
         const def = fillDefaults(key)
@@ -267,6 +325,7 @@
           enabled: !!apiItem.visible,
           customLabel: apiItem.label || '',
           placeholder: def?.placeholder || '',
+          sortOrder: apiItem.placeholder != null ? parseInt(apiItem.placeholder) : (def?.sortOrder ?? null),
           cssContent: apiItem.cssCode || def?.cssContent || '',
           ruleOptions: def?.ruleOptions
         })
@@ -328,7 +387,8 @@
         visible: item.enabled,
         cssCode: item.cssContent,
         label: item.customLabel || item.label,
-        type: keyToType[item.key] || 'text'
+        type: keyToType[item.key] || 'text',
+        placeholder: item.sortOrder
       }))
 
       const result = await saveLoginItems(payload)
@@ -342,6 +402,21 @@
       console.error('保存失败:', err)
       showToast('保存失败: ' + (err.message || '网络错误'), 'error')
     }
+  }
+
+  const openCssEditor = (item) => {
+    cssEditor.value = { visible: true, item, code: item.cssContent || '' }
+  }
+
+  const closeCssEditor = () => {
+    cssEditor.value = { visible: false, item: null, code: '' }
+  }
+
+  const saveCssCode = () => {
+    if (cssEditor.value.item) {
+      cssEditor.value.item.cssContent = cssEditor.value.code
+    }
+    closeCssEditor()
   }
   </script>
   
@@ -547,4 +622,53 @@
   
   .login-signup-link { width: 100%; max-width: 320px; display: flex; justify-content: flex-end; font-size: 13px; color: #111; margin-bottom: 15px; }
   .signup-text { color: #3b1c8f; margin-left: 5px; cursor: pointer; }
+
+  .css-preview {
+    width: 96%; height: 32px; padding: 0 10px; border-radius: 4px;
+    border: 1px solid #dcdfe6; box-sizing: border-box;
+    cursor: pointer; font-size: 13px; color: #606266; background: white;
+    display: flex; align-items: center; outline: none; transition: border-color 0.2s;
+  }
+  .css-preview:hover { border-color: #8b5cf6; }
+  .css-text { word-break: break-all; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; display: block; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .css-editor-modal {
+    background: #fff; border-radius: 8px; width: 600px; max-width: 90vw;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden;
+    border: 1px solid #e4e7ed;
+  }
+  .css-editor-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px; border-bottom: 1px solid #ebeef5; background: #fafafa;
+  }
+  .css-editor-title { font-size: 14px; font-weight: 600; color: #303133; }
+  .css-editor-close { background: none; border: none; cursor: pointer; padding: 2px; color: #909399; display: flex; }
+  .css-editor-close:hover { color: #606266; }
+  .css-editor-body { padding: 16px 20px; flex: 1; }
+  .css-textarea {
+    width: 100%; height: 280px; resize: vertical;
+    font-family: Consolas, Monaco, 'Courier New', monospace; font-size: 13px;
+    padding: 6px 10px; border-radius: 6px; border: 1px solid #dcdfe6;
+    outline: none; box-sizing: border-box; color: #333; line-height: 1.5;
+    background: white;
+  }
+  .css-textarea:focus { border-color: #8b5cf6; }
+  .css-editor-footer {
+    display: flex; justify-content: flex-end; gap: 10px;
+    padding: 12px 20px; border-top: 1px solid #ebeef5;
+  }
+  .css-btn { padding: 7px 18px; border-radius: 4px; font-size: 13px; cursor: pointer; border: 1px solid; transition: all 0.2s; }
+  .css-btn-cancel { background: white; color: #606266; border-color: #dcdfe6; }
+  .css-btn-cancel:hover { color: #8b5cf6; border-color: #8b5cf6; background: #f5f0ff; }
+  .css-btn-save { background: #512da8; color: white; border-color: #512da8; }
+  .css-btn-save:hover { background: #3b1c8f; border-color: #3b1c8f; }
+
+  .modal-enter-active, .modal-leave-active { transition: opacity 0.2s; }
+  .modal-enter-from, .modal-leave-to { opacity: 0; }
+  .modal-enter-active .css-editor-modal, .modal-leave-active .css-editor-modal { transition: transform 0.2s; }
+  .modal-enter-from .css-editor-modal, .modal-leave-to .css-editor-modal { transform: scale(0.95); }
   </style>
