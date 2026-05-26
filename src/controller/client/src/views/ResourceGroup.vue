@@ -76,20 +76,13 @@
 
         <!-- 分页 -->
         <div class="pagination-bar" v-if="totalPages > 1">
-            <span class="pagination-info">第 {{ currentPage }} / {{ totalPages }} 页，共 {{ totalGroups }} 个资源组</span>
+            <span class="pagination-info">共 {{ totalGroups }} 条记录</span>
             <div class="pagination-controls">
-                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage = 1">«</button>
-                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">‹</button>
-                <button
-                    v-for="p in visiblePages"
-                    :key="p"
-                    class="page-btn"
-                    :class="{ active: p === currentPage, ellipsis: p === '...' }"
-                    :disabled="p === '...'"
-                    @click="p !== '...' && (currentPage = p)"
-                >{{ p }}</button>
-                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">›</button>
-                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage = totalPages">»</button>
+                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage = 1">首页</button>
+                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">上一页</button>
+                <span class="page-num">{{ currentPage }} / {{ totalPages }}</span>
+                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">下一页</button>
+                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage = totalPages">尾页</button>
             </div>
         </div>
 
@@ -854,6 +847,13 @@ const saveGroupResources = async () => {
     background: transparent;
     cursor: default;
 }
+
+.page-num {
+    color: #606266;
+    font-size: 14px;
+    padding: 0 8px;
+}
+
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
 .modal { background: white; border-radius: 12px; width: 480px; max-width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2); }
 .modal-lg { width: 640px; }

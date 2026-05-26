@@ -66,7 +66,7 @@
                     <div class="resource-title">组成员 ({{ (group.members || []).length }})</div>
                     <div class="member-preview-tags" v-if="(group.members || []).length">
                         <span class="member-preview-tag" v-for="m in group.members" :key="m.userId">
-                            {{ m.username }}
+                            {{ m.displayName }}
                         </span>
                     </div>
                     <div class="member-preview-empty" v-else>暂无成员，可在编辑中添加</div>
@@ -85,20 +85,13 @@
 
         <!-- 分页 -->
         <div class="pagination-bar" v-if="totalPages > 1">
-            <span class="pagination-info">第 {{ currentPage }} / {{ totalPages }} 页，共 {{ totalGroups }} 个角色组</span>
+            <span class="pagination-info">共 {{ totalGroups }} 条记录</span>
             <div class="pagination-controls">
-                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage = 1">«</button>
-                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">‹</button>
-                <button
-                    v-for="p in visiblePages"
-                    :key="p"
-                    class="page-btn"
-                    :class="{ active: p === currentPage, ellipsis: p === '...' }"
-                    :disabled="p === '...'"
-                    @click="p !== '...' && (currentPage = p)"
-                >{{ p }}</button>
-                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">›</button>
-                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage = totalPages">»</button>
+                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage = 1">首页</button>
+                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">上一页</button>
+                <span class="page-num">{{ currentPage }} / {{ totalPages }}</span>
+                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">下一页</button>
+                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage = totalPages">尾页</button>
             </div>
         </div>
 
@@ -318,8 +311,8 @@
                                             <polyline points="20 6 9 17 4 12"/>
                                         </svg>
                                     </span>
-                                    <span class="member-pool-avatar" @click.stop="toggleMemberSelection(u)">{{ u.username.charAt(0).toUpperCase() }}</span>
-                                    <span class="member-pool-name" @click.stop="toggleMemberSelection(u)">{{ u.username }}</span>
+                                    <span class="member-pool-avatar" @click.stop="toggleMemberSelection(u)">{{ (u.displayName || u.username || '?').charAt(0).toUpperCase() }}</span>
+                                    <span class="member-pool-name" @click.stop="toggleMemberSelection(u)">{{ u.displayName || u.username }}</span>
                                     <span class="member-pool-email" @click.stop="toggleMemberSelection(u)">{{ u.email }}</span>
                                 </div>
                                 <div v-if="filteredAvailableUsers.length === 0" class="pool-empty">
@@ -354,8 +347,8 @@
                         <div class="member-tags-area">
                             <div class="member-tags" v-if="formData.members?.length">
                                 <div class="member-tag" v-for="(m, idx) in formData.members" :key="m.userId">
-                                    <span class="member-tag-avatar">{{ m.username.charAt(0).toUpperCase() }}</span>
-                                    <span class="member-tag-name">{{ m.username }}</span>
+                                    <span class="member-tag-avatar">{{ (m.displayName || m.username || '?').charAt(0).toUpperCase() }}</span>
+                                    <span class="member-tag-name">{{ m.displayName || m.username }}</span>
                                     <button type="button" class="member-tag-remove" @click="removeMember(idx)" title="移除">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                                             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -544,7 +537,7 @@ async function fetchRoleGroups() {
                         // 处理组成员数据，确保格式一致
                         const members = (detailRes.data.members || []).map(m => ({
                             userId: m.userId || m.user_id || m.id,
-                            username: m.username || m.name || '',
+                            displayName: m.displayName || m.username || m.name || '',
                             level: m.level || 1
                         }))
                         // 使用权限配置中的资源组数据
@@ -575,10 +568,10 @@ async function fetchAllUsers() {
         const res = await apiListUsers({ page: 1, pageSize: 1000 })
         if (res.code === 200) {
             const list = Array.isArray(res.data?.list) ? res.data.list : (Array.isArray(res.data) ? res.data : [])
-            if (list.length === 0 && Array.isArray(res)) allUsers.value = res.map(u => ({ id: u.id, username: u.username || u.name || '', email: u.email || '' }))
-            else allUsers.value = list.map(u => ({ id: u.id, username: u.username || u.name || '', email: u.email || '' }))
+            if (list.length === 0 && Array.isArray(res)) allUsers.value = res.map(u => ({ id: u.id, displayName: u.displayName || u.username || u.name || '', email: u.email || '' }))
+            else allUsers.value = list.map(u => ({ id: u.id, displayName: u.displayName || u.username || u.name || '', email: u.email || '' }))
         } else if (Array.isArray(res)) {
-            allUsers.value = res.map(u => ({ id: u.id, username: u.username || u.name || '', email: u.email || '' }))
+            allUsers.value = res.map(u => ({ id: u.id, displayName: u.displayName || u.username || u.name || '', email: u.email || '' }))
         }
     } catch (e) {
         showToast('加载用户列表失败', 'error')
@@ -644,7 +637,7 @@ const filteredAvailableUsers = computed(() => {
     if (!memberSearchKeyword.value) return availableUsersForForm.value
     const keyword = memberSearchKeyword.value.toLowerCase()
     return availableUsersForForm.value.filter(u =>
-        (u.username || '').toLowerCase().includes(keyword) ||
+        (u.displayName || '').toLowerCase().includes(keyword) ||
         (u.email || '').toLowerCase().includes(keyword)
     )
 })
@@ -906,8 +899,8 @@ const addSelectedMembers = () => {
     const selected = availableUsersForForm.value.filter(u => formData.value.selectedUserIds.includes(u.id))
     if (!formData.value.members) formData.value.members = []
     selected.forEach(user => {
-        if (!formData.value.members.some(m => m.userId === user.id)) {
-            formData.value.members.push({ userId: user.id, username: user.username })
+            if (!formData.value.members.some(m => m.userId === user.id)) {
+            formData.value.members.push({ userId: user.id, displayName: user.displayName })
         }
     })
     formData.value.selectedUserIds = []
@@ -1160,6 +1153,12 @@ async function fetchResourceGroups() {
     border-color: transparent;
     background: transparent;
     cursor: default;
+}
+
+.page-num {
+    color: #606266;
+    font-size: 14px;
+    padding: 0 8px;
 }
 
 /* 弹窗样式 */

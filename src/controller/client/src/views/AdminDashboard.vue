@@ -56,44 +56,55 @@
         <div class="quick-actions">
             <h2 class="section-title">快捷操作</h2>
             <div class="actions-grid">
-                <div class="action-card" @click="$router.push('/import')">
+                <div class="action-card" @click="$router.push('/users')">
                     <div class="action-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="17 8 12 3 7 8"/>
-                            <line x1="12" y1="3" x2="12" y2="15"/>
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                         </svg>
                     </div>
                     <div class="action-text">
-                        <div class="action-title">导入数据</div>
-                        <div class="action-desc">导入人员或资源名单</div>
+                        <div class="action-title">人员管理</div>
+                        <div class="action-desc">管理系统用户账号</div>
+                    </div>
+                </div>
+                <div class="action-card" @click="$router.push('/resources')">
+                    <div class="action-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                            <line x1="8" y1="21" x2="16" y2="21"/>
+                            <line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                    </div>
+                    <div class="action-text">
+                        <div class="action-title">资源管理</div>
+                        <div class="action-desc">管理系统资源项</div>
                     </div>
                 </div>
                 <div class="action-card" @click="$router.push('/user-groups')">
                     <div class="action-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                            <circle cx="8.5" cy="7" r="4"/>
-                            <line x1="20" y1="8" x2="20" y2="14"/>
-                            <line x1="23" y1="11" x2="17" y2="11"/>
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                            <path d="M2 17l10 5 10-5"/>
+                            <path d="M2 12l10 5 10-5"/>
                         </svg>
                     </div>
                     <div class="action-text">
-                        <div class="action-title">创建用户组</div>
-                        <div class="action-desc">管理用户组成员</div>
+                        <div class="action-title">用户组管理</div>
+                        <div class="action-desc">管理用户角色组</div>
                     </div>
                 </div>
                 <div class="action-card" @click="$router.push('/resource-groups')">
                     <div class="action-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                            <line x1="12" y1="11" x2="12" y2="17"/>
-                            <line x1="9" y1="14" x2="15" y2="14"/>
                         </svg>
                     </div>
                     <div class="action-text">
-                        <div class="action-title">创建资源组</div>
-                        <div class="action-desc">管理资源组成员</div>
+                        <div class="action-title">资源组管理</div>
+                        <div class="action-desc">管理资源分组</div>
                     </div>
                 </div>
                 <div class="action-card" @click="$router.push('/permissions')">
@@ -106,24 +117,6 @@
                     <div class="action-text">
                         <div class="action-title">权限审批</div>
                         <div class="action-desc">审批用户资源权限申请</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 最近操作日志 -->
-        <div class="recent-activity">
-            <h2 class="section-title">最近操作</h2>
-            <div class="activity-list">
-                <div class="activity-item" v-for="(item, index) in recentActivities" :key="index">
-                    <div class="activity-icon" :class="item.type">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                        </svg>
-                    </div>
-                    <div class="activity-content">
-                        <div class="activity-text">{{ item.text }}</div>
-                        <div class="activity-time">{{ item.time }}</div>
                     </div>
                 </div>
             </div>
@@ -144,10 +137,6 @@ const stats = ref({
     userGroups: 0,
     resourceGroups: 0
 })
-
-const recentActivities = ref([
-    { type: 'info', text: '系统初始化完成', time: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) }
-])
 
 // 组件挂载时获取统计数据
 onMounted(async () => {
@@ -199,23 +188,23 @@ onMounted(async () => {
 
 <style scoped>
 .dashboard {
-    max-width: 1400px;
+    width: 100%;
 }
 
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
-    margin-bottom: 32px;
+    gap: clamp(12px, 2vw, 20px);
+    margin-bottom: clamp(20px, 3vw, 32px);
 }
 
 .stat-card {
     background: white;
-    border-radius: 12px;
-    padding: 24px;
+    border-radius: clamp(8px, 1.5vw, 12px);
+    padding: clamp(16px, 2vw, 24px);
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: clamp(12px, 1.5vw, 16px);
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
@@ -226,12 +215,13 @@ onMounted(async () => {
 }
 
 .stat-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 12px;
+    width: clamp(44px, 5vw, 56px);
+    height: clamp(44px, 5vw, 56px);
+    border-radius: clamp(8px, 1.5vw, 12px);
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 }
 
 .stat-icon.users {
@@ -254,42 +244,49 @@ onMounted(async () => {
     color: white;
 }
 
+.stat-content {
+    min-width: 0;
+}
+
 .stat-value {
-    font-size: 32px;
+    font-size: clamp(24px, 3vw, 32px);
     font-weight: 700;
     color: #303133;
+    line-height: 1.2;
 }
 
 .stat-label {
-    font-size: 14px;
+    font-size: clamp(12px, 1.2vw, 14px);
     color: #909399;
     margin-top: 4px;
 }
 
 .section-title {
-    font-size: 18px;
+    font-size: clamp(16px, 1.8vw, 18px);
     font-weight: 600;
     color: #303133;
-    margin-bottom: 16px;
+    margin-bottom: clamp(12px, 1.5vw, 16px);
 }
 
 .quick-actions {
-    margin-bottom: 32px;
+    margin-bottom: clamp(20px, 3vw, 32px);
 }
 
 .actions-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: clamp(12px, 2vw, 20px);
 }
 
 .action-card {
     background: white;
-    border-radius: 12px;
-    padding: 24px;
+    border-radius: clamp(8px, 1.5vw, 12px);
+    padding: clamp(16px, 2vw, 24px);
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 16px;
+    text-align: center;
+    gap: clamp(10px, 1.2vw, 16px);
     cursor: pointer;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
     transition: all 0.3s ease;
@@ -303,9 +300,9 @@ onMounted(async () => {
 }
 
 .action-icon {
-    width: 48px;
-    height: 48px;
-    background: #f5f7fa;
+    width: clamp(40px, 4.5vw, 48px);
+    height: clamp(40px, 4.5vw, 48px);
+    background: linear-gradient(135deg, #f0f7ff 0%, #e6f0ff 100%);
     border-radius: 10px;
     display: flex;
     align-items: center;
@@ -313,91 +310,59 @@ onMounted(async () => {
     color: #409eff;
 }
 
+.action-text {
+    min-width: 0;
+}
+
 .action-title {
-    font-size: 16px;
+    font-size: clamp(13px, 1.4vw, 16px);
     font-weight: 600;
     color: #303133;
 }
 
 .action-desc {
-    font-size: 13px;
+    font-size: clamp(11px, 1.1vw, 13px);
     color: #909399;
     margin-top: 4px;
 }
 
-.recent-activity {
-    background: white;
-    border-radius: 12px;
-    padding: 24px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+/* 响应式布局 */
+@media (max-width: 1400px) {
+    .actions-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
 
-.activity-list {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+@media (max-width: 1100px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
-.activity-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 12px;
-    border-radius: 8px;
-    transition: background 0.3s ease;
-}
-
-.activity-item:hover {
-    background: #f5f7fa;
-}
-
-.activity-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.activity-icon.info {
-    background: #e6f7ff;
-    color: #1890ff;
-}
-
-.activity-icon.success {
-    background: #f6ffed;
-    color: #52c41a;
-}
-
-.activity-icon.warning {
-    background: #fffbe6;
-    color: #faad14;
-}
-
-.activity-text {
-    font-size: 14px;
-    color: #303133;
-}
-
-.activity-time {
-    font-size: 12px;
-    color: #909399;
-    margin-top: 4px;
-}
-
-@media (max-width: 1200px) {
-    .stats-grid,
+@media (max-width: 900px) {
     .actions-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 }
 
 @media (max-width: 768px) {
-    .stats-grid,
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
     .actions-grid {
         grid-template-columns: 1fr;
+    }
+
+    .action-card {
+        flex-direction: row;
+        text-align: left;
+        gap: 16px;
+    }
+
+    .action-icon {
+        width: 48px;
+        height: 48px;
     }
 }
 </style>

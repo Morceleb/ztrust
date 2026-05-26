@@ -115,9 +115,11 @@
         <div class="pagination" v-if="totalCount > 0">
             <span class="pagination-info">共 {{ totalCount }} 条记录</span>
             <div class="pagination-controls">
+                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage = 1">首页</button>
                 <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">上一页</button>
                 <span class="page-num">{{ currentPage }} / {{ totalPages }}</span>
                 <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">下一页</button>
+                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage = totalPages">尾页</button>
             </div>
         </div>
 
@@ -209,24 +211,26 @@
                             </div>
                             <div class="form-field-group">
                                 <div class="form-field">
-                                    <label>资源类型</label>
+                                    <label>资源类型 <span class="required">*</span></label>
                                     <div class="input-wrapper">
                                         <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
                                         </svg>
-                                        <input type="text" v-model="formData.type" class="field-input" placeholder="如：Web服务" />
+                                        <input type="text" v-model="formData.type" class="field-input" :class="{ 'field-error': formErrors.type }" placeholder="如：Web服务" />
                                     </div>
+                                    <span class="field-error-text" v-if="formErrors.type">{{ formErrors.type }}</span>
                                 </div>
                             </div>
                             <div class="form-field-group">
                                 <div class="form-field">
-                                    <label>允许方法</label>
+                                    <label>允许方法 <span class="required">*</span></label>
                                     <div class="input-wrapper">
                                         <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
                                         </svg>
-                                        <input type="text" v-model="formData.allow_method" class="field-input" placeholder="如：GET、POST" />
+                                        <input type="text" v-model="formData.allow_method" class="field-input" :class="{ 'field-error': formErrors.allow_method }" placeholder="如：GET、POST" />
                                     </div>
+                                    <span class="field-error-text" v-if="formErrors.allow_method">{{ formErrors.allow_method }}</span>
                                 </div>
                             </div>
                             <div class="form-field-group">
@@ -565,6 +569,15 @@ const handleSubmit = async () => {
     formErrors.value = {}
     if (!formData.value.name || formData.value.name.trim() === '') {
         formErrors.value.name = '请输入资源名称'
+    }
+    if (!formData.value.resourceId || formData.value.resourceId.trim() === '') {
+        formErrors.value.resourceId = '请输入 Resource ID'
+    }
+    if (!formData.value.type || formData.value.type.trim() === '') {
+        formErrors.value.type = '请输入资源类型'
+    }
+    if (!formData.value.allow_method || formData.value.allow_method.trim() === '') {
+        formErrors.value.allow_method = '请输入允许方法'
     }
     if (Object.keys(formErrors.value).length > 0) return
 
