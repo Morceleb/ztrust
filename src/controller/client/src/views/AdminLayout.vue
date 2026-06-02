@@ -34,7 +34,7 @@
                 <div class="admin-user">
                     <div class="user-avatar"><span>A</span></div>
                     <div class="user-info">
-                        <span class="user-name">管理员</span>
+                        <span class="user-name">{{ currentUserName }}</span>
                         <span class="user-role">系统管理员</span>
                     </div>
                 </div>
@@ -105,6 +105,8 @@ const showUserMenu = ref(false)
 // 注销确认弹窗状态
 const showLogoutModal = ref(false)
 
+const currentUserName = computed(() => localStorage.getItem('admin_username') || '管理员')
+
 const DashboardIcon = {
     render: () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2 }, [
         h('rect', { x: 3, y: 3, width: 7, height: 7 }),
@@ -161,13 +163,6 @@ const LoginPageIcon = {
     ])
 }
 
-const LoginPreviewIcon = {
-    render: () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2 }, [
-        h('path', { d: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z' }),
-        h('circle', { cx: 12, cy: 12, r: 3 })
-    ])
-}
-
 const menuItems = [
     { path: '/dashboard', label: '仪表盘', icon: DashboardIcon },
     { path: '/users', label: '人员管理', icon: UserIcon },
@@ -175,8 +170,7 @@ const menuItems = [
     { path: '/user-groups', label: '用户组管理', icon: UserGroupIcon },
     { path: '/resource-groups', label: '资源组管理', icon: ResourceGroupIcon },
     { path: '/permissions', label: '权限审批', icon: PermissionIcon },
-    { path: '/login-page-setting', label: '登录页面', icon: LoginPageIcon },
-    { path: '/login-preview-test', label: '登录预览', icon: LoginPreviewIcon }
+    { path: '/login-page-setting', label: '登录设置页面', icon: LoginPageIcon }
 ]
 
 const activeMenu = computed(() => route.path)
@@ -198,8 +192,10 @@ const handleLogout = () => {
 // 确认注销登录
 const confirmLogout = () => {
     showLogoutModal.value = false
-    // 后续接入后端时在此调用登出接口并清理 token
-    router.push('/login')
+    localStorage.removeItem('admin_logged_in')
+    localStorage.removeItem('admin_username')
+    localStorage.removeItem('admin_remember_me')
+    router.replace('/login')
 }
 </script>
 

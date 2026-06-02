@@ -119,6 +119,19 @@
                         <div class="action-desc">审批用户资源权限申请</div>
                     </div>
                 </div>
+                <div class="action-card" @click="$router.push('/login-page-setting')">
+                    <div class="action-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10 17l5-5-5-5"/>
+                            <path d="M15 12H3"/>
+                            <path d="M21 3v18"/>
+                        </svg>
+                    </div>
+                    <div class="action-text">
+                        <div class="action-title">登录设置页面</div>
+                        <div class="action-desc">快速跳转到登录设置页</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

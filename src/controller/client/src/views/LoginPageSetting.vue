@@ -1,5 +1,5 @@
 <template>
-    <div class="login-page-setting">
+    <div class="login-settings-page">
       <!-- Toast 提示 -->
       <Transition name="toast-fade">
         <div v-if="toast.show" class="toast-notification" :class="toast.type">
@@ -716,10 +716,10 @@
   </script>
   
   <style scoped>
-  .login-page-setting {
-    display: flex; 
-    height: 100%; 
-    min-height: calc(100vh - 100px); 
+  .login-settings-page {
+    display: flex;
+    height: 100%;
+    min-height: calc(100vh - 100px);
     margin: -20px; 
     padding: 0; 
     background: white; 
