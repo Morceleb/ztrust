@@ -14,7 +14,7 @@
             </button>
         </div>
 
-        <div class="group-list">
+        <div class="group-list" ref="cardContainerRef">
             <div class="group-card" v-for="group in paginatedGroups" :key="group.id">
                 <div class="group-header">
                     <div class="group-icon">
@@ -290,7 +290,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import {
     listResourceGroups, saveResourceGroup, bindResourcesToGroup, deleteResourceGroup, getResourceGroupDetail
 } from '@/api/resourceGroup.js'
@@ -316,7 +316,10 @@ const editingGroup = ref(null)
 
 const formData = ref({ name: '' })
 const currentPage = ref(1)
-const pageSize = 6
+
+// 动态计算每页显示的卡片数量（根据屏幕分辨率）
+const cardContainerRef = ref(null)
+const pageSize = ref(6)
 
 let toastTimer = null
 const toastMessage = ref('')
@@ -326,8 +329,69 @@ function showToast(msg, ms = 3200) {
     toastTimer = setTimeout(() => { toastMessage.value = '' }, ms)
 }
 
+// 动态计算卡片数量
+const calculatePageSize = () => {
+    nextTick(() => {
+        if (!cardContainerRef.value) return
+        const container = cardContainerRef.value
+
+        // 宽度用容器宽度（更贴近实际卡片列数）
+        const containerWidth = container.clientWidth
+
+        // 高度用窗口高度（容器自身可能没固定高度，会算小）
+        const windowHeight = window.innerHeight
+
+        // card grid: minmax(350px, 1fr), gap 20px
+        const cardMinWidth = 350
+        const cardGap = 20
+
+        // 粗略预留：顶部工具栏+外层padding+分页条（sticky）
+        // 目标：分页条始终在视口内（A 方案：列表区滚动）
+        const topAreaHeight = 120 // toolbar + 间距（估算）
+        const pagePadding = 48    // .resource-group-page padding 上下
+        const paginationHeight = 64
+
+        // 卡片高度：.group-card height 220 + 行间距
+        const cardRowHeight = 220 + cardGap
+
+        const availableHeight = windowHeight - topAreaHeight - pagePadding - paginationHeight
+        const rowsCount = Math.max(1, Math.floor(availableHeight / cardRowHeight))
+
+        const columnsCount = Math.max(1, Math.floor((containerWidth + cardGap) / (cardMinWidth + cardGap)))
+
+        const newPageSize = rowsCount * columnsCount
+        pageSize.value = Math.max(1, newPageSize)
+
+        // 尺寸变化导致总页数变小，修正 currentPage 避免空页
+        const newTotalPages = Math.ceil(totalGroups.value / pageSize.value) || 1
+        if (currentPage.value > newTotalPages) currentPage.value = newTotalPages
+    })
+}
+
+let resizeObserver = null
+
 onMounted(async () => {
     await Promise.all([fetchGroups(), fetchAllResources()])
+    await nextTick()
+    calculatePageSize()
+
+    // 使用 ResizeObserver 监听容器大小变化
+    if (cardContainerRef.value) {
+        resizeObserver = new ResizeObserver(() => {
+            calculatePageSize()
+        })
+        resizeObserver.observe(cardContainerRef.value)
+    }
+
+    // 监听窗口大小变化
+    window.addEventListener('resize', calculatePageSize)
+})
+
+onUnmounted(() => {
+    if (resizeObserver) {
+        resizeObserver.disconnect()
+    }
+    window.removeEventListener('resize', calculatePageSize)
 })
 
 async function fetchGroups() {
@@ -400,14 +464,19 @@ const filteredGroups = computed(() => {
 })
 
 const totalGroups = computed(() => filteredGroups.value.length)
-const totalPages = computed(() => Math.ceil(totalGroups.value / pageSize) || 1)
+const totalPages = computed(() => Math.ceil(totalGroups.value / pageSize.value) || 1)
 const paginatedGroups = computed(() => {
-    const start = (currentPage.value - 1) * pageSize
-    return filteredGroups.value.slice(start, start + pageSize)
+    // 反转列表，新创建的组显示在最前面
+    const list = [...filteredGroups.value].reverse()
+    const start = (currentPage.value - 1) * pageSize.value
+    return list.slice(start, start + pageSize.value)
 })
 
-// 搜索关键词变化时重置到第一页
-watch(searchKeyword, () => { currentPage.value = 1 })
+// 搜索关键词变化时重置到第一页，同时重新计算每页数量
+watch(searchKeyword, () => {
+    currentPage.value = 1
+    nextTick(() => calculatePageSize())
+})
 
 // 生成可见页码数组（带省略号）
 const visiblePages = computed(() => {
@@ -668,7 +737,14 @@ const saveGroupResources = async () => {
 .btn-primary { background: #409eff; border-color: #409eff; color: white; }
 .btn-primary:hover { background: #66b1ff; }
 .btn-sm { padding: 6px 12px; font-size: 13px; }
-.group-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
+.group-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    align-content: start;
+    max-height: calc(100vh - 280px);
+    overflow-y: auto;
+}
 .group-card {
     background: #fafafa;
     border-radius: 12px;
@@ -796,6 +872,10 @@ const saveGroupResources = async () => {
     margin-top: 20px;
     padding: 12px 4px;
     gap: 12px;
+    background: white;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
 }
 
 .pagination-info {

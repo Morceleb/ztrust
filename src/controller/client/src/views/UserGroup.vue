@@ -12,7 +12,7 @@
             </button>
         </div>
 
-        <div class="group-list">
+        <div class="group-list" ref="cardContainerRef">
             <div class="group-card" v-for="group in paginatedGroups" :key="group.id">
                 <div class="group-header">
                     <div class="group-icon">
@@ -409,7 +409,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import {
     listRoleGroups, saveRoleGroup, assignUsersToRoleGroup, deleteRoleGroup, getRoleGroupDetail
 } from '@/api/roleGroup.js'
@@ -445,7 +445,40 @@ const emptyForm = () => ({
 
 const formData = ref(emptyForm())
 const currentPage = ref(1)
-const pageSize = 6
+
+// 动态计算每页显示的卡片数量（A：分页栏始终可见，列表区域滚动）
+const cardContainerRef = ref(null)
+const pageSize = ref(1)
+
+const calculatePageSize = () => {
+    nextTick(() => {
+        if (!cardContainerRef.value) return
+        const containerWidth = cardContainerRef.value.clientWidth
+        const windowHeight = window.innerHeight
+
+        // 样式参考：.group-list grid minmax(380px, 1fr), gap 20px
+        const cardMinWidth = 380
+        const cardGap = 20
+        const columns = Math.max(1, Math.floor((containerWidth + cardGap) / (cardMinWidth + cardGap)))
+
+        // 卡片高度（此页卡片内容更高，取一个更保守的行高）
+        // .group-card 没有固定 height，这里用经验值，保证分页条不被挤出视口
+        const cardRowHeight = 320
+
+        const topAreaHeight = 120   // toolbar + 间距（估算）
+        const pagePadding = 48      // 外层 padding 上下
+        const paginationHeight = 64 // 分页条高度（sticky）
+
+        const availableHeight = windowHeight - topAreaHeight - pagePadding - paginationHeight
+        const rows = Math.max(1, Math.floor(availableHeight / cardRowHeight))
+
+        const newPageSize = rows * columns
+        pageSize.value = Math.max(1, newPageSize)
+
+        const newTotalPages = Math.ceil(totalGroups.value / pageSize.value) || 1
+        if (currentPage.value > newTotalPages) currentPage.value = newTotalPages
+    })
+}
 
 let toastTimer = null
 const toastMessage = ref('')
@@ -469,7 +502,15 @@ function showToast(msg, type = 'info', ms = 3200) {
 }
 
 onMounted(async () => {
-    await Promise.all([fetchRoleGroups(), fetchAllUsers(), fetchResourceGroups()])
+    // 先加载所有用户，再加载角色组（用于解析成员的 displayName）
+    await Promise.all([fetchAllUsers(), fetchResourceGroups()])
+    await fetchRoleGroups()
+    calculatePageSize()
+    window.addEventListener('resize', calculatePageSize)
+})
+
+onUnmounted(() => {
+    window.removeEventListener('resize', calculatePageSize)
 })
 
 async function fetchRoleGroups() {
@@ -534,12 +575,18 @@ async function fetchRoleGroups() {
                 try {
                     const detailRes = await getRoleGroupDetail(group.id)
                     if (detailRes.code === 200 && detailRes.data) {
-                        // 处理组成员数据，确保格式一致
-                        const members = (detailRes.data.members || []).map(m => ({
-                            userId: m.userId || m.user_id || m.id,
-                            displayName: m.displayName || m.username || m.name || '',
-                            level: m.level || 1
-                        }))
+                        // 处理组成员数据，从 allUsers 中查找 displayName
+                        const members = (detailRes.data.members || []).map(m => {
+                            const userId = m.userId || m.user_id || m.id
+                            const username = m.username || m.name || ''
+                            // 从 allUsers 中查找对应的 displayName
+                            const userInfo = allUsers.value.find(u => u.id === userId || u.name === username)
+                            return {
+                                userId,
+                                displayName: userInfo?.displayName || username || '',
+                                level: m.level || 1
+                            }
+                        })
                         // 使用权限配置中的资源组数据
                         const resourceGroups = permissionsMap[group.id] || []
                         return {
@@ -568,10 +615,10 @@ async function fetchAllUsers() {
         const res = await apiListUsers({ page: 1, pageSize: 1000 })
         if (res.code === 200) {
             const list = Array.isArray(res.data?.list) ? res.data.list : (Array.isArray(res.data) ? res.data : [])
-            if (list.length === 0 && Array.isArray(res)) allUsers.value = res.map(u => ({ id: u.id, displayName: u.displayName || u.username || u.name || '', email: u.email || '' }))
-            else allUsers.value = list.map(u => ({ id: u.id, displayName: u.displayName || u.username || u.name || '', email: u.email || '' }))
+            if (list.length === 0 && Array.isArray(res)) allUsers.value = res.map(u => ({ id: u.id, name: u.name || u.username || '', displayName: u.displayName || u.username || u.name || '', email: u.email || '' }))
+            else allUsers.value = list.map(u => ({ id: u.id, name: u.name || u.username || '', displayName: u.displayName || u.username || u.name || '', email: u.email || '' }))
         } else if (Array.isArray(res)) {
-            allUsers.value = res.map(u => ({ id: u.id, displayName: u.displayName || u.username || u.name || '', email: u.email || '' }))
+            allUsers.value = res.map(u => ({ id: u.id, name: u.name || u.username || '', displayName: u.displayName || u.username || u.name || '', email: u.email || '' }))
         }
     } catch (e) {
         showToast('加载用户列表失败', 'error')
@@ -584,14 +631,19 @@ const filteredGroups = computed(() => {
 })
 
 const totalGroups = computed(() => filteredGroups.value.length)
-const totalPages = computed(() => Math.ceil(totalGroups.value / pageSize) || 1)
+const totalPages = computed(() => Math.ceil(totalGroups.value / pageSize.value) || 1)
 const paginatedGroups = computed(() => {
-    const start = (currentPage.value - 1) * pageSize
-    return filteredGroups.value.slice(start, start + pageSize)
+    // 反转列表，新创建的组显示在最前面
+    const list = [...filteredGroups.value].reverse()
+    const start = (currentPage.value - 1) * pageSize.value
+    return list.slice(start, start + pageSize.value)
 })
 
-// 搜索关键词变化时重置到第一页
-watch(searchKeyword, () => { currentPage.value = 1 })
+// 搜索关键词变化时重置到第一页，并重新计算
+watch(searchKeyword, () => {
+    currentPage.value = 1
+    calculatePageSize()
+})
 
 // 生成可见页码数组（带省略号）
 const visiblePages = computed(() => {
@@ -958,7 +1010,14 @@ async function fetchResourceGroups() {
 .btn:hover { border-color: #409eff; color: #409eff; }
 .btn-primary { background: #409eff; border-color: #409eff; color: white; }
 .btn-primary:hover { background: #66b1ff; }
-.group-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 20px; }
+.group-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 20px;
+    align-content: start;
+    max-height: calc(100vh - 280px);
+    overflow-y: auto;
+}
 .group-card {
     background: #fafafa;
     border-radius: 12px;
@@ -1103,6 +1162,10 @@ async function fetchResourceGroups() {
     margin-top: 20px;
     padding: 12px 4px;
     gap: 12px;
+    background: white;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
 }
 
 .pagination-info {

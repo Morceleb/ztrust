@@ -43,20 +43,20 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th width="60">序号</th>
-                        <th>图标</th>
-                        <th>资源名称</th>
-                        <th>资源类型</th>
-                        <th>资源ID</th>
-                        <th>允许方法</th>
-                        <th class="avail-col">资源状态</th>
-                        <th width="120">操作</th>
+                        <th class="col-index">序号</th>
+                        <th class="col-icon">图标</th>
+                        <th class="col-name">资源名称</th>
+                        <th class="col-type">资源类型</th>
+                        <th class="col-resource-id">资源ID</th>
+                        <th class="col-method">允许方法</th>
+                        <th class="col-status avail-col">资源状态</th>
+                        <th class="col-actions">操作</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="(resource, index) in pagedResources" :key="resource.id">
-                        <td>{{ (currentPage - 1) * pageSize + index + 1 }}</td>
-                        <td>
+                        <td class="col-index">{{ (currentPage - 1) * pageSize + index + 1 }}</td>
+                        <td class="col-icon">
                             <div class="resource-icon" :class="{ 'has-custom': resource.icon }">
                                 <img
                                     v-if="isResourceIconUrl(resource.icon)"
@@ -70,17 +70,17 @@
                                 </svg>
                             </div>
                         </td>
-                        <td>{{ resource.name }}</td>
-                        <td>{{ resource.type || '-' }}</td>
-                        <td>{{ resource.resourceId || '-' }}</td>
-                        <td>{{ resource.allow_method || '-' }}</td>
-                        <td class="avail-col">
+                        <td class="col-name">{{ resource.name }}</td>
+                        <td class="col-type">{{ resource.type || '-' }}</td>
+                        <td class="col-resource-id">{{ resource.resourceId || '-' }}</td>
+                        <td class="col-method">{{ resource.allow_method || '-' }}</td>
+                        <td class="col-status avail-col">
                             <span
                                 class="status-badge"
                                 :class="resource.is_active ? 'status-active' : 'status-unavailable'"
                             >{{ resource.is_active ? '启用' : '禁用' }}</span>
                         </td>
-                        <td>
+                        <td class="col-actions">
                             <div class="action-buttons">
                                 <button class="action-btn action-edit" @click="handleEdit(resource)" title="编辑">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -406,7 +406,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { listResources, saveResource, deleteResource } from '@/api/resource.js'
 import * as XLSX from 'xlsx'
 
@@ -421,8 +421,29 @@ function isResourceIconUrl(s) {
 const loading = ref(false)
 const searchKeyword = ref('')
 const currentPage = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(1) // 动态计算
 const totalCount = ref(0)
+
+const calculatePageSize = () => {
+    nextTick(() => {
+        const windowHeight = window.innerHeight
+
+        // 预留顶部区域（toolbar + padding）和分页区域高度
+        const topAreaHeight = 220
+        const paginationHeight = 80
+
+        // 表格每行高度（tbody tr 高度通常在 56 左右）
+        const rowHeight = 56
+
+        const availableHeight = windowHeight - topAreaHeight - paginationHeight
+        const rows = Math.max(1, Math.floor(availableHeight / rowHeight))
+
+        pageSize.value = rows
+
+        const newTotalPages = Math.ceil(totalCount.value / pageSize.value) || 1
+        if (currentPage.value > newTotalPages) currentPage.value = newTotalPages
+    })
+}
 const showModal = ref(false)
 const showDeleteModal = ref(false)
 const modalMode = ref('add')
@@ -499,11 +520,18 @@ async function fetchResources() {
 }
 
 onMounted(() => {
+    calculatePageSize()
+    window.addEventListener('resize', calculatePageSize)
     fetchResources()
+})
+
+onUnmounted(() => {
+    window.removeEventListener('resize', calculatePageSize)
 })
 
 const handleSearch = () => {
     currentPage.value = 1
+    calculatePageSize()
     fetchResources()
 }
 
@@ -613,7 +641,8 @@ const filteredResources = computed(() => {
 })
 
 const pagedResources = computed(() => {
-    const list = filteredResources.value
+    // 反转列表，新添加的资源显示在最前面
+    const list = [...filteredResources.value].reverse()
     const start = (currentPage.value - 1) * pageSize.value
     return list.slice(start, start + pageSize.value)
 })
@@ -882,6 +911,7 @@ const confirmImport = async () => {
 .data-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
 
 .data-table th,
@@ -889,6 +919,51 @@ const confirmImport = async () => {
     padding: 12px 16px;
     text-align: left;
     border-bottom: 1px solid #ebeef5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.col-index {
+    width: 60px;
+    min-width: 60px;
+}
+
+.col-icon {
+    width: 60px;
+    min-width: 60px;
+    text-align: center;
+}
+
+.col-name {
+    width: 150px;
+    min-width: 120px;
+}
+
+.col-type {
+    width: 120px;
+    min-width: 100px;
+}
+
+.col-resource-id {
+    width: 180px;
+    min-width: 150px;
+}
+
+.col-method {
+    width: 120px;
+    min-width: 100px;
+}
+
+.col-status {
+    width: 100px;
+    min-width: 90px;
+}
+
+.col-actions {
+    width: 120px;
+    min-width: 100px;
+    text-align: center;
 }
 
 .data-table th {
@@ -908,13 +983,6 @@ const confirmImport = async () => {
 
 .data-table td {
     vertical-align: middle;
-}
-
-.data-table th.avail-col,
-.data-table td.avail-col {
-    width: 96px;
-    text-align: left;
-    padding-left: 10px;
 }
 
 .resource-icon {

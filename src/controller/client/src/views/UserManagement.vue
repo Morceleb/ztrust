@@ -54,6 +54,7 @@
                         <th class="col-time">创建时间</th>
                         <th class="col-spa">安全码</th>
                         <th class="col-actions">操作</th>
+                        
                     </tr>
                 </thead>
                 <tbody>
@@ -89,43 +90,47 @@
                         </td>
                         <td class="col-actions">
                             <div class="spa-actions">
-                                <button
-                                    type="button"
-                                    class="spa-btn spa-btn-primary"
-                                    :disabled="primarySpaDisabled(user)"
-                                    @click="onPrimarySpa(user)"
-                                >
-                                    {{ primarySpaLabel(user) }}
-                                </button>
-                                <button
-                                    type="button"
-                                    class="spa-btn spa-btn-secondary"
-                                    :class="{ 'is-muted': secondarySpaDisabled(user) }"
-                                    :disabled="secondarySpaDisabled(user)"
-                                    @click="onSecondarySpa(user)"
-                                >
-                                    {{ secondarySpaLabel(user) }}
-                                </button>
-                                <button class="action-btn action-edit" @click="handleEdit(user)" title="编辑">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                    </svg>
-                                </button>
-                                <button
-                                    type="button"
-                                    class="action-btn action-delete"
-                                    @click="handleDelete(user)"
-                                    title="删除"
-                                    :disabled="deletingUserId === user.id"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="3 6 5 6 21 6"/>
-                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                        <line x1="10" y1="11" x2="10" y2="17"/>
-                                        <line x1="14" y1="11" x2="14" y2="17"/>
-                                    </svg>
-                                </button>
+                                <div class="spa-btn-group">
+                                    <button
+                                        type="button"
+                                        class="spa-btn spa-btn-primary"
+                                        :disabled="primarySpaDisabled(user)"
+                                        @click="onPrimarySpa(user)"
+                                    >
+                                        {{ primarySpaLabel(user) }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="spa-btn spa-btn-secondary"
+                                        :class="{ 'is-muted': secondarySpaDisabled(user) }"
+                                        :disabled="secondarySpaDisabled(user)"
+                                        @click="onSecondarySpa(user)"
+                                    >
+                                        {{ secondarySpaLabel(user) }}
+                                    </button>
+                                </div>
+                                <div class="action-btn-group">
+                                    <button class="action-btn action-edit" @click="handleEdit(user)" title="编辑">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                        </svg>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="action-btn action-delete delete-btn"
+                                        @click="handleDelete(user)"
+                                        title="删除"
+                                        :disabled="deletingUserId === user.id"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="3 6 5 6 21 6"/>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                            <line x1="10" y1="11" x2="10" y2="17"/>
+                                            <line x1="14" y1="11" x2="14" y2="17"/>
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                         </td>
                     </tr>
@@ -343,7 +348,7 @@
                 </div>
                 <h3 class="delete-confirm-title">确认删除</h3>
                 <p class="delete-confirm-message">
-                    确定要删除用户「<span class="delete-username">{{ deleteTarget?.username || deleteTarget?.name }}</span>」吗？
+                    确定要删除用户「<span class="delete-username">{{ deleteTarget?.displayName || deleteTarget?.username || deleteTarget?.name }}</span>」吗？
                 </p>
                 <p class="delete-confirm-hint">此操作不可恢复</p>
                 <div class="delete-confirm-footer">
@@ -419,7 +424,8 @@
                                 <td>{{ row.email || '-' }}</td>
                                 <td>{{ row.phone || '-' }}</td>
                                 <td v-if="!importResult">
-                                    <span class="import-status-ok">待导入</span>
+                                    <span v-if="row._duplicate" class="import-status-fail">{{ row._error }}</span>
+                                    <span v-else class="import-status-ok">待导入</span>
                                 </td>
                                 <td v-if="importResult">
                                     <span v-if="row._success" class="import-status-ok">成功</span>
@@ -474,7 +480,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { listUsers, issueSpaToken as apiIssue, disableSpaToken as apiDisable, enableSpaToken as apiEnable, saveUser as apiSaveUser, deleteUser as apiDeleteUser, getTokenCode as apiGetTokenCode } from '@/api/user.js'
 import { getSpaStatus } from '@/api/spaAdmin.js'
 import { listRoleGroups, getRoleGroupDetail, assignUsersToRoleGroup } from '@/api/roleGroup.js'
@@ -483,8 +489,21 @@ import * as XLSX from 'xlsx'
 const loading = ref(false)
 const searchKeyword = ref('')
 const currentPage = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(1) // 动态计算
 const totalCount = ref(0)
+
+// 动态计算 pageSize
+const calculatePageSize = () => {
+    nextTick(() => {
+        const windowHeight = window.innerHeight
+        const topAreaHeight = 220
+        const paginationHeight = 80
+        const rowHeight = 56 // 每行高度
+        const availableHeight = windowHeight - topAreaHeight - paginationHeight
+        const rows = Math.max(1, Math.floor(availableHeight / rowHeight))
+        pageSize.value = rows
+    })
+}
 
 const showTokenModal = ref(false)
 const tokenModalMode = ref('issue') // 'issue' | 'rotate'
@@ -492,6 +511,10 @@ const lastTokenHex = ref('')
 const toastMessage = ref('')
 const loadingSpaUserId = ref(null)
 const users = ref([])
+
+// 缓存所有用户账号和邮箱（用于导入时检测系统重复）
+const allUserNames = ref(new Set())
+const allUserEmails = ref(new Set())
 
 // 添加/编辑用户弹窗相关
 const showUserModal = ref(false)
@@ -607,7 +630,6 @@ const parseImportFile = (file) => {
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
             const json = XLSX.utils.sheet_to_json(firstSheet, { defval: '' })
 
-            // 规范化 row 的 key，去除空格、BOM 等干扰字符
             const normalizeRow = (row) => {
                 const normalized = {}
                 for (const [key, val] of Object.entries(row)) {
@@ -617,18 +639,19 @@ const parseImportFile = (file) => {
                 return normalized
             }
 
-            const validRows = []
+            const allRows = []
             const errors = []
+
+            // 第一遍：解析所有行，记录格式错误（账号或用户名为空）
             json.forEach((row, index) => {
                 row = normalizeRow(row)
-                // name=账号, displayName=用户名
                 const name = String(row['账号'] || row['name'] || '').trim()
                 const displayName = String(row['用户名'] || row['displayName'] || '').trim()
                 if (!name || !displayName) {
                     errors.push(index + 1)
                     return
                 }
-                validRows.push({
+                allRows.push({
                     name,
                     displayName,
                     email: String(row['邮箱'] || row['email'] || '').trim(),
@@ -636,12 +659,46 @@ const parseImportFile = (file) => {
                 })
             })
 
+            // 第二遍：检测 name（账号）文件内重复（displayName 允许重复）
+            const nameCount = {}
+            allRows.forEach(row => {
+                nameCount[row.name] = (nameCount[row.name] || 0) + 1
+            })
+
+            // 第三遍：检测系统中已有账号和邮箱重复
+            allRows.forEach(row => {
+                const dupErrors = []
+                if (allUserNames.value.has(row.name)) {
+                    dupErrors.push('账号已存在')
+                }
+                if (row.email && allUserEmails.value.has(row.email)) {
+                    dupErrors.push('邮箱已存在')
+                }
+                if (dupErrors.length > 0) {
+                    row._duplicate = true
+                    row._error = dupErrors.join('，')
+                }
+            })
+
+            // 第四遍：标记文件内重复账号（优先级低于系统重复，同一行不会被重复标记）
+            allRows.forEach(row => {
+                if (nameCount[row.name] > 1 && !row._duplicate) {
+                    row._duplicate = true
+                    row._error = '文件中账号重复'
+                }
+            })
+
             importErrors.value = errors
-            importPreviewData.value = validRows
+            importPreviewData.value = allRows
             showImportModal.value = true
 
-            if (validRows.length === 0) {
+            if (allRows.length === 0) {
                 showToast('文件中未检测到有效数据，请检查格式')
+            } else {
+                const dupRows = allRows.filter(r => r._duplicate)
+                if (dupRows.length > 0) {
+                    showToast(`检测到 ${dupRows.length} 条数据存在重复，已标记`)
+                }
             }
         } catch (err) {
             showToast('文件解析失败，请确认是有效的 Excel 或 CSV 文件')
@@ -721,6 +778,9 @@ async function fetchUsers() {
             users.value = res
             totalCount.value = res.length
         }
+        // 更新所有用户账号和邮箱缓存（用于导入时检测重复）
+        allUserNames.value = new Set(users.value.map(u => u.name).filter(Boolean))
+        allUserEmails.value = new Set(users.value.map(u => u.email).filter(Boolean))
         // 获取每个用户的安全码状态
         await fetchSpaStatusAll()
     } catch (e) {
@@ -748,7 +808,13 @@ async function fetchSpaStatusAll() {
 }
 
 onMounted(() => {
+    calculatePageSize()
+    window.addEventListener('resize', calculatePageSize)
     fetchUsers()
+})
+
+onUnmounted(() => {
+    window.removeEventListener('resize', calculatePageSize)
 })
 
 const handleSearch = () => {
@@ -1129,19 +1195,40 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
 }
 
 .col-actions {
-    width: 200px;
-    min-width: 200px;
+    width: 320px;
+    min-width: 320px;
+    box-sizing: border-box;
 }
 
-.data-table th.col-actions,
-.data-table td.col-actions {
+/* 表头 */
+.data-table th.col-actions {
+    width: 320px;
+    min-width: 320px;
     text-align: left !important;
-    padding-left: 12px !important;
+    padding-left: 70px !important;
+    box-sizing: border-box;
 }
 
-.col-actions .spa-actions {
-    justify-content: flex-start;
+/* 内容 */
+.data-table td.col-actions {
+    padding: 0 16px 0 70px !important;
+    box-sizing: border-box;
 }
+
+/* 按钮容器 */
+.col-actions .spa-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+/* 让删除按钮自动顶到最右 */
+.col-actions .spa-actions .delete-btn {
+    margin-left: auto;
+}
+
+
 
 .col-name {
     width: 100px;
@@ -1297,11 +1384,22 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
 }
 
 .spa-actions {
-    display: inline-flex;
+    display: flex;
     gap: 6px;
     align-items: center;
-    justify-content: center;
-    white-space: nowrap;
+    justify-content: space-between;
+}
+
+.spa-btn-group {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.action-btn-group {
+    display: flex;
+    gap: 6px;
+    align-items: center;
 }
 
 .spa-btn {
@@ -2261,12 +2359,6 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
 .action-delete:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-}
-
-.spa-actions {
-    display: flex;
-    gap: 6px;
-    align-items: center;
 }
 
 /* 删除确认弹窗样式 */
