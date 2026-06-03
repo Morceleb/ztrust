@@ -48,6 +48,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { apiClient } from '@/api/axios.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -63,32 +64,40 @@ const fillDefaultCredentials = () => {
   error.value = ''
 }
 
-const persistLoginState = () => {
-  localStorage.setItem('admin_logged_in', 'true')
-  localStorage.setItem('admin_username', username.value)
-  if (rememberMe.value) {
-    localStorage.setItem('admin_remember_me', 'true')
-  } else {
-    localStorage.removeItem('admin_remember_me')
-  }
-}
-
 const handleLogin = async () => {
   error.value = ''
   loading.value = true
 
   try {
-    const normalizedUsername = username.value.trim()
-    if (normalizedUsername === 'admin' && password.value === 'admin') {
-      persistLoginState()
+    const res = await apiClient.post('/policy/auth/login', {
+      username: username.value.trim(),
+      password: password.value
+    })
+
+    if (res.data.code === 200) {
+      const { token, nickname, adminId } = res.data.data
+      localStorage.setItem('admin_token', token)
+      localStorage.setItem('admin_nickname', nickname)
+      localStorage.setItem('admin_logged_in', 'true')
+      localStorage.setItem('admin_username', username.value.trim())
+      if (rememberMe.value) {
+        localStorage.setItem('admin_remember_me', 'true')
+      } else {
+        localStorage.removeItem('admin_remember_me')
+      }
       const redirect = typeof route.query.redirect === 'string' && route.query.redirect
         ? route.query.redirect
         : '/dashboard'
       await router.replace(redirect)
-      return
+    } else {
+      error.value = res.data.message || '用户名或密码错误'
     }
-
-    error.value = '用户名或密码错误'
+  } catch (err) {
+    if (err.response && err.response.status === 401) {
+      error.value = '用户名或密码错误'
+    } else {
+      error.value = err.response?.data?.message || '登录失败，请稍后重试'
+    }
   } finally {
     loading.value = false
   }
