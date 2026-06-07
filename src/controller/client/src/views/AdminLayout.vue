@@ -96,6 +96,7 @@
 <script setup>
 import { computed, h, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { apiClient } from '@/api/axios.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -190,13 +191,18 @@ const handleLogout = () => {
 }
 
 // 确认注销登录
-const confirmLogout = () => {
+const confirmLogout = async () => {
     showLogoutModal.value = false
-    localStorage.removeItem('admin_token')
+    try {
+        await apiClient.post('/policy/auth/logout')
+    } catch (e) {
+        // 即使接口失败也清理本地状态
+    }
     localStorage.removeItem('admin_nickname')
     localStorage.removeItem('admin_logged_in')
     localStorage.removeItem('admin_username')
     localStorage.removeItem('admin_remember_me')
+    localStorage.removeItem('admin_id')
     router.replace('/login')
 }
 </script>

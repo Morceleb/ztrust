@@ -75,11 +75,14 @@ const handleLogin = async () => {
     })
 
     if (res.data.code === 200) {
-      const { token, nickname, adminId } = res.data.data
-      localStorage.setItem('admin_token', token)
+      // Token 已通过 HttpOnly Cookie 由浏览器自动存储，前端只需存显示信息
+      const { nickname, adminId } = res.data.data
       localStorage.setItem('admin_nickname', nickname)
       localStorage.setItem('admin_logged_in', 'true')
       localStorage.setItem('admin_username', username.value.trim())
+      if (adminId !== undefined) {
+        localStorage.setItem('admin_id', String(adminId))
+      }
       if (rememberMe.value) {
         localStorage.setItem('admin_remember_me', 'true')
       } else {
