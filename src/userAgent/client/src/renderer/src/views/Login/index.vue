@@ -1,168 +1,15 @@
-<template>
-    <div class="login-page">
-        <!-- 全屏背景 -->
-        <div class="login-brand">
-            <div class="brand-decoration">
-                <div class="deco-circle deco-circle-1"></div>
-                <div class="deco-circle deco-circle-2"></div>
-                <div class="deco-circle deco-circle-3"></div>
-            </div>
-        </div>
-
-        <!-- 公司地址输入卡片 -->
-        <div v-if="currentStep === 'company'" class="login-form-panel">
-            <div class="login-form-wrapper">
-                <div class="login-form-header">
-                    <h2 class="form-title">企业入口</h2>
-                    <p class="form-subtitle">请输入您的公司地址以继续</p>
-                </div>
-
-                <form class="login-form" @submit.prevent="handleCompanySubmit">
-                    <div class="form-group" :class="{ 'has-error': companyError }">
-                        <label class="form-label">公司地址 / 域名</label>
-                        <div class="input-wrapper">
-                            <div class="input-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                                    <polyline points="9 22 9 12 15 12 15 22" />
-                                </svg>
-                            </div>
-                            <input v-model="companyAddress" type="text" class="form-input"
-                                placeholder="例如：company.example.com 或 https://company.com" @input="clearCompanyError" />
-                        </div>
-                        <p v-if="companyError" class="error-msg">{{ companyError }}</p>
-                    </div>
-
-                    <button type="submit" class="login-btn" :disabled="isCompanyLoading">
-                        <span v-if="!isCompanyLoading">下一步</span>
-                        <span v-else class="loading-dots">
-                            <span></span><span></span><span></span>
-                        </span>
-                    </button>
-                </form>
-
-                <div class="login-footer">
-                    <span>© 2025 XXX 零信任平台. All rights reserved.</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- 原登录表单卡片 -->
-        <div v-else class="login-form-panel">
-            <div class="login-form-wrapper">
-                <!-- 返回修改公司地址按钮 -->
-                <button class="back-btn" @click="backToCompany">
-                    ← 返回修改公司地址
-                </button>
-
-                <div class="login-form-header">
-                    <h2 class="form-title">欢迎回来</h2>
-                    <p class="form-subtitle">
-                        {{ companyAddress ? `正在登录：${companyAddress}` : '请登录您的账号' }}
-                    </p>
-                </div>
-
-                <form class="login-form" @submit.prevent="handleLogin">
-                    <!-- 用户名 -->
-                    <div class="form-group" :class="{ 'has-error': errors.username }">
-                        <label class="form-label">用户名</label>
-                        <div class="input-wrapper">
-                            <div class="input-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                    <circle cx="12" cy="7" r="4" />
-                                </svg>
-                            </div>
-                            <input v-model="form.username" type="text" class="form-input" placeholder="请输入用户名"
-                                autocomplete="username" @input="clearError('username')" />
-                        </div>
-                        <p v-if="errors.username" class="error-msg">{{ errors.username }}</p>
-                    </div>
-
-                    <!-- 密码 -->
-                    <div class="form-group" :class="{ 'has-error': errors.password }">
-                        <label class="form-label">密码</label>
-                        <div class="input-wrapper">
-                            <div class="input-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                </svg>
-                            </div>
-                            <input v-model="form.password" :type="showPassword ? 'text' : 'password'" class="form-input"
-                                placeholder="请输入密码" autocomplete="current-password" @input="clearError('password')" />
-                            <button type="button" class="input-toggle" @click="showPassword = !showPassword"
-                                tabindex="-1">
-                                <svg v-if="!showPassword" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
-                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                    stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                    <circle cx="12" cy="12" r="3" />
-                                </svg>
-                                <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16"
-                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                    stroke-linecap="round" stroke-linejoin="round">
-                                    <path
-                                        d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                                    <line x1="1" y1="1" x2="23" y2="23" />
-                                </svg>
-                            </button>
-                        </div>
-                        <p v-if="errors.password" class="error-msg">{{ errors.password }}</p>
-                    </div>
-
-                    <!-- 记住我 & 忘记密码 -->
-                    <div class="form-options">
-                        <label class="checkbox-label">
-                            <input type="checkbox" v-model="form.rememberMe" class="checkbox-input" />
-                            <span class="checkbox-custom"></span>
-                            <span class="checkbox-text">记住我</span>
-                        </label>
-                        <a href="#" class="forgot-link" @click.prevent>忘记密码?</a>
-                    </div>
-
-                    <!-- 错误提示 -->
-                    <Transition name="alert-slide">
-                        <div v-if="loginError" class="login-error-alert">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="12" y1="8" x2="12" y2="12" />
-                                <line x1="12" y1="16" x2="12.01" y2="16" />
-                            </svg>
-                            <span>{{ loginError }}</span>
-                        </div>
-                    </Transition>
-
-                    <!-- 登录按钮 -->
-                    <button type="submit" class="login-btn" :class="{ loading: isLoading }" :disabled="isLoading">
-                        <span v-if="!isLoading">登 录</span>
-                        <span v-else class="loading-dots">
-                            <span></span><span></span><span></span>
-                        </span>
-                    </button>
-                </form>
-
-                <div class="login-footer">
-                    <span>© 2025 XXX 零信任平台. All rights reserved.</span>
-                </div>
-            </div>
-        </div>
-    </div>
-</template>
-
+<!-- src/views/LoginPage.vue -->
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
+import './index.css'
+
+import LoginLogo from '@/components/CustomUI/CustomLogo/index.vue'
+import LoginInput from '@/components/CustomUI/CustomInput/index.vue'
+import LoginButton from '@/components/CustomUI/CustomButton/index.vue'
+import LoginDivider from '@/components/CustomUI/CustomDivider/index.vue'
+import SocialLogin from '@/components/CustomUI/SocialLogin/index.vue'
 import request from '@/utils/request'
 import store from '@/store'
 
@@ -171,38 +18,71 @@ const router = useRouter()
 // 步骤控制：'company' | 'login'
 const currentStep = ref('company')
 
-// 公司地址
+// 配置对象 - 支持从后端动态加载
+const config = ref({
+    logo: { show: true, text: '我的公司', imageUrl: '', showImage: true },
+    username: { show: true, label: '用户名', placeholder: '请输入用户名' },
+    password: { show: true, label: '密码', placeholder: '请输入密码' },
+    loginButton: { show: true, text: '登录' },
+    divider: { show: true, text: '' },
+    socialLogin: { show: true, providers: ['wechat', 'google'] },
+    footerText: '© 2026 我的公司 版权所有',
+    reminder: {
+        show: true,
+        title: '温馨提示',
+        content: '为了您的账户安全，请使用公司内部账号登录。如遇登录问题，请联系管理员。'
+    }
+})
+
+// 公司地址相关
 const companyAddress = ref('')
+const companyError = ref('')
+const isCompanyLoading = ref(false)
 
-// 表单数据
-const form = reactive({
-    username: '',
-    password: '',
-    rememberMe: false,
-})
-
-const errors = reactive({
-    username: '',
-    password: '',
-})
-
+// 登录表单相关
+const username = ref('')
+const password = ref('')
 const showPassword = ref(false)
 const isLoading = ref(false)
 const loginError = ref('')
 
-const isCompanyLoading = ref(false)
-const companyError = ref('')
+// 表单验证错误
+const errors = reactive({
+    username: '',
+    password: ''
+})
 
-// 加载已保存的公司地址
-onMounted(() => {
+// 记住我表单
+const rememberMe = ref(false)
+
+// 是否显示密码切换按钮
+const showPasswordToggle = computed(() => config.value.password?.type === 'password')
+
+// 动态获取密码输入类型
+const passwordInputType = computed(() => showPassword.value ? 'text' : 'password')
+
+// 加载配置和已保存的公司地址
+onMounted(async () => {
+    // 尝试从后端加载配置
+    try {
+        const res = await fetch('/api/tenant/login-config')
+        const data = await res.json()
+        if (data.config) {
+            config.value = { ...config.value, ...data.config }
+        }
+    } catch (err) {
+        console.log('使用默认登录配置')
+    }
+
+    // 加载已保存的公司地址
     const savedAddress = localStorage.getItem('companyAddress')
     if (savedAddress) {
         companyAddress.value = savedAddress
-        currentStep.value = 'login'   // 已有地址则直接进入登录页
+        currentStep.value = 'login'
     }
 })
 
-// 保存公司地址并切换步骤
+// 保存公司地址并切换到登录步骤
 const handleCompanySubmit = () => {
     if (!companyAddress.value.trim()) {
         companyError.value = '请输入公司地址'
@@ -210,11 +90,8 @@ const handleCompanySubmit = () => {
     }
 
     isCompanyLoading.value = true
-
-    // 保存到 localStorage
     localStorage.setItem('companyAddress', companyAddress.value.trim())
 
-    // 模拟一点延迟，更自然
     setTimeout(() => {
         currentStep.value = 'login'
         isCompanyLoading.value = false
@@ -230,24 +107,32 @@ const backToCompany = () => {
     currentStep.value = 'company'
 }
 
+// 清除单个字段错误
 const clearError = (field) => {
     errors[field] = ''
     loginError.value = ''
 }
 
+// 表单验证
 const validate = () => {
     let valid = true
-    if (!form.username.trim()) {
+
+    if (!config.value.username?.show) {
+        return valid
+    }
+
+    if (config.value.username?.show && !username.value.trim()) {
         errors.username = '请输入用户名'
         valid = false
     }
-    if (!form.password) {
+    if (config.value.password?.show && !password.value) {
         errors.password = '请输入密码'
         valid = false
     }
     return valid
 }
 
+// 处理登录
 const handleLogin = async () => {
     if (!validate()) return
 
@@ -255,9 +140,10 @@ const handleLogin = async () => {
     loginError.value = ''
 
     try {
+
         const response = await request.post('/auth/login', {
-            username: form.username,
-            password: form.password
+            username: username.value,
+            password: password.value
         })
 
         store.dispatch('auth/loginSuccess', response.data.data.user)
@@ -268,6 +154,162 @@ const handleLogin = async () => {
         isLoading.value = false
     }
 }
+
+// 社交登录
+const handleSocialClick = (provider) => {
+    console.log('第三方登录:', provider)
+}
+
+// 处理公司地址输入回车
+const handleCompanyKeydown = (e) => {
+    if (e.key === 'Enter') {
+        handleCompanySubmit()
+    }
+}
+
+// 处理登录表单回车
+const handleLoginKeydown = (e) => {
+    if (e.key === 'Enter') {
+        handleLogin()
+    }
+}
 </script>
 
-<style scoped src="./index.css"></style>
+<template>
+    <main class="login-container">
+        <!-- 左侧温馨提示区域 -->
+        <div class="left-content">
+            <div v-if="config.reminder?.show" class="reminder">
+                <h3 class="reminder-title">{{ config.reminder.title }}</h3>
+                <p class="reminder-content">{{ config.reminder.content }}</p>
+            </div>
+        </div>
+
+        <!-- 右侧登录表单区域 -->
+        <div class="login-page">
+            <!-- Logo -->
+            <LoginLogo v-if="config.logo?.show" :text="config.logo.text" :image-url="config.logo.imageUrl"
+                :show-image="config.logo.showImage" />
+
+            <!-- ==================== 步骤一：公司地址输入 ==================== -->
+            <div v-if="currentStep === 'company'" class="form-area">
+                <div class="form-group" :class="{ 'has-error': companyError }">
+                    <label class="form-label">接入地址 / 域名</label>
+                    <div class="input-wrapper">
+                        <div class="input-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                                <polyline points="9 22 9 12 15 12 15 22" />
+                            </svg>
+                        </div>
+                        <input v-model="companyAddress" type="text" class="form-input company-input"
+                            placeholder="例如：company.example.com 或 https://company.com" @input="clearCompanyError"
+                            @keydown="handleCompanyKeydown" />
+                    </div>
+                    <p v-if="companyError" class="error-msg">{{ companyError }}</p>
+                </div>
+
+                <!-- 加载动画替代按钮 -->
+                <div v-if="isCompanyLoading" class="login-btn loading">
+                    <span class="loading-dots">
+                        <span></span><span></span><span></span>
+                    </span>
+                </div>
+                <LoginButton v-else-if="config.loginButton?.show" text="下一步" @click="handleCompanySubmit" />
+            </div>
+
+            <!-- ==================== 步骤二：用户登录表单 ==================== -->
+            <div v-else class="form-area">
+                <!-- 返回修改公司地址 -->
+                <button class="back-btn" @click="backToCompany">
+                    ← 返回修改接入地址
+                </button>
+
+                <p class="login-subtitle">
+                    正在登录：{{ companyAddress }}
+                </p>
+
+                <!-- 输入框区域 -->
+                <LoginInput v-if="config.username?.show" v-model="username" :label="config.username.label"
+                    :placeholder="config.username.placeholder" @input="clearError('username')"
+                    @keydown="handleLoginKeydown" />
+
+                <!-- 密码输入（带显示/隐藏切换） -->
+                <div v-if="config.password?.show" class="input-group" :class="{ 'has-error': errors.password }">
+                    <label>{{ config.password.label }}</label>
+                    <div class="input-wrapper">
+                        <input :type="passwordInputType" v-model="password" :placeholder="config.password.placeholder"
+                            class="form-input" @input="clearError('password')" @keydown="handleLoginKeydown" />
+                        <button type="button" class="input-toggle" @click="showPassword = !showPassword" tabindex="-1">
+                            <svg v-if="!showPassword" xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
+                            <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path
+                                    d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                                <line x1="1" y1="1" x2="23" y2="23" />
+                            </svg>
+                        </button>
+                    </div>
+                    <p v-if="errors.password" class="error-msg">{{ errors.password }}</p>
+                </div>
+
+                <!-- 记住我 -->
+                <div class="form-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" v-model="rememberMe" class="checkbox-input" />
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">记住我</span>
+                    </label>
+                    <a href="#" class="forgot-link" @click.prevent>忘记密码?</a>
+                </div>
+
+                <!-- 错误提示 -->
+                <Transition name="alert-slide">
+                    <div v-if="loginError" class="login-error-alert">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        <span>{{ loginError }}</span>
+                    </div>
+                </Transition>
+
+                <!-- 加载状态按钮 -->
+                <div v-if="isLoading" class="login-btn loading">
+                    <span class="loading-dots">
+                        <span></span><span></span><span></span>
+                    </span>
+                </div>
+                <LoginButton v-else-if="config.loginButton?.show" :text="config.loginButton.text"
+                    @click="handleLogin" />
+
+                <!-- 分割线 -->
+                <LoginDivider v-if="config.divider?.show" :text="config.divider.text" />
+
+                <!-- 社交登录 -->
+                <SocialLogin v-if="config.socialLogin?.show" :providers="config.socialLogin.providers"
+                    @social-click="handleSocialClick" />
+            </div>
+
+            <!-- 当没有输入框时显示占位图 -->
+            <img v-if="!config.username?.show && !config.password?.show && currentStep === 'login'"
+                src="@/assets/placeholder-form.png" class="form-placeholder" alt="表单占位图" />
+
+            <!-- 页脚 -->
+            <div v-if="config.footerText" class="footer">
+                {{ config.footerText }}
+            </div>
+        </div>
+    </main>
+</template>

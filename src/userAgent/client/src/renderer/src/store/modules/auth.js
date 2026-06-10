@@ -1,6 +1,10 @@
+import request from '@/utils/request'
+import activityMonitor from '@/utils/activityMonitor'
+import { SecurityConfig } from '@/config/security'
+
 const state = {
     isLoggedIn: false,
-    user: null,         // 可选：存用户信息
+    user: null,
 }
 
 const getters = {
@@ -26,24 +30,71 @@ const actions = {
     loginSuccess({ commit }, user) {
         commit('SET_LOGGED_IN', true)
         commit('SET_USER', user)
+
+        // 初始化并启动行为监控
+        if (SecurityConfig.activityMonitor.enabled) {
+            activityMonitor.init({
+                id: user.id,
+                name: user.name || user.displayName
+            })
+            activityMonitor.start()
+            // 设置登录状态，开始失活计时
+            activityMonitor.setLoginState(true, {
+                id: user.id,
+                name: user.name || user.displayName
+            })
+        }
     },
 
     // 登出
     logout({ commit }) {
+        // 先更新 Vuex 状态
         commit('LOGOUT')
-        // 可选：调用后端 logout 接口清除 httpOnly cookie
-        // await api.post('/logout')
+        // 停止行为监控
+        activityMonitor.stop()
+        activityMonitor.performLogout('manual')
+        // 重置登录状态，停止失活计时
+        activityMonitor.setLoginState(false)
     },
 
-    async checkAuth({ commit }) {
+    // 超时自动注销
+    timeoutLogout({ commit }) {
+        commit('LOGOUT')
+        activityMonitor.stop()
+        activityMonitor.setLoginState(false)
+    },
+
+    async checkAuth({ commit, dispatch }) {
         try {
-            // 调用后端接口验证（推荐使用 refresh token 自动刷新 access token 的方式）
-            const response = await api.get('/api/me')   // 或 /api/user 或 /api/check-auth
+            const response = await request.get('/auth/test')
             commit('SET_LOGGED_IN', true)
             commit('SET_USER', response.data.user || response.data)
+
+            // 登录成功后初始化监控
+            if (SecurityConfig.activityMonitor.enabled) {
+                const user = response.data.user || response.data
+                activityMonitor.init({
+                    id: user.id,
+                    name: user.name || user.displayName
+                })
+                activityMonitor.start()
+                // 设置登录状态，开始失活计时
+                activityMonitor.setLoginState(true, {
+                    id: user.id,
+                    name: user.name || user.displayName
+                })
+            }
         } catch (err) {
             // 401/403 或其他错误 → 未登录
-            commit('LOGOUT')
+            // 只有当前是登录状态才需要登出操作
+            if (state.isLoggedIn) {
+                activityMonitor.stop()
+                activityMonitor.performLogout('manual')
+                activityMonitor.setLoginState(false)
+            }
+
+            // commit('LOGOUT')
+
             throw err
         }
     }

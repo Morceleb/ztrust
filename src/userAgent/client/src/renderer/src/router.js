@@ -29,7 +29,7 @@ const routes = [
                 // 【关键】显式覆盖父级的 requiresAuth，允许未登录访问
                 meta: { requiresAuth: false }
             },
-            { path: 'settings', component: Settings },
+            { path: 'settings', component: Settings, meta: { requiresAuth: false } },
             { path: 'personal_info', component: PersonalInfo },
             { path: 'terminal_management', component: TerminalManagerment },
             { path: 'apply_permission', component: ApplyPermission },

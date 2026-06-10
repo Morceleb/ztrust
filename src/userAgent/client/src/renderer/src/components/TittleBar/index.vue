@@ -1,20 +1,20 @@
 <template>
     <div class="custom-title-bar">
-        <div class="drag-area"></div>
+        <div class="drag-area" @mousedown="startDrag"></div>
         <div class="controls">
-            <button @click="minimize" class="control-btn">－</button>
-            <button @click="maximize" class="control-btn">▢</button>
-            <button @click="close" class="control-btn close">✕</button>
+            <button @click="minimize" class="control-btn" title="最小化">－</button>
+            <button @click="maximize" class="control-btn" title="最大化">▢</button>
+            <button @click="close" class="control-btn close" title="关闭">✕</button>
         </div>
     </div>
 </template>
 
 <script setup>
-const minimize = () => window.electronAPI.controlWindow('minimize')
-const maximize = () => window.electronAPI.controlWindow('maximize')
-const close = () => window.electronAPI.controlWindow('close')
-</script>
+import { invoke } from '@tauri-apps/api/core'
+import './index.css'
 
-<style scoped>
-@import url(./index.css);
-</style>
+const minimize = () => invoke('window_control', { action: 'minimize' })
+const maximize = () => invoke('window_control', { action: 'maximize' })
+const close = () => invoke('window_control', { action: 'close' })
+const startDrag = () => invoke('window_start_dragging')
+</script>

@@ -3,22 +3,21 @@
     justify-content: space-between;
     align-items: center;
     height: 32px;
-    /* 匹配你左侧或顶部的颜色 */
     color: white;
-    /* 整个区域设置为可拖拽 */
-    -webkit-app-region: drag;
+    background: transparent;
 }
 
 .drag-area {
     flex: 1;
     padding-left: 10px;
     font-size: 12px;
+    height: 100%;
+    cursor: default;
 }
 
 .controls {
     display: flex;
-    /* 按钮区域必须设置为不可拖拽，否则点击无效 */
-    -webkit-app-region: no-drag;
+    height: 100%;
 }
 
 .control-btn {
@@ -26,15 +25,19 @@
     height: 32px;
     border: none;
     background: transparent;
-    color: white;
+    color: #4b5563;
     cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    transition: background 0.15s, color 0.15s;
 }
 
 .control-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.08);
+    color: #1f2937;
 }
 
 .control-btn.close:hover {
-    background: #e81123;
-    /* 经典的关闭红 */
+    background: #ef4444;
+    color: #fff;
 }

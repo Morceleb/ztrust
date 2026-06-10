@@ -1,42 +1,49 @@
 appId: com.electron.app
 productName: ztrust-new
-directories:
-  buildResources: build
-files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-asarUnpack:
-  - resources/**
+electronVersion: 39.8.7
+
 win:
+  target:
+    - target: nsis
+      arch:
+        - x64
   executableName: ztrust-new
+
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
-mac:
-  entitlementsInherit: build/entitlements.mac.plist
-  extendInfo:
-    - NSCameraUsageDescription: Application requests access to the device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
-    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
-    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
-  notarize: false
-dmg:
-  artifactName: ${name}-${version}.${ext}
-linux:
-  target:
-    - AppImage
-    - snap
-    - deb
-  maintainer: electronjs.org
-  category: Utility
-appImage:
-  artifactName: ${name}-${version}.${ext}
+
+# files 包含 out/ 编译产物和 node_modules（prebuild.js 已清理无用文件）
+files:
+  - out/**/*
+  - node_modules/**/*
+  - '!**/src/**'
+  - '!**/.vscode/**'
+  - '!**/.eslintrc*'
+  - '!**/.prettierrc*'
+  - '!**/dev-app-update.yml'
+  - '!**/CHANGELOG.md'
+  - '!**/README.md'
+  - '!**/.env*'
+  - '!**/.eslintcache'
+  - '!**/electron.vite.config.*'
+  - '!**/test/**'
+  - '!**/__tests__/**'
+  - '!**/demo/**'
+  - '!**/example/**'
+  - '!**/docs/**'
+  - '!**/.github/**'
+
+asar: true
 npmRebuild: false
+compression: normal
+
+directories:
+  output: dist
+  buildResources: build
+
 publish:
   provider: generic
   url: https://example.com/auto-updates
