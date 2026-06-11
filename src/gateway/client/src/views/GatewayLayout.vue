@@ -41,12 +41,13 @@
 
       <div class="gw-sidebar-foot">
         <div class="gw-user">
-          <div class="gw-user-avatar">管</div>
+          <div class="gw-user-avatar">{{ avatarText }}</div>
           <div class="gw-user-meta">
-            <span class="gw-user-name">管理员</span>
-            <span class="gw-user-role">网关运维</span>
+            <span class="gw-user-name">{{ adminNickname }}</span>
+            <span class="gw-user-role">管理员</span>
           </div>
         </div>
+        <button type="button" class="gw-logout" @click="handleLogout">退出登录</button>
       </div>
     </aside>
 
@@ -63,12 +64,27 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { apiClient } from '@/api/axios.js'
+import { clearAdminSession, getStoredAdminNickname, getStoredAdminUsername } from '@/utils/authStorage.js'
 
 const route = useRoute()
+const router = useRouter()
 const monitorOpen = ref(true)
 
 const pageTitle = computed(() => route.meta?.title || '概览')
+const adminNickname = computed(() => getStoredAdminNickname() || getStoredAdminUsername() || '管理员')
+const avatarText = computed(() => adminNickname.value.slice(0, 1))
+
+const handleLogout = async () => {
+  try {
+    await apiClient.post('/policy/auth/logout')
+  } catch (error) {
+    // 即使接口失败也清理本地状态
+  }
+  clearAdminSession()
+  await router.replace('/login')
+}
 </script>
 
 <style scoped>
@@ -213,6 +229,8 @@ const pageTitle = computed(() => route.meta?.title || '概览')
 .gw-sidebar-foot {
   padding: 14px 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 12px;
 }
 
 .gw-user {
@@ -248,6 +266,23 @@ const pageTitle = computed(() => route.meta?.title || '概览')
 .gw-user-role {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.5);
+}
+
+.gw-logout {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.gw-logout:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.24);
 }
 
 .gw-main {

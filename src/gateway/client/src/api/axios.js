@@ -1,11 +1,3 @@
-/**
- * Axios 实例配置
- * 统一管理请求拦截、响应处理和基础配置
- *
- * 所有 /api/policy/admin/** 接口通过 HttpOnly Cookie 携带 Token（浏览器自动管理）
- * 拦截器负责处理 401 响应（跳转登录页）
- */
-
 import axios from 'axios'
 import { clearAdminSession } from '@/utils/authStorage.js'
 
@@ -15,20 +7,9 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  // 允许跨域请求携带 Cookie（后端通过 Set-Cookie 设置 HttpOnly Cookie）
   withCredentials: true
 })
 
-const identityClient = axios.create({
-  baseURL: '/identity',
-  timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  withCredentials: true
-})
-
-// 统一错误处理：将 axios 错误转换为与原 fetch+readBody 一致的 { code, message, data } 结构
 function normalizeError(err) {
   if (err.response) {
     const { status, data } = err.response
@@ -43,7 +24,6 @@ function normalizeError(err) {
   return { code: -1, message: err.message || '请求异常', data: null }
 }
 
-// 清除本地登录状态并跳转登录页
 function clearAuthAndRedirect() {
   clearAdminSession()
   if (window.location.pathname !== '/login') {
@@ -51,9 +31,6 @@ function clearAuthAndRedirect() {
   }
 }
 
-// ============================
-// 响应拦截器：处理 401（Cookie 失效/未登录）
-// ============================
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -64,14 +41,4 @@ apiClient.interceptors.response.use(
   }
 )
 
-identityClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      clearAuthAndRedirect()
-    }
-    return Promise.reject(error)
-  }
-)
-
-export { apiClient, identityClient, normalizeError }
+export { apiClient, normalizeError, clearAuthAndRedirect }

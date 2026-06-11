@@ -97,6 +97,7 @@
 import { computed, h, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { apiClient } from '@/api/axios.js'
+import { clearAdminSession, getStoredAdminNickname, getStoredAdminUsername } from '@/utils/authStorage.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -106,7 +107,7 @@ const showUserMenu = ref(false)
 // 注销确认弹窗状态
 const showLogoutModal = ref(false)
 
-const currentUserName = computed(() => localStorage.getItem('admin_nickname') || localStorage.getItem('admin_username') || '管理员')
+const currentUserName = computed(() => getStoredAdminNickname() || getStoredAdminUsername() || '管理员')
 
 const DashboardIcon = {
     render: () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2 }, [
@@ -198,11 +199,7 @@ const confirmLogout = async () => {
     } catch (e) {
         // 即使接口失败也清理本地状态
     }
-    localStorage.removeItem('admin_nickname')
-    localStorage.removeItem('admin_logged_in')
-    localStorage.removeItem('admin_username')
-    localStorage.removeItem('admin_remember_me')
-    localStorage.removeItem('admin_id')
+    clearAdminSession()
     router.replace('/login')
 }
 </script>

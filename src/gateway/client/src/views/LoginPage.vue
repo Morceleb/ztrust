@@ -2,9 +2,11 @@
   <div class="login-page">
     <div class="login-shell">
       <section class="hero-panel">
-        <div class="badge">Admin Portal</div>
-        <h1>控制台登录</h1>
-       
+        <div class="badge">Gateway Admin</div>
+        <h1>网关管理登录</h1>
+        <ul>
+          <li>登录后访问资源与日志管理</li>
+        </ul>
       </section>
 
       <section class="form-panel">
@@ -17,12 +19,12 @@
           <form class="login-form" @submit.prevent="handleLogin">
             <label class="field">
               <span class="field-label">用户名</span>
-              <input v-model.trim="username" type="text" autocomplete="username" placeholder="请输入用户名" />
+              <input v-model.trim="username" type="text" autocomplete="username" placeholder="请输入管理员用户名" />
             </label>
 
             <label class="field">
               <span class="field-label">密码</span>
-              <input v-model="password" type="password" autocomplete="current-password" placeholder="请输入密码" />
+              <input v-model="password" type="password" autocomplete="current-password" placeholder="请输入管理员密码" />
             </label>
 
             <div class="field-row">
@@ -36,7 +38,7 @@
             <p v-if="error" class="error-text">{{ error }}</p>
 
             <button class="primary-btn" type="submit" :disabled="loading">
-              {{ loading ? '登录中...' : '登录进入控制台' }}
+              {{ loading ? '登录中...' : '登录进入网关控制台' }}
             </button>
           </form>
         </div>
@@ -76,7 +78,6 @@ const handleLogin = async () => {
     })
 
     if (res.data.code === 200) {
-      // Token 已通过 HttpOnly Cookie 由浏览器自动存储，前端只需存显示信息
       const { nickname, adminId } = res.data.data
       setAdminSession({
         nickname,
@@ -86,7 +87,7 @@ const handleLogin = async () => {
       })
       const redirect = typeof route.query.redirect === 'string' && route.query.redirect
         ? route.query.redirect
-        : '/dashboard'
+        : '/overview'
       await router.replace(redirect)
     } else {
       error.value = res.data.message || '用户名或密码错误'
@@ -104,7 +105,7 @@ const handleLogin = async () => {
 
 onMounted(() => {
   if (isAdminLoggedIn()) {
-    router.replace(typeof route.query.redirect === 'string' && route.query.redirect ? route.query.redirect : '/dashboard')
+    router.replace(typeof route.query.redirect === 'string' && route.query.redirect ? route.query.redirect : '/overview')
   }
 })
 </script>
@@ -116,9 +117,9 @@ onMounted(() => {
   align-items: stretch;
   justify-content: center;
   background:
-    radial-gradient(circle at top left, rgba(103, 126, 234, 0.28), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(118, 75, 162, 0.2), transparent 28%),
-    linear-gradient(135deg, #0f172a 0%, #111827 42%, #1f2937 100%);
+    radial-gradient(circle at top left, rgba(14, 165, 233, 0.24), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.2), transparent 28%),
+    linear-gradient(135deg, #082f49 0%, #0f172a 42%, #111827 100%);
   color: #e5eefc;
 }
 
@@ -139,7 +140,7 @@ onMounted(() => {
   padding: 32px;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 28px;
-  background: rgba(15, 23, 42, 0.48);
+  background: rgba(8, 47, 73, 0.48);
   backdrop-filter: blur(18px);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.28);
 }
@@ -149,9 +150,9 @@ onMounted(() => {
   width: fit-content;
   padding: 8px 14px;
   border-radius: 999px;
-  background: rgba(96, 165, 250, 0.16);
-  border: 1px solid rgba(96, 165, 250, 0.22);
-  color: #bfdbfe;
+  background: rgba(125, 211, 252, 0.16);
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  color: #bae6fd;
   font-size: 13px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -200,7 +201,7 @@ onMounted(() => {
 }
 
 .form-kicker {
-  color: #4f46e5;
+  color: #0284c7;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -234,12 +235,12 @@ onMounted(() => {
   padding: 14px 16px;
   font-size: 15px;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .field input:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.14);
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.14);
 }
 
 .field-row {
@@ -275,8 +276,8 @@ onMounted(() => {
   margin-top: 8px;
   padding: 14px 16px;
   color: white;
-  background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
-  box-shadow: 0 16px 32px rgba(79, 70, 229, 0.25);
+  background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+  box-shadow: 0 16px 32px rgba(2, 132, 199, 0.25);
 }
 
 .primary-btn:disabled {
