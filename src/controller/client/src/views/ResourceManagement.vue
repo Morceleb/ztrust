@@ -48,6 +48,7 @@
                         <th class="col-name">资源名称</th>
                         <th class="col-type">资源类型</th>
                         <th class="col-resource-id">资源ID</th>
+                        <th class="col-url">URL</th>
                         <th class="col-method">允许方法</th>
                         <th class="col-status avail-col">资源状态</th>
                         <th class="col-actions">操作</th>
@@ -73,6 +74,9 @@
                         <td class="col-name">{{ resource.name }}</td>
                         <td class="col-type">{{ resource.type || '-' }}</td>
                         <td class="col-resource-id">{{ resource.resourceId || '-' }}</td>
+                        <td class="col-url">
+                          <span class="resource-url-text" :title="resource.url">{{ resource.url || '-' }}</span>
+                        </td>
                         <td class="col-method">{{ resource.allow_method || '-' }}</td>
                         <td class="col-status avail-col">
                             <span
@@ -98,7 +102,7 @@
                         </td>
                     </tr>
                     <tr v-if="filteredResources.length === 0">
-                        <td colspan="8" class="empty-cell">
+                        <td colspan="9" class="empty-cell">
                             <div class="empty-state">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -176,6 +180,19 @@
                                 </div>
                             </div>
                             <div class="form-field-group form-field-span-2">
+                                <div class="form-field">
+                                    <label>URL <span class="required">*</span></label>
+                                    <div class="input-wrapper">
+                                        <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                                        </svg>
+                                        <input type="text" v-model="formData.url" class="field-input" :class="{ 'field-error': formErrors.url }" placeholder="https://example.com/api" />
+                                    </div>
+                                    <span class="field-error-text" v-if="formErrors.url">{{ formErrors.url }}</span>
+                                </div>
+                            </div>
+                            <div class="form-field-group">
                                 <div class="form-field">
                                     <label>资源图标</label>
                                     <div class="input-wrapper">
@@ -490,7 +507,8 @@ async function fetchResources() {
                     ...item,
                     allow_method: item.allowMethod,
                     is_active: item.isActive,
-                    icon: item.icon ?? item.iconUrl ?? ''
+                    icon: item.icon ?? item.iconUrl ?? '',
+                    url: item.url ?? ''
                 }))
                 totalCount.value = res.data.length
             }
@@ -500,7 +518,8 @@ async function fetchResources() {
                     ...item,
                     allow_method: item.allowMethod,
                     is_active: item.isActive,
-                    icon: item.icon ?? item.iconUrl ?? ''
+                    icon: item.icon ?? item.iconUrl ?? '',
+                    url: item.url ?? ''
                 }))
                 totalCount.value = res.data.total || res.data.list.length
             } else {
@@ -546,7 +565,7 @@ const toggleActive = () => {
 
 const handleAdd = () => {
     modalMode.value = 'add'
-    formData.value = { id: null, name: '', type: '', resourceId: '', icon: '', allow_method: '', is_active: true }
+    formData.value = { id: null, name: '', type: '', resourceId: '', icon: '', allow_method: '', is_active: true, url: '' }
     formErrors.value = {}
     showModal.value = true
 }
@@ -557,10 +576,11 @@ const handleEdit = (resource) => {
         id: resource.id,
         name: resource.name,
         type: resource.type || '',
-        resourceId: resource.resourceId || resource.url || '',
+        resourceId: resource.resourceId || '',
         icon: resource.icon || '',
         allow_method: resource.allow_method || '',
-        is_active: resource.is_active !== false
+        is_active: resource.is_active !== false,
+        url: resource.url || ''
     }
     formErrors.value = {}
     currentResource.value = resource
@@ -607,6 +627,9 @@ const handleSubmit = async () => {
     if (!formData.value.allow_method || formData.value.allow_method.trim() === '') {
         formErrors.value.allow_method = '请输入允许方法'
     }
+    if (!formData.value.url || formData.value.url.trim() === '') {
+        formErrors.value.url = '请输入 URL'
+    }
     if (Object.keys(formErrors.value).length > 0) return
 
     try {
@@ -618,6 +641,7 @@ const handleSubmit = async () => {
             resourceId: formData.value.resourceId?.trim() || null,
             icon: formData.value.icon?.trim() || null,
             allowMethod: formData.value.allow_method?.trim() || null,
+            url: formData.value.url?.trim() || null,
             isActive: formData.value.is_active === true
         }
         console.log('提交资源数据:', payload)
@@ -936,33 +960,38 @@ const confirmImport = async () => {
 }
 
 .col-name {
+    width: 130px;
+    min-width: 100px;
+}
+
+.col-type {
+    width: 100px;
+    min-width: 80px;
+}
+
+.col-resource-id {
     width: 150px;
     min-width: 120px;
 }
 
-.col-type {
-    width: 120px;
-    min-width: 100px;
-}
-
-.col-resource-id {
-    width: 180px;
-    min-width: 150px;
+.col-url {
+    width: 170px;
+    min-width: 140px;
 }
 
 .col-method {
-    width: 120px;
-    min-width: 100px;
+    width: 100px;
+    min-width: 80px;
 }
 
 .col-status {
-    width: 100px;
-    min-width: 90px;
+    width: 90px;
+    min-width: 80px;
 }
 
 .col-actions {
-    width: 120px;
-    min-width: 100px;
+    width: 100px;
+    min-width: 90px;
     text-align: center;
 }
 
