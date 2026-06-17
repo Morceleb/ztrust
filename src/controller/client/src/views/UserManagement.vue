@@ -26,7 +26,7 @@
                 <input
                     ref="fileInputRef"
                     type="file"
-                    accept=".xlsx,.xls,.csv"
+                    accept=".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     style="display:none"
                     @change="handleFileChange"
                 />
@@ -417,14 +417,14 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(row, index) in importPreviewData" :key="index">
+                            <tr v-for="(row, index) in importPreviewData" :key="index" :class="{ 'error-row': row._error }">
                                 <td>{{ index + 1 }}</td>
                                 <td>{{ row.name }}</td>
                                 <td>{{ row.displayName }}</td>
                                 <td>{{ row.email || '-' }}</td>
                                 <td>{{ row.phone || '-' }}</td>
                                 <td v-if="!importResult">
-                                    <span v-if="row._duplicate" class="import-status-fail">{{ row._error }}</span>
+                                    <span v-if="row._duplicate || row._invalid" class="import-status-fail">{{ row._error }}</span>
                                     <span v-else class="import-status-ok">待导入</span>
                                 </td>
                                 <td v-if="importResult">
@@ -515,6 +515,7 @@ const users = ref([])
 // 缓存所有用户账号和邮箱（用于导入时检测系统重复）
 const allUserNames = ref(new Set())
 const allUserEmails = ref(new Set())
+const allUserPhones = ref(new Set())
 
 // 添加/编辑用户弹窗相关
 const showUserModal = ref(false)
@@ -642,49 +643,149 @@ const parseImportFile = (file) => {
             const allRows = []
             const errors = []
 
+            // 收集所有账号的用户名映射（用于提示冲突）
+            const nameToUsers = {}
+            const emailToUsers = {}
+            const phoneToUsers = {}
+            users.value.forEach(u => {
+                const n = u.name || u.username || ''
+                const e = u.email || ''
+                const p = u.phone || ''
+                if (n) nameToUsers[n] = u.displayName || n
+                if (e) emailToUsers[e] = u.displayName || n
+                if (p) phoneToUsers[p] = u.displayName || n
+            })
+
             // 第一遍：解析所有行，记录格式错误（账号或用户名为空）
             json.forEach((row, index) => {
                 row = normalizeRow(row)
                 const name = String(row['账号'] || row['name'] || '').trim()
                 const displayName = String(row['用户名'] || row['displayName'] || '').trim()
+                const email = String(row['邮箱'] || row['email'] || '').trim()
+                const phone = String(row['手机'] || row['phone'] || '').trim()
+
+                // 校验账号不为空
                 if (!name || !displayName) {
                     errors.push(index + 1)
                     return
                 }
+
+                // 校验账号不支持中文
+                if (/[\u4e00-\u9fa5]/.test(name)) {
+                    allRows.push({
+                        name,
+                        displayName,
+                        email,
+                        phone,
+                        _error: '账号不支持中文，请修改为英文字母、数字或下划线',
+                        _invalid: true
+                    })
+                    return
+                }
+
+                // 校验手机号格式（11位纯数字）
+                if (phone && !/^\d{11}$/.test(phone)) {
+                    allRows.push({
+                        name,
+                        displayName,
+                        email,
+                        phone,
+                        _error: '手机号需为11位纯数字',
+                        _invalid: true
+                    })
+                    return
+                }
+
                 allRows.push({
                     name,
                     displayName,
-                    email: String(row['邮箱'] || row['email'] || '').trim(),
-                    phone: String(row['手机'] || row['phone'] || '').trim()
+                    email,
+                    phone
                 })
             })
 
             // 第二遍：检测 name（账号）文件内重复（displayName 允许重复）
             const nameCount = {}
             allRows.forEach(row => {
-                nameCount[row.name] = (nameCount[row.name] || 0) + 1
+                if (!row._invalid) {
+                    nameCount[row.name] = (nameCount[row.name] || 0) + 1
+                }
             })
 
-            // 第三遍：检测系统中已有账号和邮箱重复
+            // 第三遍：检测系统中已有账号、邮箱、手机重复
             allRows.forEach(row => {
+                if (row._invalid) return
                 const dupErrors = []
                 if (allUserNames.value.has(row.name)) {
-                    dupErrors.push('账号已存在')
+                    const existUser = nameToUsers[row.name] || row.name
+                    dupErrors.push(`账号「${row.name}」与「${existUser}」相同`)
                 }
-                if (row.email && allUserEmails.value.has(row.email)) {
-                    dupErrors.push('邮箱已存在')
+                if (row.email && String(row.email).trim() && allUserEmails.value.has(String(row.email).trim())) {
+                    const existUser = emailToUsers[String(row.email).trim()] || row.email
+                    dupErrors.push(`邮箱「${row.email}」与「${existUser}」相同`)
+                }
+                if (row.phone && String(row.phone).trim() && allUserPhones.value.has(String(row.phone).trim())) {
+                    const existUser = phoneToUsers[String(row.phone).trim()] || row.phone
+                    dupErrors.push(`手机「${row.phone}」与「${existUser}」相同`)
                 }
                 if (dupErrors.length > 0) {
                     row._duplicate = true
-                    row._error = dupErrors.join('，')
+                    row._error = dupErrors.join('，') + '，请检查修改'
                 }
             })
 
-            // 第四遍：标记文件内重复账号（优先级低于系统重复，同一行不会被重复标记）
+            // 第四遍：标记文件中账号重复（以第一个出现的为准）
+            Object.keys(nameCount).forEach(name => {
+                if (nameCount[name] > 1) {
+                    const dupRows = allRows.filter(r => String(r.name).trim() === name && !r._invalid)
+                    const firstName = dupRows[0]?.displayName || dupRows[0]?.name || ''
+                    // 跳过第一个，后面重复的都提示与第一个重复
+                    dupRows.slice(1).forEach(row => {
+                        row._duplicate = true
+                        row._error = row._error ? row._error + `；账号「${name}」与「${firstName}」重复` : `账号「${name}」与「${firstName}」重复`
+                    })
+                }
+            })
+
+            // 第五遍：检测文件中邮箱重复（以第一个出现的为准）
+            const emailCount = {}
             allRows.forEach(row => {
-                if (nameCount[row.name] > 1 && !row._duplicate) {
-                    row._duplicate = true
-                    row._error = '文件中账号重复'
+                if (row.email && String(row.email).trim()) {
+                    const email = String(row.email).trim()
+                    if (!emailCount[email]) emailCount[email] = []
+                    emailCount[email].push(row)
+                }
+            })
+            Object.keys(emailCount).forEach(email => {
+                if (emailCount[email].length > 1) {
+                    const rows = emailCount[email]
+                    const firstName = rows[0]?.displayName || rows[0]?.name || ''
+                    // 跳过第一个，后面重复的都提示与第一个重复
+                    rows.slice(1).forEach(row => {
+                        row._duplicate = true
+                        row._error = row._error ? row._error + `；邮箱「${email}」与「${firstName}」重复` : `邮箱「${email}」与「${firstName}」重复`
+                    })
+                }
+            })
+
+            // 第六遍：检测文件中手机号重复（以第一个出现的为准）
+            const phoneCount = {}
+            allRows.forEach(row => {
+                if (row.phone && String(row.phone).trim()) {
+                    const phone = String(row.phone).trim()
+                    if (!phoneCount[phone]) phoneCount[phone] = []
+                    phoneCount[phone].push(row)
+                }
+            })
+            Object.keys(phoneCount).forEach(phone => {
+                if (phoneCount[phone].length > 1) {
+                    const rows = phoneCount[phone]
+                    const firstName = rows[0]?.displayName || rows[0]?.name || ''
+                    // 跳过第一个，后面重复的都提示与第一个重复
+                    rows.slice(1).forEach(row => {
+                        row._duplicate = true
+                        row._error = row._error ? row._error + `；手机「${phone}」与「${firstName}」重复` : `手机「${phone}」与「${firstName}」重复`
+                    })
                 }
             })
 
@@ -701,8 +802,13 @@ const parseImportFile = (file) => {
                 }
             }
         } catch (err) {
-            showToast('文件解析失败，请确认是有效的 Excel 或 CSV 文件')
             console.error('parseImportFile error:', err)
+            console.error('Error stack:', err.stack)
+            let errorMsg = '文件解析失败，请确认是有效的 Excel 或 CSV 文件'
+            if (err.name === 'TypeError' && err.message.includes('read')) {
+                errorMsg = '浏览器不支持此文件格式，请使用 Chrome、Edge 或 Firefox 浏览器'
+            }
+            showToast(errorMsg)
         }
     }
     reader.readAsArrayBuffer(file)
@@ -723,6 +829,10 @@ const confirmImport = async () => {
     let failed = 0
 
     for (const row of importPreviewData.value) {
+        // 跳过有问题的数据（格式错误或重复）
+        if (row._invalid || row._duplicate) {
+            continue
+        }
         try {
             const payload = {
                 name: row.name,
@@ -750,11 +860,14 @@ const confirmImport = async () => {
     importResult.value = { success, failed }
     importing.value = false
 
+    const validCount = importPreviewData.value.filter(r => !r._invalid && !r._duplicate).length
+    const skipCount = importPreviewData.value.length - validCount
+
     if (success > 0) {
-        showToast(`导入完成：成功 ${success} 条，失败 ${failed} 条`)
+        showToast(`导入完成：成功 ${success} 条${skipCount > 0 ? `，跳过 ${skipCount} 条问题数据` : ''}`)
         await fetchUsers()
     } else {
-        showToast('导入失败，请检查数据格式或网络')
+        showToast('没有可导入的数据，请检查数据格式或重复问题')
     }
 }
 
@@ -781,6 +894,7 @@ async function fetchUsers() {
         // 更新所有用户账号和邮箱缓存（用于导入时检测重复）
         allUserNames.value = new Set(users.value.map(u => u.name).filter(Boolean))
         allUserEmails.value = new Set(users.value.map(u => u.email).filter(Boolean))
+        allUserPhones.value = new Set(users.value.map(u => u.phone).filter(Boolean))
         // 获取每个用户的安全码状态
         await fetchSpaStatusAll()
     } catch (e) {
@@ -2471,7 +2585,7 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
 .import-modal {
     width: 100%;
     max-width: 720px;
-    max-height: 85vh;
+    max-height: 90vh;
     background: #fff;
     border-radius: 20px;
     box-shadow: 0 28px 72px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.04);
@@ -2593,20 +2707,21 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
     flex: 1;
     overflow-y: auto;
     padding: 0 24px;
-    min-height: 0;
+    min-height: 400px;
+    max-height: 600px;
 }
 
 .import-preview-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 15px;
 }
 
 .import-preview-table th {
     background: #fafafa;
     color: #606266;
     font-weight: 600;
-    padding: 10px 12px;
+    padding: 12px 14px;
     text-align: left;
     border-bottom: 1px solid #ebeef5;
     position: sticky;
@@ -2614,9 +2729,21 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
 }
 
 .import-preview-table td {
-    padding: 9px 12px;
+    padding: 10px 14px;
     border-bottom: 1px solid #f1f5f9;
     color: #374151;
+}
+
+.import-preview-table tbody tr.error-row {
+    background: #fef2f2;
+}
+
+.import-preview-table tbody tr.error-row:hover {
+    background: #fee2e2;
+}
+
+.import-preview-table tbody tr.error-row td {
+    color: #dc2626;
 }
 
 .import-preview-table tbody tr:hover {

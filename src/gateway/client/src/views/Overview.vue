@@ -18,12 +18,12 @@
             <span class="summary-cap">资源总数</span>
           </div>
           <div class="summary-item">
-            <span class="summary-num summary-ok">{{ resourceStats.available }}</span>
-            <span class="summary-cap">可用资源数</span>
+            <span class="summary-num summary-ok">{{ resourceStats.active }}</span>
+            <span class="summary-cap">启用资源数</span>
           </div>
           <div class="summary-item">
-            <span class="summary-num summary-bad">{{ resourceStats.down }}</span>
-            <span class="summary-cap">不可用资源数</span>
+            <span class="summary-num summary-bad">{{ resourceStats.inactive }}</span>
+            <span class="summary-cap">禁用资源数</span>
           </div>
         </div>
       </section>
@@ -56,6 +56,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
+import { listResources } from '@/api/resource.js'
 
 const metrics = [
   { key: 'cpu', label: 'CPU 占用', value: 27 },
@@ -63,7 +64,7 @@ const metrics = [
   { key: 'bw', label: '带宽占用', value: 69 }
 ]
 
-const resourceStats = ref({ total: 80, available: 72, down: 8 })
+const resourceStats = ref({ total: 0, active: 0, inactive: 0 })
 const anomalyCount = ref(12)
 
 const donutRefs = {}
@@ -181,6 +182,22 @@ function refreshAnomaly() {
   anomalyCount.value = 8 + Math.floor(Math.random() * 10)
 }
 
+async function fetchResourceStats() {
+  const res = await listResources({})
+  if (res.code !== 200) {
+    resourceStats.value = { total: 0, active: 0, inactive: 0 }
+    return
+  }
+  const raw = res.data
+  const list = Array.isArray(raw)
+    ? raw
+    : (Array.isArray(raw?.list) ? raw.list : Array.isArray(raw?.records) ? raw.records : [])
+
+  const total = list.length
+  const active = list.filter((item) => Boolean(item.isActive ?? item.is_active)).length
+  resourceStats.value = { total, active, inactive: total - active }
+}
+
 onMounted(() => {
   metrics.forEach((m) => {
     const el = donutRefs[m.key]
@@ -207,6 +224,7 @@ onMounted(() => {
   }
 
   window.addEventListener('resize', resizeAll)
+  fetchResourceStats()
 })
 
 onBeforeUnmount(() => {

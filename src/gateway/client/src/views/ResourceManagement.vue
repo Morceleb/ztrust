@@ -18,15 +18,11 @@
     <div class="panel-card toolbar-card">
       <div class="toolbar-row">
         <input
-          v-model.trim="keyword"
+          v-model="keyword"
           type="text"
           class="search-input"
           placeholder="搜索资源名称、资源ID、资源类型"
-          @keyup.enter="handleSearch"
         />
-        <button type="button" class="btn btn-primary" :disabled="loading" @click="handleSearch">
-          {{ loading ? '查询中...' : '搜索' }}
-        </button>
       </div>
       <p class="toolbar-tip">网关侧仅提供资源查看权限，不支持新增、编辑和删除操作。</p>
     </div>
@@ -47,7 +43,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(resource, index) in resources" :key="resource.id ?? resource.resourceId ?? index">
+          <tr v-for="(resource, index) in pagedResources" :key="resource.id ?? resource.resourceId ?? index">
             <td class="col-index">{{ (currentPage - 1) * pageSize + index + 1 }}</td>
             <td class="col-icon">
               <div class="resource-icon" :class="{ 'has-custom': resource.icon }">
@@ -75,8 +71,8 @@
               </span>
             </td>
           </tr>
-          <tr v-if="!loading && resources.length === 0">
-            <td colspan="7" class="empty-cell">暂无资源数据</td>
+          <tr v-if="!loading && pagedResources.length === 0">
+            <td colspan="7" class="empty-cell">{{ keyword ? '未找到匹配的资源' : '暂无资源数据' }}</td>
           </tr>
           <tr v-if="loading">
             <td colspan="7" class="empty-cell">正在加载资源数据...</td>
@@ -99,20 +95,40 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { listResources } from '@/api/resource.js'
 
-const resources = ref([])
+const allResources = ref([])
 const keyword = ref('')
 const currentPage = ref(1)
 const pageSize = 10
-const totalCount = ref(0)
 const loading = ref(false)
 const error = ref('')
 
+// 统计数据基于所有资源计算
+const totalCount = computed(() => filteredResources.value.length)
+const activeCount = computed(() => allResources.value.filter((item) => item.isActive).length)
+const inactiveCount = computed(() => allResources.value.filter((item) => !item.isActive).length)
+
+// 前端过滤：按关键词搜索资源名称、资源ID、资源类型
+const filteredResources = computed(() => {
+  const kw = keyword.value.trim().toLowerCase()
+  if (!kw) return allResources.value
+  return allResources.value.filter((item) => {
+    const name = (item.name || '').toLowerCase()
+    const resourceId = (item.resourceId || '').toLowerCase()
+    const type = (item.type || '').toLowerCase()
+    return name.includes(kw) || resourceId.includes(kw) || type.includes(kw)
+  })
+})
+
+// 前端分页
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize)))
-const activeCount = computed(() => resources.value.filter((item) => item.isActive).length)
-const inactiveCount = computed(() => resources.value.filter((item) => !item.isActive).length)
+
+const pagedResources = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredResources.value.slice(start, start + pageSize)
+})
 
 function normalizeResource(item) {
   return {
@@ -151,11 +167,6 @@ function sortResourcesByNewest(list) {
   return [...list].sort((left, right) => getResourceSortWeight(right) - getResourceSortWeight(left))
 }
 
-function getPagedResources(list) {
-  const start = (currentPage.value - 1) * pageSize
-  return list.slice(start, start + pageSize)
-}
-
 function isResourceIconUrl(icon) {
   return typeof icon === 'string' && /^(https?:)?\/\//.test(icon)
 }
@@ -170,47 +181,32 @@ async function fetchResources() {
   loading.value = true
   error.value = ''
 
-  const res = await listResources({
-    page: currentPage.value,
-    pageSize,
-    keyword: keyword.value
-  })
+  const res = await listResources({})
 
   if (res.code === 200) {
     const raw = res.data
     const rawList = Array.isArray(raw)
       ? raw
       : (Array.isArray(raw?.list) ? raw.list : Array.isArray(raw?.records) ? raw.records : [])
-    const normalizedList = sortResourcesByNewest(rawList.map(normalizeResource))
-    const hasServerPagination = !Array.isArray(raw) && Number(raw?.total) > normalizedList.length
 
-    resources.value = hasServerPagination ? normalizedList : getPagedResources(normalizedList)
-    totalCount.value = hasServerPagination ? Number(raw.total) : normalizedList.length
-
-    if (currentPage.value > totalPages.value) {
-      currentPage.value = totalPages.value
-      if (!hasServerPagination) {
-        resources.value = getPagedResources(normalizedList)
-      }
-    }
+    allResources.value = sortResourcesByNewest(rawList.map(normalizeResource))
+    currentPage.value = 1
   } else {
-    resources.value = []
-    totalCount.value = 0
+    allResources.value = []
     error.value = res.message || '获取资源列表失败'
   }
 
   loading.value = false
 }
 
-function handleSearch() {
+// 关键词变化时重置到第一页
+watch(keyword, () => {
   currentPage.value = 1
-  fetchResources()
-}
+})
 
 function goToPage(page) {
   if (page < 1 || page > totalPages.value || page === currentPage.value) return
   currentPage.value = page
-  fetchResources()
 }
 
 onMounted(() => {

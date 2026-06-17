@@ -19,7 +19,7 @@
                     <div class="import-tooltip">
                         <div class="import-tooltip-title">导入说明</div>
                         <div class="import-tooltip-row"><span class="import-tooltip-label">字段要求：</span><span>资源名称、Resource ID、资源类型、允许方法</span></div>
-                        <div class="import-tooltip-row"><span class="import-tooltip-label">格式要求：</span><span>Resource ID 仅支持英文字母、数字、下划线；允许方法可选值：GET、POST、PUT、DELETE</span></div>
+                        <div class="import-tooltip-row"><span class="import-tooltip-label">格式要求：</span><span>Resource ID 仅支持英文字母、数字、下划线；允许方法可选值：GET、POST、API</span></div>
                     </div>
                 </button>
                 <input
@@ -174,7 +174,12 @@
                                         <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                                         </svg>
-                                        <input type="text" v-model="formData.resourceId" class="field-input" :class="{ 'field-error': formErrors.resourceId }" placeholder="输入 Resource ID" />
+                                        <input type="text" v-model="formData.resourceId" class="field-input resource-id-input" :class="{ 'field-error': formErrors.resourceId }" placeholder="自动生成" />
+                                        <button v-if="modalMode === 'add'" type="button" class="auto-gen-btn" @click="regenerateResourceId" title="重新生成">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                            </svg>
+                                        </button>
                                     </div>
                                     <span class="field-error-text" v-if="formErrors.resourceId">{{ formErrors.resourceId }}</span>
                                 </div>
@@ -241,11 +246,34 @@
                             <div class="form-field-group">
                                 <div class="form-field">
                                     <label>允许方法 <span class="required">*</span></label>
-                                    <div class="input-wrapper">
-                                        <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
-                                        </svg>
-                                        <input type="text" v-model="formData.allow_method" class="field-input" :class="{ 'field-error': formErrors.allow_method }" placeholder="如：GET、POST" />
+                                    <div class="method-select-group">
+                                        <button
+                                            type="button"
+                                            class="method-option"
+                                            :class="{ active: formData.allow_method.includes('GET') }"
+                                            @click="toggleMethod('GET')"
+                                        >
+                                            <span class="method-dot method-dot-get"></span>
+                                            GET
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="method-option"
+                                            :class="{ active: formData.allow_method.includes('POST') }"
+                                            @click="toggleMethod('POST')"
+                                        >
+                                            <span class="method-dot method-dot-post"></span>
+                                            POST
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="method-option"
+                                            :class="{ active: formData.allow_method.includes('API') }"
+                                            @click="toggleMethod('API')"
+                                        >
+                                            <span class="method-dot method-dot-api"></span>
+                                            API
+                                        </button>
                                     </div>
                                     <span class="field-error-text" v-if="formErrors.allow_method">{{ formErrors.allow_method }}</span>
                                 </div>
@@ -327,12 +355,32 @@
                     </button>
                 </div>
 
-                <!-- 导入错误提示 -->
                 <div class="import-error-banner" v-if="importErrors.length > 0">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                     </svg>
                     <span>{{ importErrors.length }} 条数据格式异常（资源名称未填写），已自动跳过</span>
+                </div>
+
+                <!-- URL 警告提示 -->
+                <div class="import-url-warning" v-if="importUrlWarnings.length > 0">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <span>{{ importUrlWarnings.length }} 条数据缺少 URL，将使用默认值 /api/{{ '"' }}resourceId{{ '"' }}</span>
+                    <button type="button" class="url-warning-expand" @click="showUrlWarnings = !showUrlWarnings">
+                        {{ showUrlWarnings ? '收起' : '查看详情' }}
+                    </button>
+                </div>
+                <div class="url-warnings-detail" v-if="showUrlWarnings && importUrlWarnings.length > 0">
+                    <div class="url-warnings-list">
+                        <span v-for="(warn, idx) in importUrlWarnings.slice(0, 10)" :key="idx" class="url-warning-item">
+                            第 {{ warn.row }} 行：{{ warn.name }}
+                        </span>
+                        <span v-if="importUrlWarnings.length > 10" class="url-warning-more">
+                            ...还有 {{ importUrlWarnings.length - 10 }} 条
+                        </span>
+                    </div>
                 </div>
 
                 <!-- 导入结果 -->
@@ -351,6 +399,7 @@
                                 <th>序号</th>
                                 <th>资源名称 *</th>
                                 <th>Resource ID *</th>
+                                <th>URL</th>
                                 <th>资源类型</th>
                                 <th>允许方法</th>
                                 <th v-if="!importResult">状态</th>
@@ -362,6 +411,9 @@
                                 <td>{{ index + 1 }}</td>
                                 <td>{{ row.name }}</td>
                                 <td>{{ row.resourceId || '-' }}</td>
+                                <td :class="{ 'url-missing': !row.url }">
+                                    <span :title="row.url">{{ row.url || '(自动生成)' }}</span>
+                                </td>
                                 <td>{{ row.type || '-' }}</td>
                                 <td>{{ row.allowMethod || '-' }}</td>
                                 <td v-if="!importResult">
@@ -373,7 +425,7 @@
                                 </td>
                             </tr>
                             <tr v-if="importPreviewData.length === 0">
-                                <td colspan="6" class="empty-cell">
+                                <td colspan="7" class="empty-cell">
                                     <div class="empty-state">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
@@ -391,7 +443,7 @@
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                         </svg>
-                        Excel 格式：资源名称（必填）、Resource ID（必填）、资源类型、允许方法
+                        Excel 格式：资源名称（必填）、Resource ID（留空自动生成）、URL、资源类型、允许方法。URL 留空将自动生成，允许方法可选：GET、POST、API
                     </div>
                     <div class="import-footer-btns">
                         <button type="button" class="btn-modal btn-modal-ghost" @click="closeImportModal">
@@ -475,6 +527,8 @@ const fileInputRef = ref(null)
 const showImportModal = ref(false)
 const importPreviewData = ref([])
 const importErrors = ref([])
+const importUrlWarnings = ref([])
+const showUrlWarnings = ref(false)
 const importResult = ref(null)
 const importing = ref(false)
 
@@ -565,9 +619,61 @@ const toggleActive = () => {
 
 const handleAdd = () => {
     modalMode.value = 'add'
-    formData.value = { id: null, name: '', type: '', resourceId: '', icon: '', allow_method: '', is_active: true, url: '' }
+    formData.value = { id: null, name: '', type: '', resourceId: generateNextResourceId(), icon: '', allow_method: ['GET'], is_active: true, url: '' }
     formErrors.value = {}
     showModal.value = true
+}
+
+// 自动生成下一个 Resource ID (RES_001, RES_002...)
+const generateNextResourceId = () => {
+    const prefix = 'RES_'
+    let maxNum = 0
+    resources.value.forEach(r => {
+        const rid = r.resourceId || ''
+        if (rid.startsWith(prefix)) {
+            const numStr = rid.slice(prefix.length)
+            const num = parseInt(numStr, 10)
+            if (!isNaN(num) && num > maxNum) {
+                maxNum = num
+            }
+        }
+    })
+    return prefix + String(maxNum + 1).padStart(3, '0')
+}
+
+// 重新生成 Resource ID
+const regenerateResourceId = () => {
+    formData.value.resourceId = generateNextResourceId()
+}
+
+// 切换方法选中状态（支持多选）
+const toggleMethod = (method) => {
+    const arr = formData.value.allow_method
+    const idx = arr.indexOf(method)
+    if (idx > -1) {
+        arr.splice(idx, 1)
+    } else {
+        arr.push(method)
+    }
+}
+
+// 批量导入时自动生成 Resource ID (RES_001, RES_002...)
+let importResourceIdCounter = 0
+const getImportResourceId = () => {
+    importResourceIdCounter++
+    const prefix = 'RES_'
+    let maxNum = 0
+    resources.value.forEach(r => {
+        const rid = r.resourceId || ''
+        if (rid.startsWith(prefix)) {
+            const numStr = rid.slice(prefix.length)
+            const num = parseInt(numStr, 10)
+            if (!isNaN(num) && num > maxNum) {
+                maxNum = num
+            }
+        }
+    })
+    return prefix + String(maxNum + importResourceIdCounter).padStart(3, '0')
 }
 
 const handleEdit = (resource) => {
@@ -578,7 +684,7 @@ const handleEdit = (resource) => {
         type: resource.type || '',
         resourceId: resource.resourceId || '',
         icon: resource.icon || '',
-        allow_method: resource.allow_method || '',
+        allow_method: resource.allow_method ? (Array.isArray(resource.allow_method) ? [...resource.allow_method] : [resource.allow_method]) : ['GET'],
         is_active: resource.is_active !== false,
         url: resource.url || ''
     }
@@ -688,6 +794,8 @@ const handleFileChange = (e) => {
 const parseImportFile = (file) => {
     importResult.value = null
     importErrors.value = []
+    importUrlWarnings.value = []
+    importResourceIdCounter = 0  // 重置计数器
     const reader = new FileReader()
     reader.onload = (evt) => {
         try {
@@ -698,21 +806,29 @@ const parseImportFile = (file) => {
 
             const validRows = []
             const errors = []
+            const urlWarnings = []
             json.forEach((row, index) => {
                 const name = String(row['资源名称'] || row['name'] || '').trim()
                 if (!name) {
                     errors.push(index + 1)
                     return
                 }
+                let resourceId = String(row['Resource ID'] || row['resourceId'] || row['resource_id'] || '').trim()
+                const url = String(row['URL'] || row['url'] || '').trim()
+                if (!url && resourceId) {
+                    urlWarnings.push({ row: index + 2, name, resourceId })
+                }
                 validRows.push({
                     name,
-                    resourceId: String(row['Resource ID'] || row['resourceId'] || row['resource_id'] || '').trim(),
+                    resourceId,  // 保留原始值，但 confirmImport 会自动生成
+                    url,
                     type: String(row['资源类型'] || row['type'] || '').trim(),
                     allowMethod: String(row['允许方法'] || row['allowMethod'] || row['allow_method'] || '').trim()
                 })
             })
 
             importErrors.value = errors
+            importUrlWarnings.value = urlWarnings
             importPreviewData.value = validRows
             showImportModal.value = true
 
@@ -731,6 +847,8 @@ const closeImportModal = () => {
     showImportModal.value = false
     importPreviewData.value = []
     importErrors.value = []
+    importUrlWarnings.value = []
+    showUrlWarnings.value = false
     importResult.value = null
     importing.value = false
 }
@@ -738,14 +856,17 @@ const closeImportModal = () => {
 const confirmImport = async () => {
     if (!importPreviewData.value.length) return
     importing.value = true
+    importResourceIdCounter = 0  // 重置计数器，确保每次导入都从当前最大ID开始递增
     let success = 0
     let failed = 0
 
     for (const row of importPreviewData.value) {
         try {
+            const finalResourceId = row.resourceId || getImportResourceId()
             const payload = {
                 name: row.name,
-                resourceId: row.resourceId || null,
+                resourceId: finalResourceId,
+                url: row.url || (finalResourceId ? `/api/${finalResourceId}` : null),
                 type: row.type || null,
                 allowMethod: row.allowMethod || null,
                 isActive: true
@@ -1499,6 +1620,124 @@ const confirmImport = async () => {
     box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.12);
 }
 
+.field-select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+}
+
+.field-select:focus {
+    border-color: #409eff;
+    box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.12);
+}
+
+.resource-id-input {
+    background-color: #f8fafc;
+    color: #3b82f6;
+    font-weight: 600;
+    padding-right: 42px;
+}
+
+.auto-gen-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    background: #e2e8f0;
+    color: #64748b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.auto-gen-btn:hover {
+    background: #409eff;
+    color: #fff;
+}
+
+/* 方法选择按钮组 */
+.method-select-group {
+    display: flex;
+    gap: 8px;
+    padding: 5px;
+    background: #f1f5f9;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 14px;
+}
+
+.method-option {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 10px 16px;
+    border: 1.5px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.method-option:hover {
+    background: #fff;
+    color: #0f172a;
+    border-color: #cbd5e1;
+}
+
+.method-option.active {
+    background: #fff;
+    color: #0f172a;
+    border-color: #409eff;
+    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.25), 0 0 0 1px #409eff;
+    transform: translateY(-1px);
+}
+
+.method-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.method-dot-get {
+    background: #10b981;
+}
+
+.method-dot-post {
+    background: #f59e0b;
+}
+
+.method-dot-api {
+    background: #8b5cf6;
+}
+
+.method-option.active .method-dot-get {
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.25);
+    background: #059669;
+}
+
+.method-option.active .method-dot-post {
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.25);
+    background: #d97706;
+}
+
+.method-option.active .method-dot-api {
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.25);
+    background: #7c3aed;
+}
+
 .field-error {
     border-color: #f56c6c !important;
     box-shadow: 0 0 0 3px rgba(245, 108, 108, 0.12) !important;
@@ -1829,6 +2068,68 @@ const confirmImport = async () => {
     color: #d97706;
     font-size: 13px;
     flex-shrink: 0;
+}
+
+.import-url-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 24px 8px;
+    padding: 10px 14px;
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    border-radius: 10px;
+    color: #b45309;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.import-url-warning .url-warning-expand {
+    margin-left: auto;
+    padding: 2px 8px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.import-url-warning .url-warning-expand:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.url-warnings-detail {
+    margin: 0 24px 8px;
+    padding: 10px 14px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+    font-size: 12px;
+}
+
+.url-warnings-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.url-warning-item {
+    padding: 2px 8px;
+    background: #fef3c7;
+    border-radius: 4px;
+    color: #92400e;
+}
+
+.url-warning-more {
+    padding: 2px 8px;
+    color: #b45309;
+    font-style: italic;
+}
+
+.url-missing {
+    color: #d97706;
+    font-style: italic;
 }
 
 .import-result-banner {
