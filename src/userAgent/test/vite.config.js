@@ -20,14 +20,6 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     host: '0.0.0.0',
-    // 只有在非 Tauri 环境下才启用 HTTPS
-    // Tauri 会自动处理前端资源的加载
-    ...(isTauri ? {} : {
-      https: fs.existsSync('./localhost+2-key.pem') && fs.existsSync('./localhost+2.pem') ? {
-        key: fs.readFileSync('./localhost+2-key.pem'),
-        cert: fs.readFileSync('./localhost+2.pem'),
-      } : false,
-    }),
     watch: {
       // 忽略文件变更
       ignored: ['**/src-tauri/**'],

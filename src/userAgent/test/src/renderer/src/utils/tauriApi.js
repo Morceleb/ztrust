@@ -21,7 +21,8 @@ export const getActivityStats = () => invoke('activity_get_stats');
 
 // 设备信息
 export const getDeviceInfo = () => invoke('get_device_info');
-export const getDeviceFingerprint = () => invoke('get_device_fingerprint');
+export const scanWifiEnvironment = () => invoke('scan_wifi_environment');
+export const getPairedBluetoothDevices = () => invoke('get_paired_bluetooth_devices');
 
 // 数据库操作
 export const dbQuery = (sql, params) => invoke('db_query', { sql, params });
@@ -91,7 +92,8 @@ export default {
     logoutWithReport,
     getActivityStats,
     getDeviceInfo,
-    getDeviceFingerprint,
+    scanWifiEnvironment,
+    getPairedBluetoothDevices,
     dbQuery,
     dbExecute,
     clearUserData,

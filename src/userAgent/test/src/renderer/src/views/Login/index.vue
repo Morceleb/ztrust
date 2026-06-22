@@ -2,6 +2,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { invoke } from '@tauri-apps/api/core'
 
 import './index.css'
 
@@ -12,6 +13,7 @@ import LoginDivider from '@/components/CustomUI/CustomDivider/index.vue'
 import SocialLogin from '@/components/CustomUI/SocialLogin/index.vue'
 import request from '@/utils/request'
 import store from '@/store'
+import { sendSpaPacket } from '@/utils/spa'
 
 const router = useRouter()
 
@@ -39,6 +41,10 @@ const companyAddress = ref('')
 const companyError = ref('')
 const isCompanyLoading = ref(false)
 
+// 安全码相关
+const securityCode = ref('')
+const securityCodeError = ref('')
+
 // 登录表单相关
 const username = ref('')
 const password = ref('')
@@ -58,59 +64,131 @@ const rememberMe = ref(false)
 // 动态获取密码输入类型
 const passwordInputType = computed(() => showPassword.value ? 'text' : 'password')
 
+// 解析地址，提取 host（用于 API 调用）
+const extractHost = (address) => {
+    let host = address.replace(/^https?:\/\//, '').replace(/\/$/, '')
+    // 移除端口
+    host = host.replace(/:\d+$/, '')
+    return host
+}
+
+const loadRemoteLoginConfig = async () => {
+    try {
+        const baseURL = localStorage.getItem('companyAddress') || import.meta.env.VITE_API_BASE_URL;
+        if (!baseURL) return;
+
+        // 提取 host 用于 API 调用
+        const apiHost = extractHost(baseURL)
+        const res = await fetch(`${apiHost}/api/tenant/login-config`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data.config) {
+                config.value = { ...config.value, ...data.config };
+                console.log('[Login] 登录配置加载成功');
+            }
+        }
+    } catch (err) {
+        console.log('[Login] 登录配置加载失败（这可能是正常的）:', err.message);
+    }
+}
+
 // 加载配置和已保存的公司地址
 onMounted(async () => {
     // 检测环境
     const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
     console.log('[Login] 页面加载，环境:', isTauri ? 'Tauri' : 'Browser');
 
-    // 尝试从后端加载配置（只在非 Tauri 环境或配置了 API 时）
-    try {
-        const baseURL = localStorage.getItem('companyAddress') || import.meta.env.VITE_API_BASE_URL;
-        if (baseURL) {
-            const res = await fetch(`${baseURL}/api/tenant/login-config`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-            });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.config) {
-                    config.value = { ...config.value, ...data.config };
-                    console.log('[Login] 登录配置加载成功');
-                }
-            }
-        }
-    } catch (err) {
-        console.log('[Login] 登录配置加载失败（这可能是正常的）:', err.message);
-    }
-
-    // 加载已保存的公司地址
     const savedAddress = localStorage.getItem('companyAddress');
-    if (savedAddress) {
+    const savedSecurityCode = localStorage.getItem('securityCode');
+    if (savedAddress && savedSecurityCode) {
         companyAddress.value = savedAddress;
+        securityCode.value = savedSecurityCode;
         currentStep.value = 'login';
         console.log('[Login] 已加载保存的公司地址:', savedAddress);
+
+        if (!isTauri) {
+            await loadRemoteLoginConfig();
+        }
     }
 });
 
 // 保存公司地址并切换到登录步骤
-const handleCompanySubmit = () => {
+const handleCompanySubmit = async () => {
     if (!companyAddress.value.trim()) {
         companyError.value = '请输入公司地址'
         return
     }
 
-    isCompanyLoading.value = true
-    localStorage.setItem('companyAddress', companyAddress.value.trim())
+    if (!securityCode.value.trim()) {
+        securityCodeError.value = '请输入安全码'
+        return
+    }
 
-    setTimeout(() => {
+    isCompanyLoading.value = true
+
+    // 解析用户输入的地址，提取 host 和 port
+    const rawAddress = companyAddress.value.trim()
+    let parsedHost = rawAddress.replace(/^https?:\/\//, '').replace(/\/$/, '')
+    let parsedPort = null
+
+    // 检查是否包含端口号（:数字）
+    const portMatch = parsedHost.match(/:(\d+)$/)
+    if (portMatch) {
+        parsedPort = portMatch[1]
+        parsedHost = parsedHost.replace(/:\d+$/, '')
+    }
+
+    // 检测环境
+    const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
+
+    try {
+        // 在 Tauri 环境下，先发送 SPA 报文
+        if (isTauri) {
+            console.log('[Login] 检测到 Tauri 环境，准备发送 SPA 报文', { host: parsedHost, port: parsedPort });
+
+            // 获取设备信息
+            const deviceInfo = await invoke('get_device_info');
+            console.log('[Login] 获取到设备信息:', deviceInfo);
+
+            // 发送 SPA 报文（SPA 使用 41234 端口）
+            // DeviceID: hardware_hash (32 字节 = 64 hex字符)
+            // LicenseID: 固定值 (16 字节 = 32 hex字符)
+            await sendSpaPacket(
+                parsedHost,
+                securityCode.value.trim(),
+                deviceInfo.layered.hardware_hash,
+                '7f8e3d2a1c9b4e6f5a0d8c2b7e4f1a3c'
+            );
+
+            console.log('[Login] SPA 报文发送完成');
+        }
+
+        // 保存到 localStorage（保存完整地址，包括端口）
+        localStorage.setItem('companyAddress', rawAddress)
+        localStorage.setItem('companyPort', parsedPort || '80')
+        localStorage.setItem('securityCode', securityCode.value.trim())
+
+        // 切换到登录步骤
         currentStep.value = 'login'
+        await loadRemoteLoginConfig()
+
+    } catch (error) {
+        console.error('[Login] 初始化失败:', error);
+        companyError.value = `连接失败: ${error.message || error}`;
+    } finally {
         isCompanyLoading.value = false
-    }, 300)
+    }
 }
 
 const clearCompanyError = () => {
     companyError.value = ''
+}
+
+const clearSecurityCodeError = () => {
+    securityCodeError.value = ''
 }
 
 // 返回修改公司地址
@@ -159,24 +237,51 @@ const handleLogin = async () => {
     });
 
     try {
+        // 获取保存的安全码
+        const securityCode = localStorage.getItem('securityCode');
+
         const response = await request.post('/auth/login', {
             username: username.value,
-            password: password.value
+            password: password.value,
+            security_code: securityCode  // 同时发送安全码
         })
 
-        console.log('[Login] 登录响应:', response);
+        console.log('[Login] 登录响应原始:', JSON.stringify(response));
+        console.log('[Login] 响应结构分析:', {
+            responseType: typeof response,
+            hasData: 'data' in (response || {}),
+            responseData: response?.data,
+            responseDataKeys: response?.data ? Object.keys(response.data) : [],
+            dataDataKeys: response?.data?.data ? Object.keys(response.data.data) : [],
+        });
 
         // 提取 token 和 user
-        const { token, user } = response.data.data || {}
+        // 后端返回: { code, message, data: { access_token, refresh_token, expires_in, token_type, user } }
+        const rawData = response.data?.data || response.data || {};
+        const access_token = rawData.access_token || rawData.token;
+        const refresh_token = rawData.refresh_token;
+        const user = rawData.user;
 
-        // 保存认证信息到 localStorage（关键修复）
-        if (token) {
-            localStorage.setItem('auth_token', token)
-            console.log('[Login] Token 已保存');
+        // 保存认证信息到 sessionStorage
+        if (access_token) {
+            sessionStorage.setItem('auth_token', access_token)
+            console.log('[Login] ✓ access_token 已保存，长度:', access_token.length);
+
+            if (isTauri) {
+                invoke('save_access_token', { token: access_token }).catch((err) => {
+                    console.error('[Login] 保存 access_token 到 Tauri store 失败:', err);
+                });
+            }
+        } else {
+            console.error('[Login] ✗ access_token 为空，无法保存！响应结构:', rawData);
+        }
+        if (refresh_token) {
+            sessionStorage.setItem('refresh_token', refresh_token)
+            console.log('[Login] ✓ refresh_token 已保存');
         }
         if (user) {
-            localStorage.setItem('user_info', JSON.stringify(user))
-            console.log('[Login] 用户信息已保存:', user);
+            sessionStorage.setItem('user_info', JSON.stringify(user))
+            console.log('[Login] ✓ 用户信息已保存:', user);
         }
 
         // 登录成功
@@ -258,6 +363,23 @@ const handleLoginKeydown = (e) => {
                             @keydown="handleCompanyKeydown" />
                     </div>
                     <p v-if="companyError" class="error-msg">{{ companyError }}</p>
+                </div>
+
+                <div class="form-group" :class="{ 'has-error': securityCodeError }">
+                    <label class="form-label">安全码</label>
+                    <div class="input-wrapper">
+                        <div class="input-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                            </svg>
+                        </div>
+                        <input v-model="securityCode" type="text" class="form-input" placeholder="请输入安全码"
+                            @input="clearSecurityCodeError" @keydown="handleCompanyKeydown" />
+                    </div>
+                    <p v-if="securityCodeError" class="error-msg">{{ securityCodeError }}</p>
                 </div>
 
                 <!-- 加载动画替代按钮 -->

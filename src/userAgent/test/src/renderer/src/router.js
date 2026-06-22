@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import store from './store'
 import request from '@/utils/request'
 
+const isTauriRuntime = typeof window !== 'undefined' && window.__TAURI__ !== undefined
+
 import Home from './views/Home.vue'
 import Layout from './views/Layout.vue'
 import Settings from './views/Settings.vue'
@@ -47,18 +49,18 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
-    // 检测环境
-    const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
     console.log('[Router] 路由导航:', {
         from: from.path,
         to: to.path,
-        isTauri: isTauri
+        isTauri: isTauriRuntime
     });
 
     const isAuthenticated = store.getters['auth/isAuthenticated']
+    console.log('[Router] 当前认证状态 isAuthenticated:', isAuthenticated, '| store.state.auth.isLoggedIn:', store.state.auth.isLoggedIn);
 
     // 1. 如果去登录页，但已经登录了，直接去首页
     if (to.path === '/login' && isAuthenticated) {
+        console.log('[Router] 已登录访问登录页，重定向到 /index');
         next('/index')
         return
     }
@@ -76,13 +78,19 @@ router.beforeEach(async (to, from, next) => {
     if (isAuthenticated) {
         next()
     } else {
-        // 未登录状态，尝试静默鉴权（零信任评估）
-        // 检查是否有 API 服务器配置
         const baseURL = localStorage.getItem('companyAddress') || import.meta.env.VITE_API_BASE_URL;
 
         if (!baseURL) {
-            // 没有配置 API 服务器，跳转到登录页
             console.log('[Router] 未配置 API 服务器，跳转到登录页');
+            next({
+                path: '/login',
+                query: { redirect: to.fullPath }
+            })
+            return
+        }
+
+        if (isTauriRuntime) {
+            console.log('[Router] Tauri 冷启动跳过静默鉴权，直接进入登录页');
             next({
                 path: '/login',
                 query: { redirect: to.fullPath }
@@ -93,16 +101,42 @@ router.beforeEach(async (to, from, next) => {
         try {
             console.log('[Router] 尝试静默鉴权，baseURL:', baseURL);
             const res = await request.get('/auth/test')
-            console.log('[Router] 静默鉴权响应:', res);
+            console.log('[Router] 静默鉴权响应:', JSON.stringify(res));
 
-            if (res.data.success) {
-                // 静默鉴权成功，保存用户信息到 localStorage
-                if (res.data.user) {
-                    localStorage.setItem('user_info', JSON.stringify(res.data.user))
+            const resData = res.data;
+            console.log('[Router] 静默鉴权响应结构:', {
+                hasData: 'data' in resData,
+                keys: Object.keys(resData),
+                hasSuccess: 'success' in resData,
+                successValue: resData.success,
+                hasUser: 'user' in resData,
+            });
+
+            // 判断登录成功：兼容两种响应结构
+            // 结构1: { success: true, user: {} }  结构2: { code: 0/200, data: { user } }
+            const isAuthSuccess =
+                resData.success === true ||
+                resData.code === 200 ||
+                resData.code === 0 ||
+                (resData.data && resData.data.user);
+
+            console.log('[Router] 静默鉴权结果判断:', {
+                resDataSuccess: resData.success,
+                resDataCode: resData.code,
+                hasDataUser: !!(resData.data?.user),
+                isAuthSuccess,
+            });
+
+            if (isAuthSuccess) {
+                const user = resData.user || resData.data?.user || resData.data;
+                if (user) {
+                    sessionStorage.setItem('user_info', JSON.stringify(user))
                 }
-                store.dispatch('auth/loginSuccess', res.data.user)
+                store.dispatch('auth/loginSuccess', user || resData)
+                console.log('[Router] 静默鉴权成功，准备 next()');
                 next()
             } else {
+                console.log('[Router] 静默鉴权失败: 响应不满足成功条件');
                 next({
                     path: '/login',
                     query: { redirect: to.fullPath }
@@ -112,9 +146,8 @@ router.beforeEach(async (to, from, next) => {
             console.error('[Router] 静默鉴权失败:', {
                 message: err.message,
                 status: err.response?.status,
-                isTauri: isTauri
+                isTauri: isTauriRuntime
             });
-            // 静默鉴权失败，跳转到登录页
             next({
                 path: '/login',
                 query: { redirect: to.fullPath }

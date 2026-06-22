@@ -25,20 +25,47 @@ const isValidBaseURL = (url) => {
     const trimmed = url.trim();
     if (!trimmed) return false;
     if (INVALID_BASE_URLS.includes(trimmed)) return false;
-    // 检查是否看起来像有效的 URL
-    try {
-        new URL(trimmed);
-        return true;
-    } catch {
-        // 如果不是完整 URL，但看起来像域名也可以
-        return /^[a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)+$/.test(trimmed);
+
+    // 如果是完整 URL（带协议）
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        try {
+            new URL(trimmed);
+            return true;
+        } catch {
+            return false;
+        }
     }
+
+    // 支持不带协议的域名/IP + 端口
+    // 域名格式: example.com:8080
+    if (/^[a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)+(:\d+)?$/.test(trimmed)) {
+        return true;
+    }
+    // IP + 端口格式: 192.168.1.1:8080 或 192.168.1.1
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(trimmed)) {
+        return true;
+    }
+    return false;
 };
 
-// 获取 API 基础 URL
-// 优先级：1. 环境变量（必须是有效的） 2. localStorage.companyAddress 3. 空字符串
+// 提取 host 和 port（从 URL 或 host:port 格式）
+const extractHostAndPort = (url) => {
+    if (!url) return { host: '', port: '' };
+    let host = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    let port = '80'; // 默认端口
+
+    const portMatch = host.match(/:(\d+)$/);
+    if (portMatch) {
+        port = portMatch[1];
+        host = host.replace(/:\d+$/, '');
+    }
+
+    return { host, port };
+};
+
+// 获取完整 baseURL（host:port）
 const getBaseURL = () => {
-    // 1. 首先尝试环境变量（只接受有效的）
+    // 1. 首先尝试环境变量
     const envBaseURL = import.meta.env.VITE_API_BASE_URL;
     if (isValidBaseURL(envBaseURL)) {
         console.log('[Request] 使用环境变量 baseURL:', envBaseURL);
@@ -57,6 +84,31 @@ const getBaseURL = () => {
     return '';
 };
 
+// 从 localStorage 地址提取带端口的 baseURL
+const getBaseURLFromStorage = (url) => {
+    if (!url) return '';
+    const { host, port } = extractHostAndPort(url);
+    return `http://${host}:${port}`;
+};
+
+// 从环境变量提取带端口的 baseURL
+const getBaseURLFromEnv = (url) => {
+    if (!url) return '';
+    // 如果已有协议，直接返回
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+    }
+    const { host, port } = extractHostAndPort(url);
+    return `http://${host}:${port}`;
+};
+
+// 提取纯 host（移除协议和端口，用于 SPA 发送）
+const extractHostOnly = (url) => {
+    if (!url) return '';
+    const { host } = extractHostAndPort(url);
+    return host;
+};
+
 const request = axios.create({
     baseURL: getBaseURL(),
     timeout: SecurityConfig.api.timeout,
@@ -73,15 +125,18 @@ request.interceptors.request.use(
         const currentBaseURL = localStorage.getItem('companyAddress');
         const envBaseURL = import.meta.env.VITE_API_BASE_URL;
 
-        // 使用有效的 baseURL
+        // 确定要使用的 baseURL
+        let finalBaseURL = '';
         if (isValidBaseURL(currentBaseURL)) {
-            config.baseURL = currentBaseURL;
+            finalBaseURL = getBaseURLFromStorage(currentBaseURL);
         } else if (isValidBaseURL(envBaseURL)) {
-            config.baseURL = envBaseURL;
+            finalBaseURL = getBaseURLFromEnv(envBaseURL);
         }
 
+        config.baseURL = finalBaseURL;
+
         // 添加认证 Token
-        const token = localStorage.getItem('auth_token');
+        const token = sessionStorage.getItem('auth_token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -89,7 +144,7 @@ request.interceptors.request.use(
         // 添加请求时间戳
         config.headers['X-Request-Time'] = Date.now();
 
-        // 获取公司地址作为租户 ID
+        // 获取公司地址作为租户 ID（保存完整地址）
         const companyAddress = currentBaseURL || envBaseURL;
         if (companyAddress) {
             config.headers['X-Tenant-ID'] = companyAddress;
@@ -148,26 +203,6 @@ request.interceptors.response.use(
                 console.error('  - window.__TAURI__ 存在:', typeof window.__TAURI__ !== 'undefined');
                 console.error('  - 当前 baseURL:', originalRequest?.baseURL);
                 console.error('  - localStorage.companyAddress:', localStorage.getItem('companyAddress'));
-            }
-        }
-
-        // 处理 401 未授权
-        if (error.response?.status === 401 && !originalRequest._retry) {
-            originalRequest._retry = true;
-
-            console.log('[Request] 检测到 401，清除认证信息并跳转登录页');
-
-            // 清除认证信息
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('user_info');
-
-            // 使用 Vue Router 跳转，避免 window.location.href 导致页面刷新问题
-            if (window.__VUE_APP__) {
-                window.__VUE_APP__.push('/login');
-            } else {
-                setTimeout(() => {
-                    window.location.href = '/login';
-                }, 100);
             }
         }
 
