@@ -11,11 +11,16 @@
                 </button>
             </div>
             <div class="toolbar-actions">
-                <button class="btn btn-secondary" @click="triggerFileInput">
+                <button class="btn btn-secondary import-btn-with-tip" @click="triggerFileInput">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                     </svg>
                     导入资源
+                    <div class="import-tooltip">
+                        <div class="import-tooltip-title">导入说明</div>
+                        <div class="import-tooltip-row"><span class="import-tooltip-label">字段要求：</span><span>资源名称、Resource ID、资源类型、允许方法</span></div>
+                        <div class="import-tooltip-row"><span class="import-tooltip-label">格式要求：</span><span>Resource ID 仅支持英文字母、数字、下划线；允许方法可选值：GET、POST、PUT、DELETE</span></div>
+                    </div>
                 </button>
                 <input
                     ref="fileInputRef"
@@ -38,20 +43,21 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th width="60">序号</th>
-                        <th>图标</th>
-                        <th>资源名称</th>
-                        <th>资源类型</th>
-                        <th>资源ID</th>
-                        <th>允许方法</th>
-                        <th class="avail-col">资源状态</th>
-                        <th width="120">操作</th>
+                        <th class="col-index">序号</th>
+                        <th class="col-icon">图标</th>
+                        <th class="col-name">资源名称</th>
+                        <th class="col-type">资源类型</th>
+                        <th class="col-resource-id">资源ID</th>
+                        <th class="col-url">URL</th>
+                        <th class="col-method">允许方法</th>
+                        <th class="col-status avail-col">资源状态</th>
+                        <th class="col-actions">操作</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="(resource, index) in pagedResources" :key="resource.id">
-                        <td>{{ (currentPage - 1) * pageSize + index + 1 }}</td>
-                        <td>
+                        <td class="col-index">{{ (currentPage - 1) * pageSize + index + 1 }}</td>
+                        <td class="col-icon">
                             <div class="resource-icon" :class="{ 'has-custom': resource.icon }">
                                 <img
                                     v-if="isResourceIconUrl(resource.icon)"
@@ -65,17 +71,20 @@
                                 </svg>
                             </div>
                         </td>
-                        <td>{{ resource.name }}</td>
-                        <td>{{ resource.type || '-' }}</td>
-                        <td>{{ resource.resourceId || '-' }}</td>
-                        <td>{{ resource.allow_method || '-' }}</td>
-                        <td class="avail-col">
+                        <td class="col-name">{{ resource.name }}</td>
+                        <td class="col-type">{{ resource.type || '-' }}</td>
+                        <td class="col-resource-id">{{ resource.resourceId || '-' }}</td>
+                        <td class="col-url">
+                          <span class="resource-url-text" :title="resource.url">{{ resource.url || '-' }}</span>
+                        </td>
+                        <td class="col-method">{{ resource.allow_method || '-' }}</td>
+                        <td class="col-status avail-col">
                             <span
                                 class="status-badge"
                                 :class="resource.is_active ? 'status-active' : 'status-unavailable'"
                             >{{ resource.is_active ? '启用' : '禁用' }}</span>
                         </td>
-                        <td>
+                        <td class="col-actions">
                             <div class="action-buttons">
                                 <button class="action-btn action-edit" @click="handleEdit(resource)" title="编辑">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -93,7 +102,7 @@
                         </td>
                     </tr>
                     <tr v-if="filteredResources.length === 0">
-                        <td colspan="8" class="empty-cell">
+                        <td colspan="9" class="empty-cell">
                             <div class="empty-state">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -110,9 +119,11 @@
         <div class="pagination" v-if="totalCount > 0">
             <span class="pagination-info">共 {{ totalCount }} 条记录</span>
             <div class="pagination-controls">
+                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage = 1">首页</button>
                 <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">上一页</button>
                 <span class="page-num">{{ currentPage }} / {{ totalPages }}</span>
                 <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">下一页</button>
+                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage = totalPages">尾页</button>
             </div>
         </div>
 
@@ -170,6 +181,19 @@
                             </div>
                             <div class="form-field-group form-field-span-2">
                                 <div class="form-field">
+                                    <label>URL <span class="required">*</span></label>
+                                    <div class="input-wrapper">
+                                        <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                                        </svg>
+                                        <input type="text" v-model="formData.url" class="field-input" :class="{ 'field-error': formErrors.url }" placeholder="https://example.com/api" />
+                                    </div>
+                                    <span class="field-error-text" v-if="formErrors.url">{{ formErrors.url }}</span>
+                                </div>
+                            </div>
+                            <div class="form-field-group">
+                                <div class="form-field">
                                     <label>资源图标</label>
                                     <div class="input-wrapper">
                                         <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -204,24 +228,26 @@
                             </div>
                             <div class="form-field-group">
                                 <div class="form-field">
-                                    <label>资源类型</label>
+                                    <label>资源类型 <span class="required">*</span></label>
                                     <div class="input-wrapper">
                                         <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
                                         </svg>
-                                        <input type="text" v-model="formData.type" class="field-input" placeholder="如：Web服务" />
+                                        <input type="text" v-model="formData.type" class="field-input" :class="{ 'field-error': formErrors.type }" placeholder="如：Web服务" />
                                     </div>
+                                    <span class="field-error-text" v-if="formErrors.type">{{ formErrors.type }}</span>
                                 </div>
                             </div>
                             <div class="form-field-group">
                                 <div class="form-field">
-                                    <label>允许方法</label>
+                                    <label>允许方法 <span class="required">*</span></label>
                                     <div class="input-wrapper">
                                         <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
                                         </svg>
-                                        <input type="text" v-model="formData.allow_method" class="field-input" placeholder="如：GET、POST" />
+                                        <input type="text" v-model="formData.allow_method" class="field-input" :class="{ 'field-error': formErrors.allow_method }" placeholder="如：GET、POST" />
                                     </div>
+                                    <span class="field-error-text" v-if="formErrors.allow_method">{{ formErrors.allow_method }}</span>
                                 </div>
                             </div>
                             <div class="form-field-group">
@@ -397,7 +423,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { listResources, saveResource, deleteResource } from '@/api/resource.js'
 import * as XLSX from 'xlsx'
 
@@ -412,8 +438,29 @@ function isResourceIconUrl(s) {
 const loading = ref(false)
 const searchKeyword = ref('')
 const currentPage = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(1) // 动态计算
 const totalCount = ref(0)
+
+const calculatePageSize = () => {
+    nextTick(() => {
+        const windowHeight = window.innerHeight
+
+        // 预留顶部区域（toolbar + padding）和分页区域高度
+        const topAreaHeight = 220
+        const paginationHeight = 80
+
+        // 表格每行高度（tbody tr 高度通常在 56 左右）
+        const rowHeight = 56
+
+        const availableHeight = windowHeight - topAreaHeight - paginationHeight
+        const rows = Math.max(1, Math.floor(availableHeight / rowHeight))
+
+        pageSize.value = rows
+
+        const newTotalPages = Math.ceil(totalCount.value / pageSize.value) || 1
+        if (currentPage.value > newTotalPages) currentPage.value = newTotalPages
+    })
+}
 const showModal = ref(false)
 const showDeleteModal = ref(false)
 const modalMode = ref('add')
@@ -460,7 +507,8 @@ async function fetchResources() {
                     ...item,
                     allow_method: item.allowMethod,
                     is_active: item.isActive,
-                    icon: item.icon ?? item.iconUrl ?? ''
+                    icon: item.icon ?? item.iconUrl ?? '',
+                    url: item.url ?? ''
                 }))
                 totalCount.value = res.data.length
             }
@@ -470,7 +518,8 @@ async function fetchResources() {
                     ...item,
                     allow_method: item.allowMethod,
                     is_active: item.isActive,
-                    icon: item.icon ?? item.iconUrl ?? ''
+                    icon: item.icon ?? item.iconUrl ?? '',
+                    url: item.url ?? ''
                 }))
                 totalCount.value = res.data.total || res.data.list.length
             } else {
@@ -490,11 +539,18 @@ async function fetchResources() {
 }
 
 onMounted(() => {
+    calculatePageSize()
+    window.addEventListener('resize', calculatePageSize)
     fetchResources()
+})
+
+onUnmounted(() => {
+    window.removeEventListener('resize', calculatePageSize)
 })
 
 const handleSearch = () => {
     currentPage.value = 1
+    calculatePageSize()
     fetchResources()
 }
 
@@ -509,7 +565,7 @@ const toggleActive = () => {
 
 const handleAdd = () => {
     modalMode.value = 'add'
-    formData.value = { id: null, name: '', type: '', resourceId: '', icon: '', allow_method: '', is_active: true }
+    formData.value = { id: null, name: '', type: '', resourceId: '', icon: '', allow_method: '', is_active: true, url: '' }
     formErrors.value = {}
     showModal.value = true
 }
@@ -520,10 +576,11 @@ const handleEdit = (resource) => {
         id: resource.id,
         name: resource.name,
         type: resource.type || '',
-        resourceId: resource.resourceId || resource.url || '',
+        resourceId: resource.resourceId || '',
         icon: resource.icon || '',
         allow_method: resource.allow_method || '',
-        is_active: resource.is_active !== false
+        is_active: resource.is_active !== false,
+        url: resource.url || ''
     }
     formErrors.value = {}
     currentResource.value = resource
@@ -561,6 +618,18 @@ const handleSubmit = async () => {
     if (!formData.value.name || formData.value.name.trim() === '') {
         formErrors.value.name = '请输入资源名称'
     }
+    if (!formData.value.resourceId || formData.value.resourceId.trim() === '') {
+        formErrors.value.resourceId = '请输入 Resource ID'
+    }
+    if (!formData.value.type || formData.value.type.trim() === '') {
+        formErrors.value.type = '请输入资源类型'
+    }
+    if (!formData.value.allow_method || formData.value.allow_method.trim() === '') {
+        formErrors.value.allow_method = '请输入允许方法'
+    }
+    if (!formData.value.url || formData.value.url.trim() === '') {
+        formErrors.value.url = '请输入 URL'
+    }
     if (Object.keys(formErrors.value).length > 0) return
 
     try {
@@ -572,6 +641,7 @@ const handleSubmit = async () => {
             resourceId: formData.value.resourceId?.trim() || null,
             icon: formData.value.icon?.trim() || null,
             allowMethod: formData.value.allow_method?.trim() || null,
+            url: formData.value.url?.trim() || null,
             isActive: formData.value.is_active === true
         }
         console.log('提交资源数据:', payload)
@@ -595,7 +665,8 @@ const filteredResources = computed(() => {
 })
 
 const pagedResources = computed(() => {
-    const list = filteredResources.value
+    // 反转列表，新添加的资源显示在最前面
+    const list = [...filteredResources.value].reverse()
     const start = (currentPage.value - 1) * pageSize.value
     return list.slice(start, start + pageSize.value)
 })
@@ -775,6 +846,65 @@ const confirmImport = async () => {
     color: #409eff;
 }
 
+.import-btn-with-tip {
+    position: relative;
+}
+
+.import-tooltip {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: -80px;
+    z-index: 100;
+    display: none;
+    width: 320px;
+    padding: 14px 16px;
+    background: white;
+    border: 1px solid #e4e7ed;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+    text-align: left;
+}
+
+.import-btn-with-tip:hover .import-tooltip {
+    display: block;
+}
+
+.import-tooltip::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 100px;
+    width: 10px;
+    height: 10px;
+    background: white;
+    border-top: 1px solid #e4e7ed;
+    border-left: 1px solid #e4e7ed;
+    transform: rotate(45deg);
+}
+
+.import-tooltip-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #303133;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ebeef5;
+}
+
+.import-tooltip-row {
+    display: flex;
+    font-size: 12px;
+    line-height: 1.8;
+    color: #606266;
+}
+
+.import-tooltip-label {
+    color: #409eff;
+    font-weight: 500;
+    min-width: 70px;
+    flex-shrink: 0;
+}
+
 .btn-primary {
     background: #409eff;
     border-color: #409eff;
@@ -805,6 +935,7 @@ const confirmImport = async () => {
 .data-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
 
 .data-table th,
@@ -812,6 +943,56 @@ const confirmImport = async () => {
     padding: 12px 16px;
     text-align: left;
     border-bottom: 1px solid #ebeef5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.col-index {
+    width: 60px;
+    min-width: 60px;
+}
+
+.col-icon {
+    width: 60px;
+    min-width: 60px;
+    text-align: center;
+}
+
+.col-name {
+    width: 130px;
+    min-width: 100px;
+}
+
+.col-type {
+    width: 100px;
+    min-width: 80px;
+}
+
+.col-resource-id {
+    width: 150px;
+    min-width: 120px;
+}
+
+.col-url {
+    width: 170px;
+    min-width: 140px;
+}
+
+.col-method {
+    width: 100px;
+    min-width: 80px;
+}
+
+.col-status {
+    width: 90px;
+    min-width: 80px;
+}
+
+.col-actions {
+    width: 100px;
+    min-width: 90px;
+    text-align: center;
 }
 
 .data-table th {
@@ -831,13 +1012,6 @@ const confirmImport = async () => {
 
 .data-table td {
     vertical-align: middle;
-}
-
-.data-table th.avail-col,
-.data-table td.avail-col {
-    width: 96px;
-    text-align: left;
-    padding-left: 10px;
 }
 
 .resource-icon {

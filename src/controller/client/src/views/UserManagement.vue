@@ -3,7 +3,7 @@
         <!-- 搜索和操作栏 -->
         <div class="toolbar">
             <div class="search-box">
-                <input type="text" v-model="searchKeyword" placeholder="搜索用户名或邮箱..." class="search-input" />
+                <input type="text" v-model="searchKeyword" placeholder="搜索用户名、账号或邮箱..." class="search-input" />
                 <button class="search-btn" @click="handleSearch">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="11" cy="11" r="8"/>
@@ -12,11 +12,16 @@
                 </button>
             </div>
             <div class="toolbar-actions">
-                <button class="btn btn-secondary" @click="triggerFileInput">
+                <button class="btn btn-secondary import-btn-with-tip" @click="triggerFileInput">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                     </svg>
                     导入人员
+                    <div class="import-tooltip">
+                        <div class="import-tooltip-title">导入说明</div>
+                        <div class="import-tooltip-row"><span class="import-tooltip-label">字段要求：</span><span>账号、用户名、邮箱、手机、密码（密码不填默认为 123456）</span></div>
+                        <div class="import-tooltip-row"><span class="import-tooltip-label">格式要求：</span><span>账号仅支持英文字母、数字、下划线；邮箱需符合标准格式；手机需为纯数字，长度 7-15 位</span></div>
+                    </div>
                 </button>
                 <input
                     ref="fileInputRef"
@@ -39,85 +44,98 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th width="60">序号</th>
-                        <th>头像</th>
-                        <th>用户名</th>
-                        <th>邮箱</th>
-                        <th class="phone-col">手机</th>
-                        <th class="status-col">状态</th>
-                        <th>创建时间</th>
-                        <th class="spa-status-col">安全码</th>
-                        <th class="actions-col">操作</th>
+                        <th class="col-index">序号</th>
+                        <th class="col-avatar">头像</th>
+                        <th class="col-name">用户名</th>
+                        <th class="col-account">账号</th>
+                        <th class="col-email">邮箱</th>
+                        <th class="col-phone">手机</th>
+                        <th class="col-status">状态</th>
+                        <th class="col-time">创建时间</th>
+                        <th class="col-spa">安全码</th>
+                        <th class="col-actions">操作</th>
+                        
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="(user, index) in pagedUsers" :key="user.id">
-                        <td>{{ (currentPage - 1) * pageSize + index + 1 }}</td>
-                        <td>
+                        <td class="col-index">{{ (currentPage - 1) * pageSize + index + 1 }}</td>
+                        <td class="col-avatar">
                             <div class="user-avatar">
                                 <img v-if="user.avatar" :src="user.avatar" alt="avatar" />
-                                <span v-else class="avatar-placeholder">{{ (user.name || user.username || '?').charAt(0).toUpperCase() }}</span>
+                                <span v-else class="avatar-placeholder">{{ (user.displayName || user.username || user.name || '?').charAt(0).toUpperCase() }}</span>
                             </div>
                         </td>
-                        <td>{{ user.name || user.username }}</td>
-                        <td>{{ user.email }}</td>
-                        <td class="phone-col">{{ user.phone }}</td>
-                        <td class="status-col">
+                        <td class="col-name">{{ user.displayName || '-' }}</td>
+                        <td class="col-account">{{ user.name || user.username || '-' }}</td>
+                        <td class="col-email">{{ user.email }}</td>
+                        <td class="col-phone">{{ user.phone }}</td>
+                        <td class="col-status">
                             <span class="status-badge" :class="'status-' + getUserStatus(user)">{{ statusText(getUserStatus(user)) }}</span>
                         </td>
-                        <td>{{ formatTime(user.createdTime) }}</td>
-                        <td class="spa-status-col">
+                        <td class="col-time">{{ formatTime(user.createdTime) }}</td>
+                        <td class="col-spa">
                             <span
                                 class="spa-badge"
-                                :class="'spa-' + (user.spaStatus || 'none')"
+                                :class="[
+                                    'spa-' + (user.spaStatus || 'none'),
+                                    { 'spa-clickable': user.spaStatus === 'issued' || user.spaStatus === 'disabled' }
+                                ]"
+                                :title="getSpaStatusTooltip(user.spaStatus)"
+                                @click="onViewTokenCode(user)"
+                                :style="{ cursor: (user.spaStatus === 'issued' || user.spaStatus === 'disabled') ? 'pointer' : 'default' }"
                             >
                                 {{ spaStatusText(user.spaStatus) }}
                             </span>
                         </td>
-                        <td class="spa-actions-col">
+                        <td class="col-actions">
                             <div class="spa-actions">
-                                <button
-                                    type="button"
-                                    class="spa-btn spa-btn-primary"
-                                    :disabled="primarySpaDisabled(user)"
-                                    @click="onPrimarySpa(user)"
-                                >
-                                    {{ primarySpaLabel(user) }}
-                                </button>
-                                <button
-                                    type="button"
-                                    class="spa-btn spa-btn-secondary"
-                                    :class="{ 'is-muted': secondarySpaDisabled(user) }"
-                                    :disabled="secondarySpaDisabled(user)"
-                                    @click="onSecondarySpa(user)"
-                                >
-                                    {{ secondarySpaLabel(user) }}
-                                </button>
-                                <button class="action-btn action-edit" @click="handleEdit(user)" title="编辑">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                    </svg>
-                                </button>
-                                <button
-                                    type="button"
-                                    class="action-btn action-delete"
-                                    @click="handleDelete(user)"
-                                    title="删除"
-                                    :disabled="deletingUserId === user.id"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="3 6 5 6 21 6"/>
-                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                        <line x1="10" y1="11" x2="10" y2="17"/>
-                                        <line x1="14" y1="11" x2="14" y2="17"/>
-                                    </svg>
-                                </button>
+                                <div class="spa-btn-group">
+                                    <button
+                                        type="button"
+                                        class="spa-btn spa-btn-primary"
+                                        :disabled="primarySpaDisabled(user)"
+                                        @click="onPrimarySpa(user)"
+                                    >
+                                        {{ primarySpaLabel(user) }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="spa-btn spa-btn-secondary"
+                                        :class="{ 'is-muted': secondarySpaDisabled(user) }"
+                                        :disabled="secondarySpaDisabled(user)"
+                                        @click="onSecondarySpa(user)"
+                                    >
+                                        {{ secondarySpaLabel(user) }}
+                                    </button>
+                                </div>
+                                <div class="action-btn-group">
+                                    <button class="action-btn action-edit" @click="handleEdit(user)" title="编辑">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                        </svg>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="action-btn action-delete delete-btn"
+                                        @click="handleDelete(user)"
+                                        title="删除"
+                                        :disabled="deletingUserId === user.id"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="3 6 5 6 21 6"/>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                            <line x1="10" y1="11" x2="10" y2="17"/>
+                                            <line x1="14" y1="11" x2="14" y2="17"/>
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                         </td>
                     </tr>
                     <tr v-if="filteredUsers.length === 0">
-                        <td colspan="9" class="empty-cell">
+                        <td colspan="10" class="empty-cell">
                             <div class="empty-state">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -135,9 +153,11 @@
         <div class="pagination" v-if="totalCount > 0">
             <span class="pagination-info">共 {{ totalCount }} 条记录</span>
             <div class="pagination-controls">
+                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage = 1">首页</button>
                 <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">上一页</button>
                 <span class="page-num">{{ currentPage }} / {{ totalPages }}</span>
                 <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">下一页</button>
+                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage = totalPages">尾页</button>
             </div>
         </div>
 
@@ -232,16 +252,29 @@
                         <div class="form-user-grid">
                             <div class="form-field-group">
                                 <div class="form-field">
-                                    <label>登录账号 <span class="required">*</span></label>
+                                    <label>用户名 <span class="required">*</span></label>
                                     <div class="input-wrapper">
                                         <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                                             <circle cx="12" cy="7" r="4"/>
                                         </svg>
-                                        <input type="text" v-model="userFormData.username" class="field-input" :class="{ 'field-error': userFormErrors.username }" placeholder="字母、数字或下划线" />
+                                        <input type="text" v-model="userFormData.displayName" class="field-input" :class="{ 'field-error': userFormErrors.displayName }" placeholder="输入用户名" />
+                                    </div>
+                                    <span class="field-error-text" v-if="userFormErrors.displayName">{{ userFormErrors.displayName }}</span>
+                                </div>
+                            </div>
+                            <div class="form-field-group">
+                                <div class="form-field">
+                                    <label>账号 <span class="required">*</span></label>
+                                    <div class="input-wrapper">
+                                        <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                            <circle cx="12" cy="7" r="4"/>
+                                        </svg>
+                                        <input type="text" v-model="userFormData.username" class="field-input" :class="{ 'field-error': userFormErrors.username }" placeholder="字母、数字或下划线" :disabled="userModalMode === 'edit'" />
                                     </div>
                                     <span class="field-error-text" v-if="userFormErrors.username">{{ userFormErrors.username }}</span>
-                                    <span class="field-hint">只能是字母、数字或下划线</span>
+                                    <span class="field-hint" v-if="userModalMode === 'add'">只能是字母、数字或下划线</span>
                                 </div>
                             </div>
                             <div class="form-field-group">
@@ -259,26 +292,28 @@
                             </div>
                             <div class="form-field-group">
                                 <div class="form-field">
-                                    <label>邮箱</label>
+                                    <label>邮箱 <span class="required">*</span></label>
                                     <div class="input-wrapper">
                                         <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                                             <polyline points="22,6 12,13 2,6"/>
                                         </svg>
-                                        <input type="email" v-model="userFormData.email" class="field-input" placeholder="user@example.com" />
+                                        <input type="email" v-model="userFormData.email" class="field-input" :class="{ 'field-error': userFormErrors.email }" placeholder="user@example.com" />
                                     </div>
+                                    <span class="field-error-text" v-if="userFormErrors.email">{{ userFormErrors.email }}</span>
                                 </div>
                             </div>
                             <div class="form-field-group">
                                 <div class="form-field">
-                                    <label>手机号</label>
+                                    <label>手机号 <span class="required">*</span></label>
                                     <div class="input-wrapper">
                                         <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
                                             <line x1="12" y1="18" x2="12.01" y2="18"/>
                                         </svg>
-                                        <input type="tel" v-model="userFormData.phone" class="field-input" placeholder="13800138000" />
+                                        <input type="tel" v-model="userFormData.phone" class="field-input" :class="{ 'field-error': userFormErrors.phone }" placeholder="13800138000" />
                                     </div>
+                                    <span class="field-error-text" v-if="userFormErrors.phone">{{ userFormErrors.phone }}</span>
                                 </div>
                             </div>
                         </div>
@@ -313,7 +348,7 @@
                 </div>
                 <h3 class="delete-confirm-title">确认删除</h3>
                 <p class="delete-confirm-message">
-                    确定要删除用户「<span class="delete-username">{{ deleteTarget?.username || deleteTarget?.name }}</span>」吗？
+                    确定要删除用户「<span class="delete-username">{{ deleteTarget?.displayName || deleteTarget?.username || deleteTarget?.name }}</span>」吗？
                 </p>
                 <p class="delete-confirm-hint">此操作不可恢复</p>
                 <div class="delete-confirm-footer">
@@ -356,7 +391,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                     </svg>
-                    <span>{{ importErrors.length }} 条数据格式异常（用户名未填写），已自动跳过</span>
+                    <span>{{ importErrors.length }} 条数据格式异常（账号或用户名为空），已自动跳过</span>
                 </div>
 
                 <!-- 导入结果 -->
@@ -373,7 +408,8 @@
                         <thead>
                             <tr>
                                 <th>序号</th>
-                                <th>用户名 *</th>
+                                <th>账号</th>
+                                <th>用户名</th>
                                 <th>邮箱</th>
                                 <th>手机</th>
                                 <th v-if="!importResult">状态</th>
@@ -383,11 +419,13 @@
                         <tbody>
                             <tr v-for="(row, index) in importPreviewData" :key="index">
                                 <td>{{ index + 1 }}</td>
-                                <td>{{ row.username }}</td>
+                                <td>{{ row.name }}</td>
+                                <td>{{ row.displayName }}</td>
                                 <td>{{ row.email || '-' }}</td>
                                 <td>{{ row.phone || '-' }}</td>
                                 <td v-if="!importResult">
-                                    <span class="import-status-ok">待导入</span>
+                                    <span v-if="row._duplicate" class="import-status-fail">{{ row._error }}</span>
+                                    <span v-else class="import-status-ok">待导入</span>
                                 </td>
                                 <td v-if="importResult">
                                     <span v-if="row._success" class="import-status-ok">成功</span>
@@ -395,7 +433,7 @@
                                 </td>
                             </tr>
                             <tr v-if="importPreviewData.length === 0">
-                                <td colspan="5" class="empty-cell">
+                                <td colspan="6" class="empty-cell">
                                     <div class="empty-state">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
@@ -442,8 +480,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { listUsers, issueSpaToken as apiIssue, disableSpaToken as apiDisable, enableSpaToken as apiEnable, saveUser as apiSaveUser, deleteUser as apiDeleteUser } from '@/api/user.js'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { listUsers, issueSpaToken as apiIssue, disableSpaToken as apiDisable, enableSpaToken as apiEnable, saveUser as apiSaveUser, deleteUser as apiDeleteUser, getTokenCode as apiGetTokenCode } from '@/api/user.js'
 import { getSpaStatus } from '@/api/spaAdmin.js'
 import { listRoleGroups, getRoleGroupDetail, assignUsersToRoleGroup } from '@/api/roleGroup.js'
 import * as XLSX from 'xlsx'
@@ -451,8 +489,21 @@ import * as XLSX from 'xlsx'
 const loading = ref(false)
 const searchKeyword = ref('')
 const currentPage = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(1) // 动态计算
 const totalCount = ref(0)
+
+// 动态计算 pageSize
+const calculatePageSize = () => {
+    nextTick(() => {
+        const windowHeight = window.innerHeight
+        const topAreaHeight = 220
+        const paginationHeight = 80
+        const rowHeight = 56 // 每行高度
+        const availableHeight = windowHeight - topAreaHeight - paginationHeight
+        const rows = Math.max(1, Math.floor(availableHeight / rowHeight))
+        pageSize.value = rows
+    })
+}
 
 const showTokenModal = ref(false)
 const tokenModalMode = ref('issue') // 'issue' | 'rotate'
@@ -461,6 +512,10 @@ const toastMessage = ref('')
 const loadingSpaUserId = ref(null)
 const users = ref([])
 
+// 缓存所有用户账号和邮箱（用于导入时检测系统重复）
+const allUserNames = ref(new Set())
+const allUserEmails = ref(new Set())
+
 // 添加/编辑用户弹窗相关
 const showUserModal = ref(false)
 const userModalMode = ref('add')
@@ -468,6 +523,7 @@ const userFormErrors = ref({})
 const submitting = ref(false)
 const userFormData = ref({
     id: '',
+    displayName: '',
     username: '',
     password: '',
     email: '',
@@ -574,27 +630,75 @@ const parseImportFile = (file) => {
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
             const json = XLSX.utils.sheet_to_json(firstSheet, { defval: '' })
 
-            const validRows = []
+            const normalizeRow = (row) => {
+                const normalized = {}
+                for (const [key, val] of Object.entries(row)) {
+                    const cleanKey = String(key).replace(/[\s\uFEFF\xA0]+/g, '').trim()
+                    normalized[cleanKey] = val
+                }
+                return normalized
+            }
+
+            const allRows = []
             const errors = []
+
+            // 第一遍：解析所有行，记录格式错误（账号或用户名为空）
             json.forEach((row, index) => {
-                const username = String(row['用户名'] || row['username'] || row['登录账号'] || row['name'] || '').trim()
-                if (!username) {
+                row = normalizeRow(row)
+                const name = String(row['账号'] || row['name'] || '').trim()
+                const displayName = String(row['用户名'] || row['displayName'] || '').trim()
+                if (!name || !displayName) {
                     errors.push(index + 1)
                     return
                 }
-                validRows.push({
-                    username,
+                allRows.push({
+                    name,
+                    displayName,
                     email: String(row['邮箱'] || row['email'] || '').trim(),
                     phone: String(row['手机'] || row['phone'] || '').trim()
                 })
             })
 
+            // 第二遍：检测 name（账号）文件内重复（displayName 允许重复）
+            const nameCount = {}
+            allRows.forEach(row => {
+                nameCount[row.name] = (nameCount[row.name] || 0) + 1
+            })
+
+            // 第三遍：检测系统中已有账号和邮箱重复
+            allRows.forEach(row => {
+                const dupErrors = []
+                if (allUserNames.value.has(row.name)) {
+                    dupErrors.push('账号已存在')
+                }
+                if (row.email && allUserEmails.value.has(row.email)) {
+                    dupErrors.push('邮箱已存在')
+                }
+                if (dupErrors.length > 0) {
+                    row._duplicate = true
+                    row._error = dupErrors.join('，')
+                }
+            })
+
+            // 第四遍：标记文件内重复账号（优先级低于系统重复，同一行不会被重复标记）
+            allRows.forEach(row => {
+                if (nameCount[row.name] > 1 && !row._duplicate) {
+                    row._duplicate = true
+                    row._error = '文件中账号重复'
+                }
+            })
+
             importErrors.value = errors
-            importPreviewData.value = validRows
+            importPreviewData.value = allRows
             showImportModal.value = true
 
-            if (validRows.length === 0) {
+            if (allRows.length === 0) {
                 showToast('文件中未检测到有效数据，请检查格式')
+            } else {
+                const dupRows = allRows.filter(r => r._duplicate)
+                if (dupRows.length > 0) {
+                    showToast(`检测到 ${dupRows.length} 条数据存在重复，已标记`)
+                }
             }
         } catch (err) {
             showToast('文件解析失败，请确认是有效的 Excel 或 CSV 文件')
@@ -621,7 +725,8 @@ const confirmImport = async () => {
     for (const row of importPreviewData.value) {
         try {
             const payload = {
-                username: row.username,
+                name: row.name,
+                displayName: row.displayName,
                 password: row.password || '123456',
                 ...(row.email && { email: row.email }),
                 ...(row.phone && { phone: row.phone })
@@ -673,6 +778,9 @@ async function fetchUsers() {
             users.value = res
             totalCount.value = res.length
         }
+        // 更新所有用户账号和邮箱缓存（用于导入时检测重复）
+        allUserNames.value = new Set(users.value.map(u => u.name).filter(Boolean))
+        allUserEmails.value = new Set(users.value.map(u => u.email).filter(Boolean))
         // 获取每个用户的安全码状态
         await fetchSpaStatusAll()
     } catch (e) {
@@ -700,7 +808,13 @@ async function fetchSpaStatusAll() {
 }
 
 onMounted(() => {
+    calculatePageSize()
+    window.addEventListener('resize', calculatePageSize)
     fetchUsers()
+})
+
+onUnmounted(() => {
+    window.removeEventListener('resize', calculatePageSize)
 })
 
 const handleSearch = () => {
@@ -747,6 +861,28 @@ const secondarySpaDisabled = (user) => {
     if (s === 'none') return true
     if (s === 'updating') return true
     return loadingSpaUserId.value === user.id
+}
+
+const getSpaStatusTooltip = (status) => {
+    if (status === 'none') return '请先发放安全码'
+    if (status === 'issued' || status === 'disabled') return '点击查看安全码'
+    return ''
+}
+
+async function onViewTokenCode(user) {
+    if (user.spaStatus === 'none') return
+    try {
+        const res = await apiGetTokenCode(user.id)
+        if (res.code === 200 && res.data) {
+            lastTokenHex.value = res.data
+            showTokenModal.value = true
+        } else {
+            showToast(res.message || '获取安全码失败')
+        }
+    } catch (e) {
+        console.error('获取安全码异常:', e)
+        showToast('获取安全码失败，请稍后重试')
+    }
 }
 
 async function onPrimarySpa(user) {
@@ -827,6 +963,7 @@ const handleAdd = () => {
     userModalMode.value = 'add'
     userFormData.value = {
         id: '',
+        displayName: '',
         username: '',
         password: '',
         email: '',
@@ -841,7 +978,8 @@ const handleEdit = (user) => {
     userModalMode.value = 'edit'
     userFormData.value = {
         id: user.id,
-        username: user.username || user.name || '',
+        displayName: user.displayName || '',
+        username: user.name || user.username || '',
         password: '',
         email: user.email || '',
         phone: user.phone || ''
@@ -860,10 +998,28 @@ const closeUserModal = () => {
 const handleUserSubmit = async () => {
     userFormErrors.value = {}
 
+    // 用户名（displayName）必填校验
+    if (!userFormData.value.displayName || userFormData.value.displayName.trim() === '') {
+        userFormErrors.value.displayName = '请输入用户名'
+    }
+
+    // 账号（name）必填校验
     if (!userFormData.value.username || userFormData.value.username.trim() === '') {
-        userFormErrors.value.username = '请输入登录账号'
+        userFormErrors.value.username = '请输入账号'
     } else if (!/^[a-zA-Z0-9_]+$/.test(userFormData.value.username)) {
         userFormErrors.value.username = '账号只能包含字母、数字或下划线'
+    }
+
+    // 邮箱必填校验
+    if (!userFormData.value.email || userFormData.value.email.trim() === '') {
+        userFormErrors.value.email = '请输入邮箱'
+    }
+
+    // 手机号必填校验（11位纯数字）
+    if (!userFormData.value.phone || userFormData.value.phone.trim() === '') {
+        userFormErrors.value.phone = '请输入手机号'
+    } else if (!/^\d{11}$/.test(userFormData.value.phone)) {
+        userFormErrors.value.phone = '手机号需为11位纯数字'
     }
 
     if (Object.keys(userFormErrors.value).length > 0) return
@@ -874,7 +1030,8 @@ const handleUserSubmit = async () => {
         const password = userFormData.value.password?.trim() || '123456'
         const payload = {
             ...(userFormData.value.id && { id: userFormData.value.id }),
-            username: userFormData.value.username.trim(),
+            name: userFormData.value.username.trim(),
+            displayName: userFormData.value.displayName.trim(),
             password: password,
             ...(userFormData.value.email && { email: userFormData.value.email.trim() }),
             ...(userFormData.value.phone && { phone: userFormData.value.phone.trim() }),
@@ -919,7 +1076,8 @@ const filteredUsers = computed(() => {
     if (!searchKeyword.value) return users.value
     const keyword = searchKeyword.value.toLowerCase()
     return users.value.filter(user =>
-        (user.username || user.name || '').toLowerCase().includes(keyword) ||
+        (user.displayName || '').toLowerCase().includes(keyword) ||
+        (user.name || user.username || '').toLowerCase().includes(keyword) ||
         (user.email || '').toLowerCase().includes(keyword)
     )
 })
@@ -984,13 +1142,129 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
 .data-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
 
 .data-table th,
 .data-table td {
-    padding: 12px 16px;
+    padding: 12px 10px;
     text-align: left;
     border-bottom: 1px solid #ebeef5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 各列固定宽度 */
+.col-index {
+    width: 50px;
+    min-width: 50px;
+}
+
+.col-avatar {
+    width: 50px;
+    min-width: 50px;
+    text-align: center;
+}
+
+.data-table th.col-avatar,
+.data-table td.col-avatar {
+    text-align: center;
+}
+
+.col-status {
+    width: 90px;
+    min-width: 90px;
+    text-align: center;
+}
+
+.data-table th.col-status,
+.data-table td.col-status {
+    text-align: center;
+}
+
+.col-spa {
+    width: 90px;
+    min-width: 90px;
+    text-align: center;
+}
+
+.data-table th.col-spa,
+.data-table td.col-spa {
+    text-align: center;
+}
+
+.col-actions {
+    width: 320px;
+    min-width: 320px;
+    box-sizing: border-box;
+}
+
+/* 表头 */
+.data-table th.col-actions {
+    width: 320px;
+    min-width: 320px;
+    text-align: left !important;
+    padding-left: 70px !important;
+    box-sizing: border-box;
+}
+
+/* 内容 */
+.data-table td.col-actions {
+    padding: 0 16px 0 70px !important;
+    box-sizing: border-box;
+}
+
+/* 按钮容器 */
+.col-actions .spa-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+/* 让删除按钮自动顶到最右 */
+.col-actions .spa-actions .delete-btn {
+    margin-left: auto;
+}
+
+
+
+.col-name {
+    width: 100px;
+    min-width: 100px;
+}
+
+.col-account {
+    width: 160px;
+    min-width: 140px;
+}
+
+.col-email {
+    width: 200px;
+    min-width: 180px;
+}
+
+.col-phone {
+    width: 140px;
+    min-width: 120px;
+}
+
+.col-status {
+    width: 90px;
+    min-width: 90px;
+    text-align: center;
+}
+
+.col-time {
+    width: 160px;
+    min-width: 140px;
+}
+
+.col-spa {
+    width: 90px;
+    min-width: 90px;
+    text-align: center;
 }
 
 .data-table th {
@@ -998,18 +1272,13 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
     font-weight: 600;
     color: #606266;
     font-size: 14px;
-}
-
-.data-table th.phone-col,
-.data-table td.phone-col {
-    padding-left: 10px;
-}
-
-.data-table th.status-col,
-.data-table td.status-col {
-    width: 96px;
     text-align: left;
-    padding-left: 10px;
+    padding-left: 12px;
+}
+
+.data-table td {
+    text-align: left;
+    padding-left: 12px;
 }
 
 .data-table tbody tr:hover {
@@ -1072,17 +1341,6 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
     color: #999;
 }
 
-.data-table th.spa-status-col,
-.data-table td.spa-status-col {
-    width: 96px;
-    white-space: nowrap;
-}
-
-.data-table th.spa-actions-col,
-.data-table td.spa-actions-col {
-    min-width: 200px;
-}
-
 .spa-badge {
     display: inline-flex;
     align-items: center;
@@ -1114,11 +1372,34 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
     color: #2563eb;
 }
 
+.spa-clickable {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.spa-clickable:hover {
+    opacity: 0.8;
+    transform: scale(1.02);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
 .spa-actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
-    white-space: nowrap;
+    justify-content: space-between;
+}
+
+.spa-btn-group {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.action-btn-group {
+    display: flex;
+    gap: 6px;
+    align-items: center;
 }
 
 .spa-btn {
@@ -1565,6 +1846,65 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
     color: #409eff;
 }
 
+.import-btn-with-tip {
+    position: relative;
+}
+
+.import-tooltip {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: -80px;
+    z-index: 100;
+    display: none;
+    width: 320px;
+    padding: 14px 16px;
+    background: white;
+    border: 1px solid #e4e7ed;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+    text-align: left;
+}
+
+.import-btn-with-tip:hover .import-tooltip {
+    display: block;
+}
+
+.import-tooltip::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 100px;
+    width: 10px;
+    height: 10px;
+    background: white;
+    border-top: 1px solid #e4e7ed;
+    border-left: 1px solid #e4e7ed;
+    transform: rotate(45deg);
+}
+
+.import-tooltip-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #303133;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ebeef5;
+}
+
+.import-tooltip-row {
+    display: flex;
+    font-size: 12px;
+    line-height: 1.8;
+    color: #606266;
+}
+
+.import-tooltip-label {
+    color: #409eff;
+    font-weight: 500;
+    min-width: 70px;
+    flex-shrink: 0;
+}
+
 .btn-primary {
     background: #409eff;
     border-color: #409eff;
@@ -1729,6 +2069,12 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
 .add-user-modal .field-input:focus {
     border-color: #409eff;
     box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.12);
+}
+
+.add-user-modal .field-input:disabled {
+    background: #f8fafc;
+    color: #94a3b8;
+    cursor: not-allowed;
 }
 
 .add-user-modal .field-error {
@@ -2013,12 +2359,6 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value) |
 .action-delete:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-}
-
-.spa-actions {
-    display: flex;
-    gap: 6px;
-    align-items: center;
 }
 
 /* 删除确认弹窗样式 */

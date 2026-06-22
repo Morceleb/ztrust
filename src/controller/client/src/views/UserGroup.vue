@@ -12,8 +12,8 @@
             </button>
         </div>
 
-        <div class="group-list">
-            <div class="group-card" v-for="group in filteredGroups" :key="group.id">
+        <div class="group-list" ref="cardContainerRef">
+            <div class="group-card" v-for="group in paginatedGroups" :key="group.id">
                 <div class="group-header">
                     <div class="group-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -66,20 +66,32 @@
                     <div class="resource-title">组成员 ({{ (group.members || []).length }})</div>
                     <div class="member-preview-tags" v-if="(group.members || []).length">
                         <span class="member-preview-tag" v-for="m in group.members" :key="m.userId">
-                            {{ m.username }}
+                            {{ m.displayName }}
                         </span>
                     </div>
                     <div class="member-preview-empty" v-else>暂无成员，可在编辑中添加</div>
                 </div>
             </div>
 
-            <div v-if="filteredGroups.length === 0" class="empty-state">
+            <div v-if="paginatedGroups.length === 0 && filteredGroups.length === 0" class="empty-state">
                 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                     <path d="M12 2L2 7l10 5 10-5-10-5z"/>
                     <path d="M2 17l10 5 10-5"/>
                     <path d="M2 12l10 5 10-5"/>
                 </svg>
                 <p>暂无角色组</p>
+            </div>
+        </div>
+
+        <!-- 分页 -->
+        <div class="pagination-bar" v-if="totalPages > 1">
+            <span class="pagination-info">共 {{ totalGroups }} 条记录</span>
+            <div class="pagination-controls">
+                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage = 1">首页</button>
+                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">上一页</button>
+                <span class="page-num">{{ currentPage }} / {{ totalPages }}</span>
+                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">下一页</button>
+                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage = totalPages">尾页</button>
             </div>
         </div>
 
@@ -299,8 +311,8 @@
                                             <polyline points="20 6 9 17 4 12"/>
                                         </svg>
                                     </span>
-                                    <span class="member-pool-avatar" @click.stop="toggleMemberSelection(u)">{{ u.username.charAt(0).toUpperCase() }}</span>
-                                    <span class="member-pool-name" @click.stop="toggleMemberSelection(u)">{{ u.username }}</span>
+                                    <span class="member-pool-avatar" @click.stop="toggleMemberSelection(u)">{{ (u.displayName || u.username || '?').charAt(0).toUpperCase() }}</span>
+                                    <span class="member-pool-name" @click.stop="toggleMemberSelection(u)">{{ u.displayName || u.username }}</span>
                                     <span class="member-pool-email" @click.stop="toggleMemberSelection(u)">{{ u.email }}</span>
                                 </div>
                                 <div v-if="filteredAvailableUsers.length === 0" class="pool-empty">
@@ -335,8 +347,8 @@
                         <div class="member-tags-area">
                             <div class="member-tags" v-if="formData.members?.length">
                                 <div class="member-tag" v-for="(m, idx) in formData.members" :key="m.userId">
-                                    <span class="member-tag-avatar">{{ m.username.charAt(0).toUpperCase() }}</span>
-                                    <span class="member-tag-name">{{ m.username }}</span>
+                                    <span class="member-tag-avatar">{{ (m.displayName || m.username || '?').charAt(0).toUpperCase() }}</span>
+                                    <span class="member-tag-name">{{ m.displayName || m.username }}</span>
                                     <button type="button" class="member-tag-remove" @click="removeMember(idx)" title="移除">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                                             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -397,7 +409,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import {
     listRoleGroups, saveRoleGroup, assignUsersToRoleGroup, deleteRoleGroup, getRoleGroupDetail
 } from '@/api/roleGroup.js'
@@ -432,6 +444,41 @@ const emptyForm = () => ({
 })
 
 const formData = ref(emptyForm())
+const currentPage = ref(1)
+
+// 动态计算每页显示的卡片数量（A：分页栏始终可见，列表区域滚动）
+const cardContainerRef = ref(null)
+const pageSize = ref(1)
+
+const calculatePageSize = () => {
+    nextTick(() => {
+        if (!cardContainerRef.value) return
+        const containerWidth = cardContainerRef.value.clientWidth
+        const windowHeight = window.innerHeight
+
+        // 样式参考：.group-list grid minmax(380px, 1fr), gap 20px
+        const cardMinWidth = 380
+        const cardGap = 20
+        const columns = Math.max(1, Math.floor((containerWidth + cardGap) / (cardMinWidth + cardGap)))
+
+        // 卡片高度（此页卡片内容更高，取一个更保守的行高）
+        // .group-card 没有固定 height，这里用经验值，保证分页条不被挤出视口
+        const cardRowHeight = 320
+
+        const topAreaHeight = 120   // toolbar + 间距（估算）
+        const pagePadding = 48      // 外层 padding 上下
+        const paginationHeight = 64 // 分页条高度（sticky）
+
+        const availableHeight = windowHeight - topAreaHeight - pagePadding - paginationHeight
+        const rows = Math.max(1, Math.floor(availableHeight / cardRowHeight))
+
+        const newPageSize = rows * columns
+        pageSize.value = Math.max(1, newPageSize)
+
+        const newTotalPages = Math.ceil(totalGroups.value / pageSize.value) || 1
+        if (currentPage.value > newTotalPages) currentPage.value = newTotalPages
+    })
+}
 
 let toastTimer = null
 const toastMessage = ref('')
@@ -455,7 +502,15 @@ function showToast(msg, type = 'info', ms = 3200) {
 }
 
 onMounted(async () => {
-    await Promise.all([fetchRoleGroups(), fetchAllUsers(), fetchResourceGroups()])
+    // 先加载所有用户，再加载角色组（用于解析成员的 displayName）
+    await Promise.all([fetchAllUsers(), fetchResourceGroups()])
+    await fetchRoleGroups()
+    calculatePageSize()
+    window.addEventListener('resize', calculatePageSize)
+})
+
+onUnmounted(() => {
+    window.removeEventListener('resize', calculatePageSize)
 })
 
 async function fetchRoleGroups() {
@@ -520,12 +575,18 @@ async function fetchRoleGroups() {
                 try {
                     const detailRes = await getRoleGroupDetail(group.id)
                     if (detailRes.code === 200 && detailRes.data) {
-                        // 处理组成员数据，确保格式一致
-                        const members = (detailRes.data.members || []).map(m => ({
-                            userId: m.userId || m.user_id || m.id,
-                            username: m.username || m.name || '',
-                            level: m.level || 1
-                        }))
+                        // 处理组成员数据，从 allUsers 中查找 displayName
+                        const members = (detailRes.data.members || []).map(m => {
+                            const userId = m.userId || m.user_id || m.id
+                            const username = m.username || m.name || ''
+                            // 从 allUsers 中查找对应的 displayName
+                            const userInfo = allUsers.value.find(u => u.id === userId || u.name === username)
+                            return {
+                                userId,
+                                displayName: userInfo?.displayName || username || '',
+                                level: m.level || 1
+                            }
+                        })
                         // 使用权限配置中的资源组数据
                         const resourceGroups = permissionsMap[group.id] || []
                         return {
@@ -554,10 +615,10 @@ async function fetchAllUsers() {
         const res = await apiListUsers({ page: 1, pageSize: 1000 })
         if (res.code === 200) {
             const list = Array.isArray(res.data?.list) ? res.data.list : (Array.isArray(res.data) ? res.data : [])
-            if (list.length === 0 && Array.isArray(res)) allUsers.value = res.map(u => ({ id: u.id, username: u.username || u.name || '', email: u.email || '' }))
-            else allUsers.value = list.map(u => ({ id: u.id, username: u.username || u.name || '', email: u.email || '' }))
+            if (list.length === 0 && Array.isArray(res)) allUsers.value = res.map(u => ({ id: u.id, name: u.name || u.username || '', displayName: u.displayName || u.username || u.name || '', email: u.email || '' }))
+            else allUsers.value = list.map(u => ({ id: u.id, name: u.name || u.username || '', displayName: u.displayName || u.username || u.name || '', email: u.email || '' }))
         } else if (Array.isArray(res)) {
-            allUsers.value = res.map(u => ({ id: u.id, username: u.username || u.name || '', email: u.email || '' }))
+            allUsers.value = res.map(u => ({ id: u.id, name: u.name || u.username || '', displayName: u.displayName || u.username || u.name || '', email: u.email || '' }))
         }
     } catch (e) {
         showToast('加载用户列表失败', 'error')
@@ -567,6 +628,37 @@ async function fetchAllUsers() {
 const filteredGroups = computed(() => {
     if (!searchKeyword.value) return groups.value
     return groups.value.filter(g => (g.name || '').toLowerCase().includes(searchKeyword.value.toLowerCase()))
+})
+
+const totalGroups = computed(() => filteredGroups.value.length)
+const totalPages = computed(() => Math.ceil(totalGroups.value / pageSize.value) || 1)
+const paginatedGroups = computed(() => {
+    // 反转列表，新创建的组显示在最前面
+    const list = [...filteredGroups.value].reverse()
+    const start = (currentPage.value - 1) * pageSize.value
+    return list.slice(start, start + pageSize.value)
+})
+
+// 搜索关键词变化时重置到第一页，并重新计算
+watch(searchKeyword, () => {
+    currentPage.value = 1
+    calculatePageSize()
+})
+
+// 生成可见页码数组（带省略号）
+const visiblePages = computed(() => {
+    const total = totalPages.value
+    const cur = currentPage.value
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+    const pages = []
+    if (cur <= 4) {
+        pages.push(1, 2, 3, 4, 5, '...', total)
+    } else if (cur >= total - 3) {
+        pages.push(1, '...', total - 4, total - 3, total - 2, total - 1, total)
+    } else {
+        pages.push(1, '...', cur - 1, cur, cur + 1, '...', total)
+    }
+    return pages
 })
 
 const availableResourceGroups = computed(() => {
@@ -597,7 +689,7 @@ const filteredAvailableUsers = computed(() => {
     if (!memberSearchKeyword.value) return availableUsersForForm.value
     const keyword = memberSearchKeyword.value.toLowerCase()
     return availableUsersForForm.value.filter(u =>
-        (u.username || '').toLowerCase().includes(keyword) ||
+        (u.displayName || '').toLowerCase().includes(keyword) ||
         (u.email || '').toLowerCase().includes(keyword)
     )
 })
@@ -859,8 +951,8 @@ const addSelectedMembers = () => {
     const selected = availableUsersForForm.value.filter(u => formData.value.selectedUserIds.includes(u.id))
     if (!formData.value.members) formData.value.members = []
     selected.forEach(user => {
-        if (!formData.value.members.some(m => m.userId === user.id)) {
-            formData.value.members.push({ userId: user.id, username: user.username })
+            if (!formData.value.members.some(m => m.userId === user.id)) {
+            formData.value.members.push({ userId: user.id, displayName: user.displayName })
         }
     })
     formData.value.selectedUserIds = []
@@ -918,8 +1010,25 @@ async function fetchResourceGroups() {
 .btn:hover { border-color: #409eff; color: #409eff; }
 .btn-primary { background: #409eff; border-color: #409eff; color: white; }
 .btn-primary:hover { background: #66b1ff; }
-.group-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 20px; }
-.group-card { background: #fafafa; border-radius: 12px; padding: 20px; border: 1px solid #ebeef5; transition: all 0.3s; }
+.group-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 20px;
+    align-content: start;
+    max-height: calc(100vh - 280px);
+    overflow-y: auto;
+}
+.group-card {
+    background: #fafafa;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #ebeef5;
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+    height: 215px;
+    overflow: hidden;
+}
 .group-card:hover { border-color: #409eff; box-shadow: 0 4px 12px rgba(64, 158, 255, 0.1); }
 .group-header {
     display: grid;
@@ -927,7 +1036,7 @@ async function fetchResourceGroups() {
     column-gap: 12px;
     row-gap: 12px;
     align-items: start;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
 }
 .group-icon {
     grid-row: 1;
@@ -974,16 +1083,146 @@ async function fetchResourceGroups() {
 .action-btn.edit-name { background: #fff7e6; color: #fa8c16; }
 .action-btn.edit-name:hover { background: #ffe7b3; }
 .group-resources,
-.group-members-preview { margin-top: 12px; padding-top: 12px; border-top: 1px solid #ebeef5; }
-.resource-title { font-size: 13px; color: #909399; margin-bottom: 8px; }
-.resource-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.resource-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: white; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 12px; color: #606266; }
+.group-members-preview {
+    margin-top: 4px;
+    padding-top: 6px;
+    border-top: 1px solid #ebeef5;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+.resource-title { font-size: 13px; color: #909399; margin-bottom: 6px; }
+.resource-tags {
+    display: flex;
+  flex-wrap: wrap; /* 改为 wrap：允许放不下的元素掉到下一行 */
+  align-content: flex-start; /* 确保多行排列时从顶部开始对齐 */
+  overflow: hidden; /* 隐藏掉到第二行的元素 */
+  gap: 6px;
+  height: 28px; /* 将 min-height 替换为固定的 height，设定为刚好一行标签的高度 */
+}
+.resource-tags:empty::after {
+  content: '暂无可访问资源组';
+  display: block;
+  color: #c0c4cc;
+  font-size: 12px;
+  line-height: 26px;
+}
+.resource-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 1px solid #bfdbfe;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #1e40af;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .resource-level { font-style: normal; font-size: 11px; color: #f56c6c; font-weight: 500; }
-.member-preview-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.member-preview-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #f0f5ff; border: 1px solid #d6e4ff; border-radius: 4px; font-size: 12px; color: #303133; }
-.member-preview-tag em { font-style: normal; font-size: 11px; color: #409eff; }
+.member-preview-tags {
+    display: flex;
+  flex-wrap: wrap; /* 改为 wrap */
+  align-content: flex-start;
+  overflow: hidden;
+  gap: 6px;
+  height: 28px; /* 固定为一行的高度 */
+}
+.member-preview-tags:empty::after {
+  content: '暂无组成员';
+  display: block;
+  color: #c0c4cc;
+  font-size: 12px;
+  line-height: 26px;
+}
+.member-preview-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border: 1px solid #bbf7d0;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #166534;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.member-preview-tag em { font-style: normal; font-size: 11px; color: #4ade80; }
 .member-preview-empty { font-size: 12px; color: #c0c4cc; }
 .empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 0; color: #909399; }
+
+/* 分页 */
+.pagination-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding: 12px 4px;
+    gap: 12px;
+    background: white;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+}
+
+.pagination-info {
+    font-size: 13px;
+    color: #909399;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.page-btn {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: white;
+    color: #606266;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.page-btn:hover:not(:disabled):not(.ellipsis) {
+    border-color: #409eff;
+    color: #409eff;
+}
+
+.page-btn.active {
+    background: #409eff;
+    border-color: #409eff;
+    color: white;
+    font-weight: 600;
+}
+
+.page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.page-btn.ellipsis {
+    border-color: transparent;
+    background: transparent;
+    cursor: default;
+}
+
+.page-num {
+    color: #606266;
+    font-size: 14px;
+    padding: 0 8px;
+}
 
 /* 弹窗样式 */
 .modal-overlay {
@@ -1427,22 +1666,23 @@ async function fetchResourceGroups() {
 .member-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    padding: 12px;
+    gap: 6px;
+    padding: 8px;
 }
 
 .member-tag {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 10px 6px 8px;
+    padding: 5px 12px;
     background: linear-gradient(135deg, #f0fdf4, #dcfce7);
     border: 1px solid #bbf7d0;
-    border-radius: 8px;
-    font-size: 13px;
+    border-radius: 20px;
+    font-size: 12px;
     font-weight: 500;
     color: #166534;
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .member-tag:hover {
@@ -1765,16 +2005,19 @@ async function fetchResourceGroups() {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
-    background: white;
-    border: 1px solid #dcdfe6;
-    border-radius: 6px;
-    font-size: 13px;
-    color: #606266;
+    padding: 5px 12px;
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border: 1px solid #bfdbfe;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #1e40af;
+    transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .selected-tag svg {
-    color: #909399;
+    color: #3b82f6;
     flex-shrink: 0;
 }
 
@@ -1848,22 +2091,23 @@ async function fetchResourceGroups() {
 .selected-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    padding: 12px;
+    gap: 6px;
+    padding: 8px;
 }
 
 .selected-tag {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 10px 6px 12px;
+    padding: 5px 12px;
     background: linear-gradient(135deg, #eff6ff, #dbeafe);
     border: 1px solid #bfdbfe;
-    border-radius: 8px;
-    font-size: 13px;
+    border-radius: 20px;
+    font-size: 12px;
     font-weight: 500;
     color: #1e40af;
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .selected-tag svg {

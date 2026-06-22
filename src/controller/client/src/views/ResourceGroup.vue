@@ -14,8 +14,8 @@
             </button>
         </div>
 
-        <div class="group-list">
-            <div class="group-card" v-for="group in filteredGroups" :key="group.id">
+        <div class="group-list" ref="cardContainerRef">
+            <div class="group-card" v-for="group in paginatedGroups" :key="group.id">
                 <div class="group-header">
                     <div class="group-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -50,8 +50,9 @@
                 </div>
                 <div class="group-resources">
                     <div class="resource-title">包含资源 ({{ group.matchedResources.length }})</div>
-                    <div class="resource-card-list" v-if="group.matchedResources.length">
-                        <div class="resource-card" v-for="res in group.matchedResources.slice(0, 8)" :key="res.resourceId">
+                    <div class="resource-scroll-wrapper" v-if="group.matchedResources.length">
+                        <div class="resource-card-list">
+                            <div class="resource-card" v-for="res in group.matchedResources.slice(0, 6)" :key="res.resourceId">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                                 <polyline points="14 2 14 8 20 8"/>
@@ -59,19 +60,29 @@
                             <span class="resource-card-name">{{ res.resourceName }}</span>
                             <span class="resource-card-level">{{ levelText(res.effectiveLevel) }}</span>
                         </div>
-                        <div class="resource-more-card" v-if="group.matchedResources.length > 8">
-                            +{{ group.matchedResources.length - 8 }} 更多
-                        </div>
                     </div>
-                    <div class="resource-empty" v-else>暂未添加资源</div>
+                    </div>
+                    <div class="resource-empty" v-if="!group.matchedResources.length">暂未添加资源</div>
                 </div>
             </div>
 
-            <div v-if="filteredGroups.length === 0" class="empty-state">
+            <div v-if="paginatedGroups.length === 0 && filteredGroups.length === 0" class="empty-state">
                 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
                 <p>暂无资源组</p>
+            </div>
+        </div>
+
+        <!-- 分页 -->
+        <div class="pagination-bar" v-if="totalPages > 1">
+            <span class="pagination-info">共 {{ totalGroups }} 条记录</span>
+            <div class="pagination-controls">
+                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage = 1">首页</button>
+                <button class="page-btn" :disabled="currentPage === 1" @click="currentPage--">上一页</button>
+                <span class="page-num">{{ currentPage }} / {{ totalPages }}</span>
+                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage++">下一页</button>
+                <button class="page-btn" :disabled="currentPage === totalPages" @click="currentPage = totalPages">尾页</button>
             </div>
         </div>
 
@@ -192,9 +203,20 @@
                     </button>
                 </div>
                 <div class="modal-body modal-body-fixed">
+                    <div class="manage-search">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                        <input
+                            type="text"
+                            v-model="manageSearchKeyword"
+                            placeholder="搜索资源名称或ID..."
+                            class="manage-search-input"
+                        />
+                    </div>
                     <div class="manage-list manage-list-fixed">
                         <div
-                            v-for="(match, idx) in currentMatches"
+                            v-for="(match, idx) in filteredManageResources"
                             :key="match.resourceId"
                             class="manage-item"
                         >
@@ -215,7 +237,7 @@
                             <button
                                 type="button"
                                 class="btn-remove"
-                                @click="removeResourceFromGroup(idx)"
+                                @click="removeResourceFromGroup(match.resourceId)"
                                 title="从组中移除"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -223,17 +245,17 @@
                                 </svg>
                             </button>
                         </div>
-                        <div v-if="currentMatches.length === 0" class="manage-empty">
+                        <div v-if="filteredManageResources.length === 0" class="manage-empty">
                             <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                             </svg>
-                            <p>尚未添加任何资源到此组</p>
+                            <p>{{ manageSearchKeyword ? '未找到匹配的资源' : '尚未添加任何资源到此组' }}</p>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <div class="footer-info">
-                        <span class="resource-count">共 {{ currentMatches.length }} 项资源</span>
+                        <span class="resource-count">共 {{ filteredManageResources.length }} 项资源</span>
                     </div>
                     <div class="footer-actions">
                         <button class="btn-modal btn-modal-ghost" @click="handleCancelManage">取消</button>
@@ -268,7 +290,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import {
     listResourceGroups, saveResourceGroup, bindResourcesToGroup, deleteResourceGroup, getResourceGroupDetail
 } from '@/api/resourceGroup.js'
@@ -286,12 +308,18 @@ const currentGroup = ref(null)
 const currentMatches = ref([])
 const selectedResourceMap = ref({})
 const poolSearchKeyword = ref('')
+const manageSearchKeyword = ref('')
 const availableResources = ref([])
 const groups = ref([])
 const hasModify = ref(false)
 const editingGroup = ref(null)
 
 const formData = ref({ name: '' })
+const currentPage = ref(1)
+
+// 动态计算每页显示的卡片数量（根据屏幕分辨率）
+const cardContainerRef = ref(null)
+const pageSize = ref(6)
 
 let toastTimer = null
 const toastMessage = ref('')
@@ -301,8 +329,69 @@ function showToast(msg, ms = 3200) {
     toastTimer = setTimeout(() => { toastMessage.value = '' }, ms)
 }
 
+// 动态计算卡片数量
+const calculatePageSize = () => {
+    nextTick(() => {
+        if (!cardContainerRef.value) return
+        const container = cardContainerRef.value
+
+        // 宽度用容器宽度（更贴近实际卡片列数）
+        const containerWidth = container.clientWidth
+
+        // 高度用窗口高度（容器自身可能没固定高度，会算小）
+        const windowHeight = window.innerHeight
+
+        // card grid: minmax(350px, 1fr), gap 20px
+        const cardMinWidth = 350
+        const cardGap = 20
+
+        // 粗略预留：顶部工具栏+外层padding+分页条（sticky）
+        // 目标：分页条始终在视口内（A 方案：列表区滚动）
+        const topAreaHeight = 120 // toolbar + 间距（估算）
+        const pagePadding = 48    // .resource-group-page padding 上下
+        const paginationHeight = 64
+
+        // 卡片高度：.group-card height 220 + 行间距
+        const cardRowHeight = 220 + cardGap
+
+        const availableHeight = windowHeight - topAreaHeight - pagePadding - paginationHeight
+        const rowsCount = Math.max(1, Math.floor(availableHeight / cardRowHeight))
+
+        const columnsCount = Math.max(1, Math.floor((containerWidth + cardGap) / (cardMinWidth + cardGap)))
+
+        const newPageSize = rowsCount * columnsCount
+        pageSize.value = Math.max(1, newPageSize)
+
+        // 尺寸变化导致总页数变小，修正 currentPage 避免空页
+        const newTotalPages = Math.ceil(totalGroups.value / pageSize.value) || 1
+        if (currentPage.value > newTotalPages) currentPage.value = newTotalPages
+    })
+}
+
+let resizeObserver = null
+
 onMounted(async () => {
     await Promise.all([fetchGroups(), fetchAllResources()])
+    await nextTick()
+    calculatePageSize()
+
+    // 使用 ResizeObserver 监听容器大小变化
+    if (cardContainerRef.value) {
+        resizeObserver = new ResizeObserver(() => {
+            calculatePageSize()
+        })
+        resizeObserver.observe(cardContainerRef.value)
+    }
+
+    // 监听窗口大小变化
+    window.addEventListener('resize', calculatePageSize)
+})
+
+onUnmounted(() => {
+    if (resizeObserver) {
+        resizeObserver.disconnect()
+    }
+    window.removeEventListener('resize', calculatePageSize)
 })
 
 async function fetchGroups() {
@@ -374,6 +463,37 @@ const filteredGroups = computed(() => {
     return groups.value.filter(g => (g.name || '').toLowerCase().includes(searchKeyword.value.toLowerCase()))
 })
 
+const totalGroups = computed(() => filteredGroups.value.length)
+const totalPages = computed(() => Math.ceil(totalGroups.value / pageSize.value) || 1)
+const paginatedGroups = computed(() => {
+    // 反转列表，新创建的组显示在最前面
+    const list = [...filteredGroups.value].reverse()
+    const start = (currentPage.value - 1) * pageSize.value
+    return list.slice(start, start + pageSize.value)
+})
+
+// 搜索关键词变化时重置到第一页，同时重新计算每页数量
+watch(searchKeyword, () => {
+    currentPage.value = 1
+    nextTick(() => calculatePageSize())
+})
+
+// 生成可见页码数组（带省略号）
+const visiblePages = computed(() => {
+    const total = totalPages.value
+    const cur = currentPage.value
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+    const pages = []
+    if (cur <= 4) {
+        pages.push(1, 2, 3, 4, 5, '...', total)
+    } else if (cur >= total - 3) {
+        pages.push(1, '...', total - 4, total - 3, total - 2, total - 1, total)
+    } else {
+        pages.push(1, '...', cur - 1, cur, cur + 1, '...', total)
+    }
+    return pages
+})
+
 // 可添加的资源池（排除已在此组中的）
 const availablePoolResources = computed(() => {
     const matchedIds = new Set(currentMatches.value.map(m => m.resourceId))
@@ -385,6 +505,15 @@ const filteredPoolResources = computed(() => {
     if (!poolSearchKeyword.value) return availablePoolResources.value
     return availablePoolResources.value.filter(res =>
         (res.name || '').toLowerCase().includes(poolSearchKeyword.value.toLowerCase())
+    )
+})
+
+// 根据搜索关键词过滤管理资源列表
+const filteredManageResources = computed(() => {
+    if (!manageSearchKeyword.value) return currentMatches.value
+    return currentMatches.value.filter(m =>
+        (m.resourceName || '').toLowerCase().includes(manageSearchKeyword.value.toLowerCase()) ||
+        (m.resourceId && String(m.resourceId).toLowerCase().includes(manageSearchKeyword.value.toLowerCase()))
     )
 })
 
@@ -503,6 +632,7 @@ const openManageResourceModal = async (group) => {
         currentMatches.value = group.matchedResources ? [...group.matchedResources.map(m => ({ ...m }))] : []
     }
     hasModify.value = false
+    manageSearchKeyword.value = ''
     showManageResourceModal.value = true
 }
 
@@ -545,9 +675,12 @@ const addSelectedResources = () => {
     showAddResourceModal.value = false
 }
 
-const removeResourceFromGroup = (idx) => {
-    currentMatches.value.splice(idx, 1)
-    hasModify.value = true
+const removeResourceFromGroup = (resourceId) => {
+    const idx = currentMatches.value.findIndex(m => m.resourceId === resourceId)
+    if (idx !== -1) {
+        currentMatches.value.splice(idx, 1)
+        hasModify.value = true
+    }
 }
 
 const markAsModified = () => {
@@ -604,8 +737,25 @@ const saveGroupResources = async () => {
 .btn-primary { background: #409eff; border-color: #409eff; color: white; }
 .btn-primary:hover { background: #66b1ff; }
 .btn-sm { padding: 6px 12px; font-size: 13px; }
-.group-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
-.group-card { background: #fafafa; border-radius: 12px; padding: 20px; border: 1px solid #ebeef5; transition: all 0.3s; }
+.group-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    align-content: start;
+    max-height: calc(100vh - 280px);
+    overflow-y: auto;
+}
+.group-card {
+    background: #fafafa;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #ebeef5;
+    transition: all 0.3s;
+    height: 220px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
 .group-card:hover { border-color: #409eff; box-shadow: 0 4px 12px rgba(64, 158, 255, 0.1); }
 .group-header {
     display: grid;
@@ -613,7 +763,7 @@ const saveGroupResources = async () => {
     column-gap: 12px;
     row-gap: 12px;
     align-items: start;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
 }
 .group-icon {
     grid-row: 1;
@@ -661,14 +811,39 @@ const saveGroupResources = async () => {
 .action-btn.manage:hover { background: #409eff; color: white; }
 .action-btn.delete { background: #fff2f0; color: #f56c6c; }
 .action-btn.delete:hover { background: #f56c6c; color: white; }
-.group-resources { margin-top: 12px; padding-top: 12px; border-top: 1px solid #ebeef5; }
+.group-resources {
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px solid #ebeef5;
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
 .resource-title { font-size: 13px; color: #909399; margin-bottom: 8px; }
 .resource-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .resource-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: white; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 12px; color: #606266; }
 .level-badge { padding: 1px 4px; background: #667eea; color: white; border-radius: 3px; font-size: 10px; }
 .resource-more { display: inline-block; padding: 4px 10px; background: #f5f7fa; border-radius: 4px; font-size: 12px; color: #909399; }
 /* 资源卡片列表样式 */
-.resource-card-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.resource-card-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.resource-scroll-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.resource-scroll-wrapper::-webkit-scrollbar {
+    display: none;
+}
 .resource-card {
     display: inline-flex;
     align-items: center;
@@ -688,6 +863,77 @@ const saveGroupResources = async () => {
 .resource-more-card { display: inline-flex; align-items: center; padding: 6px 12px; background: #f5f7fa; border: 1px dashed #d1d5db; border-radius: 8px; font-size: 12px; color: #9ca3af; }
 .resource-empty { font-size: 13px; color: #9ca3af; padding: 4px 0; }
 .empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 0; color: #909399; }
+
+/* 分页 */
+.pagination-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding: 12px 4px;
+    gap: 12px;
+    background: white;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+}
+
+.pagination-info {
+    font-size: 13px;
+    color: #909399;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.page-btn {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: white;
+    color: #606266;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.page-btn:hover:not(:disabled):not(.ellipsis) {
+    border-color: #409eff;
+    color: #409eff;
+}
+
+.page-btn.active {
+    background: #409eff;
+    border-color: #409eff;
+    color: white;
+    font-weight: 600;
+}
+
+.page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.page-btn.ellipsis {
+    border-color: transparent;
+    background: transparent;
+    cursor: default;
+}
+
+.page-num {
+    color: #606266;
+    font-size: 14px;
+    padding: 0 8px;
+}
+
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
 .modal { background: white; border-radius: 12px; width: 480px; max-width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2); }
 .modal-lg { width: 640px; }
@@ -839,6 +1085,34 @@ const saveGroupResources = async () => {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12px;
+}
+
+.manage-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 6px 12px;
+}
+
+.manage-search svg {
+    color: #9ca3af;
+    flex-shrink: 0;
+}
+
+.manage-search-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: 13px;
+    color: #374151;
+}
+
+.manage-search-input::placeholder {
+    color: #9ca3af;
 }
 
 .manage-list {
