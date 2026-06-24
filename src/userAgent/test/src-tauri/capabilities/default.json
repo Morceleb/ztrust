@@ -1,7 +1,7 @@
 {
   "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main"],
+  "description": "Capability for the main window and dynamic resource windows",
+  "windows": ["main", "resource_*"],
   "permissions": [
     "core:default",
     "core:window:default",

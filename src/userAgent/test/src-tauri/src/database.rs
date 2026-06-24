@@ -1,8 +1,8 @@
 use log::info;
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use chrono::{Utc, Duration};
+use chrono::{Duration, Utc};
 use base64;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

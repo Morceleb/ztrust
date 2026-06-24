@@ -14,12 +14,16 @@ const getters = {
 
 const mutations = {
     SET_LOGGED_IN(state, value) {
+        console.log('[Auth/Mutation] SET_LOGGED_IN:', value, '| 当前 state.isLoggedIn:', state.isLoggedIn);
         state.isLoggedIn = value
+        console.log('[Auth/Mutation] SET_LOGGED_IN 后 state.isLoggedIn:', state.isLoggedIn);
     },
     SET_USER(state, user) {
+        console.log('[Auth/Mutation] SET_USER:', user ? user.name || user.displayName : 'null');
         state.user = user
     },
     LOGOUT(state) {
+        console.log('[Auth/Mutation] LOGOUT | 当前 isLoggedIn:', state.isLoggedIn);
         state.isLoggedIn = false
         state.user = null
     }
@@ -28,8 +32,11 @@ const mutations = {
 const actions = {
     // 登录成功后调用
     loginSuccess({ commit }, user) {
+        console.log('[Auth/Action] loginSuccess 被调用, user:', user);
         commit('SET_LOGGED_IN', true)
+        console.log('[Auth/Action] loginSuccess: SET_LOGGED_IN(true) 已提交');
         commit('SET_USER', user)
+        console.log('[Auth/Action] loginSuccess: SET_USER 已提交, 当前 isLoggedIn:', this.state.auth.isLoggedIn);
 
         // 初始化并启动行为监控
         if (SecurityConfig.activityMonitor.enabled) {
@@ -38,7 +45,6 @@ const actions = {
                 name: user.name || user.displayName
             })
             activityMonitor.start()
-            // 设置登录状态，开始失活计时
             activityMonitor.setLoginState(true, {
                 id: user.id,
                 name: user.name || user.displayName

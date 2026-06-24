@@ -12,6 +12,7 @@ import { useRouter } from 'vue-router'
 import { useBehaviorCollector } from './modules/behaviorCollector'
 import { useMouseTracker } from '@/modules/behaviorCollector/composables/useMouseTracker'
 import activityMonitor from '@/utils/activityMonitorWrapper'
+import { collectFingerprints } from '@/utils/fingerprintService'
 import store from '@/store'
 
 const router = useRouter()
@@ -27,8 +28,15 @@ const handleTimeout = () => {
     router.push('/login')
 }
 
-onMounted(() => {
+onMounted(async () => {
     activityMonitor.onTimeout(handleTimeout)
+
+    try {
+        const fingerprints = await collectFingerprints()
+        console.log('[App] 双指纹与无线环境已生成:', fingerprints)
+    } catch (error) {
+        console.error('[App] 初始化双指纹失败:', error)
+    }
 });
 
 onUnmounted(() => {

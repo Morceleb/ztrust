@@ -95,14 +95,36 @@ const handleCardClick = (item) => {
         postBody.value = '{\n  \n}'
         showModal.value = true
     } else {
-        // GET 或其他：直接访问
-        directAccess(item.resourceId)
+        // GET 或其他：直接在新窗口中访问
+        directAccess(item.resourceId, item.name)
     }
 }
 
-// 直接访问（GET）
-const directAccess = (resourceId) => {
-    window.open(`${localStorage.getItem('companyAddress')}/auth/access/${resourceId}`, '_blank')
+// 获取认证 token
+const getAuthToken = () => {
+    return sessionStorage.getItem('auth_token') || ''
+}
+
+// 直接访问（GET）- 在 Tauri 新窗口中打开
+const openResourceWindow = async (resourceId, resourceName) => {
+    let baseUrl = localStorage.getItem('companyAddress') || ''
+    if (baseUrl && !baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+        baseUrl = 'http://' + baseUrl
+    }
+    const targetUrl = `${baseUrl}/auth/access/${resourceId}`
+
+    const invokeParams = { resourceId: resourceId, title: resourceName || '资源访问', baseUrl }
+
+    try {
+        await window.__TAURI__.core.invoke('open_resource_window', invokeParams)
+    } catch (err) {
+        console.error('打开窗口失败:', err)
+        window.open(targetUrl, '_blank')
+    }
+}
+
+const directAccess = (resourceId, resourceName) => {
+    openResourceWindow(resourceId, resourceName)
 }
 
 // 关闭模态框
@@ -135,9 +157,7 @@ const submitPost = async () => {
         // 使用封装后的 request（axios）
         const response = await request.post(`/auth/access/${resourceId}`, body)
         console.log('请求成功：', response.data)
-        // 成功后打开新页面
-        window.open(`${localStorage.getItem('companyAddress')}/auth/access/${resourceId}`, '_blank')
-
+        openResourceWindow(resourceId, currentResource.value.name || '资源访问')
     } catch (error) {
         const status = error.response?.status || '未知'
         const message = error.response?.data?.message
