@@ -123,7 +123,17 @@
                 <div class="modal-body modal-body-fixed">
                     <div class="pool-header">
                         <span class="pool-title">可添加的资源</span>
-                        <span class="pool-count">{{ filteredPoolResources.length }} / {{ availablePoolResources.length }} 个</span>
+                        <div class="pool-header-right">
+                            <button
+                                type="button"
+                                class="btn-select-all"
+                                :disabled="filteredPoolResources.length === 0"
+                                @click="toggleSelectAllPool"
+                            >
+                                {{ isAllPoolSelected ? '取消全选' : '全选' }}
+                            </button>
+                            <span class="pool-count">{{ filteredPoolResources.length }} / {{ availablePoolResources.length }} 个</span>
+                        </div>
                     </div>
                     <div class="pool-search">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -654,6 +664,26 @@ const setResourceLevel = (resourceId, event) => {
 
 const selectedCount = computed(() => Object.keys(selectedResourceMap.value).length)
 
+const isAllPoolSelected = computed(() => {
+    const list = filteredPoolResources.value
+    if (!list.length) return false
+    return list.every(res => selectedResourceMap.value[res.id] !== undefined)
+})
+
+const toggleSelectAllPool = () => {
+    const list = filteredPoolResources.value
+    if (!list.length) return
+    const map = { ...selectedResourceMap.value }
+    if (isAllPoolSelected.value) {
+        list.forEach(res => { delete map[res.id] })
+    } else {
+        list.forEach(res => {
+            if (map[res.id] === undefined) map[res.id] = 1
+        })
+    }
+    selectedResourceMap.value = map
+}
+
 const addSelectedResources = () => {
     const map = selectedResourceMap.value
     if (!Object.keys(map).length) return
@@ -966,8 +996,8 @@ const saveGroupResources = async () => {
 /* 添加资源弹窗 */
 .add-resource-modal {
     width: 100%;
-    max-width: 580px;
-    height: 460px;
+    max-width: 900px;
+    height: 760px;
     background: #fff;
     border-radius: 16px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
@@ -980,8 +1010,8 @@ const saveGroupResources = async () => {
 /* 管理资源弹窗 */
 .manage-resource-modal {
     width: 100%;
-    max-width: 580px;
-    height: 460px;
+    max-width: 900px;
+    height: 700px;
     background: #fff;
     border-radius: 16px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
@@ -1116,7 +1146,7 @@ const saveGroupResources = async () => {
 }
 
 .manage-list {
-    height: 360px;
+    height: 580px;
     overflow-y: auto;
     border: 1px solid #e5e7eb;
     border-radius: 10px;
@@ -1125,7 +1155,7 @@ const saveGroupResources = async () => {
 }
 
 .manage-list-fixed {
-    height: 360px;
+    height: 580px;
 }
 
 .manage-list::-webkit-scrollbar,
@@ -1294,6 +1324,39 @@ const saveGroupResources = async () => {
     margin-bottom: 12px;
 }
 
+.pool-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-select-all {
+    height: 28px;
+    padding: 0 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    color: #4b5563;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-select-all:hover:not(:disabled) {
+    border-color: #409eff;
+    color: #409eff;
+    background: #ecf5ff;
+}
+
+.btn-select-all:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .pool-title {
     font-size: 14px;
     font-weight: 600;
@@ -1345,7 +1408,7 @@ const saveGroupResources = async () => {
 }
 
 .resource-pool-fixed {
-    height: 160px;
+    height: 240px;
 }
 
 .resource-pool-list {

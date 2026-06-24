@@ -18,8 +18,9 @@
                     导入资源
                     <div class="import-tooltip">
                         <div class="import-tooltip-title">导入说明</div>
-                        <div class="import-tooltip-row"><span class="import-tooltip-label">字段要求：</span><span>资源名称、Resource ID、资源类型、允许方法</span></div>
-                        <div class="import-tooltip-row"><span class="import-tooltip-label">格式要求：</span><span>Resource ID 仅支持英文字母、数字、下划线；允许方法可选值：GET、POST、API</span></div>
+                        <div class="import-tooltip-row"><span class="import-tooltip-label">字段要求：</span><span>资源名称（必填）、URL（选填）、资源类型、允许方法。Resource ID 由系统自动生成</span></div>
+                        <div class="import-tooltip-row"><span class="import-tooltip-label">格式要求：</span><span>允许方法可选值：GET、POST、API</span></div>
+                        <div class="import-tooltip-row"><span class="import-tooltip-label">重复校验：</span><span>资源名称不可与文件内或系统中已有数据重复</span></div>
                     </div>
                 </button>
                 <input
@@ -77,7 +78,7 @@
                         <td class="col-url">
                           <span class="resource-url-text" :title="resource.url">{{ resource.url || '-' }}</span>
                         </td>
-                        <td class="col-method">{{ resource.allow_method || '-' }}</td>
+                        <td class="col-method">{{ Array.isArray(resource.allow_method) ? resource.allow_method.join(', ') : (resource.allow_method || '-') }}</td>
                         <td class="col-status avail-col">
                             <span
                                 class="status-badge"
@@ -398,7 +399,7 @@
                             <tr>
                                 <th>序号</th>
                                 <th>资源名称 *</th>
-                                <th>Resource ID *</th>
+                                <th>Resource ID</th>
                                 <th>URL</th>
                                 <th>资源类型</th>
                                 <th>允许方法</th>
@@ -407,17 +408,18 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(row, index) in importPreviewData" :key="index">
+                            <tr v-for="(row, index) in importPreviewData" :key="index" :class="{ 'error-row': row._error }">
                                 <td>{{ index + 1 }}</td>
                                 <td>{{ row.name }}</td>
-                                <td>{{ row.resourceId || '-' }}</td>
+                                <td>{{ row.resourceId || '(自动生成)' }}</td>
                                 <td :class="{ 'url-missing': !row.url }">
                                     <span :title="row.url">{{ row.url || '(自动生成)' }}</span>
                                 </td>
                                 <td>{{ row.type || '-' }}</td>
                                 <td>{{ row.allowMethod || '-' }}</td>
-                                <td v-if="!importResult">
-                                    <span class="import-status-ok">待导入</span>
+                                <td v-if="!importResult" :class="{ 'import-error-cell': row._error }">
+                                    <span v-if="row._error" class="import-status-fail">{{ row._error }}</span>
+                                    <span v-else class="import-status-ok">待导入</span>
                                 </td>
                                 <td v-if="importResult">
                                     <span v-if="row._success" class="import-status-ok">成功</span>
@@ -730,8 +732,8 @@ const handleSubmit = async () => {
     if (!formData.value.type || formData.value.type.trim() === '') {
         formErrors.value.type = '请输入资源类型'
     }
-    if (!formData.value.allow_method || formData.value.allow_method.trim() === '') {
-        formErrors.value.allow_method = '请输入允许方法'
+    if (!Array.isArray(formData.value.allow_method) || formData.value.allow_method.length === 0) {
+        formErrors.value.allow_method = '请选择至少一个允许方法'
     }
     if (!formData.value.url || formData.value.url.trim() === '') {
         formErrors.value.url = '请输入 URL'
@@ -746,7 +748,7 @@ const handleSubmit = async () => {
             type: formData.value.type?.trim() || null,
             resourceId: formData.value.resourceId?.trim() || null,
             icon: formData.value.icon?.trim() || null,
-            allowMethod: formData.value.allow_method?.trim() || null,
+            allowMethod: Array.isArray(formData.value.allow_method) ? formData.value.allow_method.join(',') : (formData.value.allow_method || null),
             url: formData.value.url?.trim() || null,
             isActive: formData.value.is_active === true
         }
@@ -804,27 +806,81 @@ const parseImportFile = (file) => {
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
             const json = XLSX.utils.sheet_to_json(firstSheet, { defval: '' })
 
+            const normalizeRow = (row) => {
+                const normalized = {}
+                for (const [key, val] of Object.entries(row)) {
+                    const cleanKey = String(key).replace(/[\s\uFEFF\xA0]+/g, '').trim()
+                    normalized[cleanKey] = val
+                }
+                return normalized
+            }
+
             const validRows = []
             const errors = []
             const urlWarnings = []
+
+            // 收集系统已有资源的 资源名称映射（用于提示冲突）
+            const existingNameToId = {}
+            resources.value.forEach(r => {
+                const n = r.name || ''
+                const rid = r.resourceId || ''
+                if (n) existingNameToId[n] = rid || n
+            })
+
+            // 第一遍：解析所有行（不再读取 Resource ID，全部由系统自动生成）
             json.forEach((row, index) => {
+                row = normalizeRow(row)
                 const name = String(row['资源名称'] || row['name'] || '').trim()
                 if (!name) {
                     errors.push(index + 1)
                     return
                 }
-                let resourceId = String(row['Resource ID'] || row['resourceId'] || row['resource_id'] || '').trim()
                 const url = String(row['URL'] || row['url'] || '').trim()
-                if (!url && resourceId) {
-                    urlWarnings.push({ row: index + 2, name, resourceId })
+                const type = String(row['资源类型'] || row['type'] || '').trim()
+                const allowMethod = String(row['允许方法'] || row['allowMethod'] || row['allow_method'] || '').trim()
+
+                // 统一在解析阶段为每行分配 Resource ID
+                const autoRid = getImportResourceId()
+                if (!url) {
+                    urlWarnings.push({ row: index + 2, name, resourceId: autoRid })
                 }
                 validRows.push({
                     name,
-                    resourceId,  // 保留原始值，但 confirmImport 会自动生成
+                    resourceId: autoRid,
                     url,
-                    type: String(row['资源类型'] || row['type'] || '').trim(),
-                    allowMethod: String(row['允许方法'] || row['allowMethod'] || row['allow_method'] || '').trim()
+                    type,
+                    allowMethod,
+                    _sourceRow: index + 2  // 记录 Excel 中实际行号（含表头偏移）
                 })
+            })
+
+            // 第二遍：检测文件内资源名称重复（以第一条为准）
+            const nameCount = {}
+            validRows.forEach(row => {
+                const key = row.name
+                if (!nameCount[key]) nameCount[key] = []
+                nameCount[key].push(row)
+            })
+            Object.keys(nameCount).forEach(name => {
+                if (nameCount[name].length > 1) {
+                    const rows = nameCount[name]
+                    const firstRid = rows[0]?.resourceId || '-'
+                    const firstRowNum = rows[0]?._sourceRow || '-'
+                    // 跳过第一个，后面重复的都提示与第一条重复
+                    rows.slice(1).forEach(row => {
+                        const tip = `资源名称「${name}」与第 ${firstRowNum} 行（Resource ID: ${firstRid}）重复`
+                        row._error = row._error ? row._error + '；' + tip : tip
+                    })
+                }
+            })
+
+            // 第三遍：检测系统已有资源名称重复
+            validRows.forEach(row => {
+                if (row._invalid) return
+                if (existingNameToId[row.name]) {
+                    const tip = `资源名称「${row.name}」与已有资源（Resource ID: ${existingNameToId[row.name]}）重复`
+                    row._error = row._error ? row._error + '；' + tip : tip
+                }
             })
 
             importErrors.value = errors
@@ -834,6 +890,11 @@ const parseImportFile = (file) => {
 
             if (validRows.length === 0) {
                 showToast('文件中未检测到有效数据，请检查格式')
+            } else {
+                const dupRows = validRows.filter(r => r._error)
+                if (dupRows.length > 0) {
+                    showToast(`检测到 ${dupRows.length} 条数据存在重复，请处理后再导入`)
+                }
             }
         } catch (err) {
             showToast('文件解析失败，请确认是有效的 Excel 或 CSV 文件')
@@ -855,12 +916,18 @@ const closeImportModal = () => {
 
 const confirmImport = async () => {
     if (!importPreviewData.value.length) return
+    // 过滤掉重复/无效行
+    const rowsToImport = importPreviewData.value.filter(r => !r._error)
+    if (!rowsToImport.length) {
+        showToast('没有可导入的有效数据，请先修正重复项')
+        return
+    }
     importing.value = true
     importResourceIdCounter = 0  // 重置计数器，确保每次导入都从当前最大ID开始递增
     let success = 0
     let failed = 0
 
-    for (const row of importPreviewData.value) {
+    for (const row of rowsToImport) {
         try {
             const finalResourceId = row.resourceId || getImportResourceId()
             const payload = {
@@ -1974,9 +2041,8 @@ const confirmImport = async () => {
 
 /* 导入弹窗 */
 .import-modal {
-    width: 100%;
-    max-width: 800px;
-    max-height: 85vh;
+    width: 800px;
+    max-height: 95vh;
     background: #fff;
     border-radius: 20px;
     box-shadow: 0 28px 72px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.04);
@@ -1984,6 +2050,13 @@ const confirmImport = async () => {
     flex-direction: column;
     overflow: hidden;
     animation: modal-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@media (max-width: 840px) {
+    .import-modal {
+        width: calc(100vw - 48px);
+        max-width: 800px;
+    }
 }
 
 .import-modal .modal-header {
@@ -2186,6 +2259,12 @@ const confirmImport = async () => {
     color: #374151;
 }
 
+.import-preview-table td.import-error-cell {
+    max-width: 280px;
+    word-break: break-word;
+    line-height: 1.5;
+}
+
 .import-preview-table tbody tr:hover {
     background: #f9fafb;
 }
@@ -2198,6 +2277,14 @@ const confirmImport = async () => {
 .import-status-fail {
     color: #dc2626;
     font-weight: 600;
+}
+
+.import-preview-table .error-row td {
+    background: #fef2f2;
+}
+
+.import-preview-table .error-row:hover td {
+    background: #fee2e2;
 }
 
 .import-modal .modal-footer-import {

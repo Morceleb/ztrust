@@ -154,6 +154,17 @@
                     <div class="pool-section">
                         <div class="pool-header">
                             <span class="pool-title">可添加的资源组</span>
+                            <div class="pool-header-right">
+                                <button
+                                    type="button"
+                                    class="btn-select-all"
+                                    :disabled="filteredAvailableResourceGroups.length === 0"
+                                    @click="toggleSelectAllResources"
+                                >
+                                    {{ isAllResourcesSelected ? '取消全选' : '全选' }}
+                                </button>
+                                <span class="pool-count">{{ filteredAvailableResourceGroups.length }} 个</span>
+                            </div>
                         </div>
                         <div class="pool-search">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -285,6 +296,17 @@
                     <div class="pool-section">
                         <div class="pool-header">
                             <span class="pool-title">可添加的用户</span>
+                            <div class="pool-header-right">
+                                <button
+                                    type="button"
+                                    class="btn-select-all"
+                                    :disabled="filteredAvailableUsers.length === 0"
+                                    @click="toggleSelectAllMembers"
+                                >
+                                    {{ isAllMembersSelected ? '取消全选' : '全选' }}
+                                </button>
+                                <span class="pool-count">{{ filteredAvailableUsers.length }} 个</span>
+                            </div>
                         </div>
                         <div class="pool-search">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -810,6 +832,34 @@ const toggleResourceSelection = (rg) => {
     }
 }
 
+const isAllResourcesSelected = computed(() => {
+    const list = filteredAvailableResourceGroups.value
+    if (!list.length) return false
+    return list.every(rg => formData.value.selectedResourceNames?.some(r => r.id === rg.id))
+})
+
+const toggleSelectAllResources = () => {
+    const list = filteredAvailableResourceGroups.value
+    if (!list.length) return
+    if (!formData.value.selectedResourceNames) formData.value.selectedResourceNames = []
+    if (isAllResourcesSelected.value) {
+        // 取消全选
+        list.forEach(rg => {
+            const idx = formData.value.selectedResourceNames.findIndex(r => r.id === rg.id)
+            if (idx !== -1) formData.value.selectedResourceNames.splice(idx, 1)
+            delete tempResourceLevels.value[rg.id]
+        })
+    } else {
+        // 全选
+        list.forEach(rg => {
+            if (!formData.value.selectedResourceNames.some(r => r.id === rg.id)) {
+                formData.value.selectedResourceNames.push({ ...rg, selectedLevel: 1 })
+                tempResourceLevels.value[rg.id] = 1
+            }
+        })
+    }
+}
+
 // 获取资源组当前选中的等级
 function getResourceSelectedLevel(resourceGroupId) {
     return tempResourceLevels.value[resourceGroupId] || 1
@@ -943,6 +993,27 @@ const toggleMemberSelection = (user) => {
         formData.value.selectedUserIds.push(user.id)
     } else {
         formData.value.selectedUserIds.splice(idx, 1)
+    }
+}
+
+const isAllMembersSelected = computed(() => {
+    const list = filteredAvailableUsers.value
+    if (!list.length) return false
+    return list.every(u => formData.value.selectedUserIds?.includes(u.id))
+})
+
+const toggleSelectAllMembers = () => {
+    const list = filteredAvailableUsers.value
+    if (!list.length) return
+    if (!formData.value.selectedUserIds) formData.value.selectedUserIds = []
+    if (isAllMembersSelected.value) {
+        // 取消全选：移除列表中所有 id
+        const idsToRemove = new Set(list.map(u => u.id))
+        formData.value.selectedUserIds = formData.value.selectedUserIds.filter(id => !idsToRemove.has(id))
+    } else {
+        // 全选
+        const existing = new Set(formData.value.selectedUserIds)
+        list.forEach(u => { if (!existing.has(u.id)) formData.value.selectedUserIds.push(u.id) })
     }
 }
 
@@ -1356,7 +1427,7 @@ async function fetchResourceGroups() {
     flex: 1;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
-    max-height: 180px;
+    max-height: 360px;
     overflow-y: auto;
     background: #fff;
 }
@@ -1524,8 +1595,8 @@ async function fetchResourceGroups() {
 /* 组成员弹窗 */
 .member-modal {
     width: 100%;
-    max-width: 680px;
-    height: 580px;
+    max-width: 900px;
+    height: 720px;
     background: #fff;
     border-radius: 16px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
@@ -1544,7 +1615,7 @@ async function fetchResourceGroups() {
 }
 
 .member-pool-fixed {
-    height: 140px;
+    height: 300px;
 }
 
 .member-pool-list {
@@ -1762,8 +1833,8 @@ async function fetchResourceGroups() {
 /* 访问资源弹窗 */
 .resource-modal {
     width: 100%;
-    max-width: 680px;
-    height: 580px;
+    max-width: 900px;
+    height: 720px;
     background: #fff;
     border-radius: 16px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
@@ -1791,7 +1862,50 @@ async function fetchResourceGroups() {
 
 .pool-header {
     display: flex;
+    justify-content: space-between;
     align-items: center;
+    margin-bottom: 12px;
+}
+
+.pool-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-select-all {
+    height: 28px;
+    padding: 0 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    color: #4b5563;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-select-all:hover:not(:disabled) {
+    border-color: #409eff;
+    color: #409eff;
+    background: #ecf5ff;
+}
+
+.btn-select-all:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pool-count {
+    font-size: 12px;
+    color: #9ca3af;
+    background: #f3f4f6;
+    padding: 2px 8px;
+    border-radius: 10px;
 }
 
 .pool-title {
@@ -1836,7 +1950,7 @@ async function fetchResourceGroups() {
 }
 
 .resource-pool-fixed {
-    height: 140px;
+    height: 300px;
 }
 
 .resource-pool-list {
