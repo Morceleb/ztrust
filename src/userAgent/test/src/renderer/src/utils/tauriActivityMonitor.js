@@ -253,11 +253,27 @@ class ActivityMonitorClient {
             console.error('[ActivityMonitorClient] 注销报告失败:', error);
         }
 
-        // 保留 companyAddress，清除其他 localStorage 数据
+        // 保留 companyAddress、securityCode 和记住的用户凭据，清除其他 localStorage 数据
         const savedAddress = localStorage.getItem('companyAddress');
+        const savedSecurityCode = localStorage.getItem('securityCode');
+        const savedUsername = localStorage.getItem('savedUsername');
+        const savedPassword = localStorage.getItem('savedPassword');
+        const rememberMe = localStorage.getItem('rememberMe');
         localStorage.clear();
         if (savedAddress) {
             localStorage.setItem('companyAddress', savedAddress);
+        }
+        if (savedSecurityCode) {
+            localStorage.setItem('securityCode', savedSecurityCode);
+        }
+        if (savedUsername) {
+            localStorage.setItem('savedUsername', savedUsername);
+        }
+        if (savedPassword) {
+            localStorage.setItem('savedPassword', savedPassword);
+        }
+        if (rememberMe) {
+            localStorage.setItem('rememberMe', rememberMe);
         }
     }
 

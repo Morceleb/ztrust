@@ -72,6 +72,29 @@ const extractHost = (address) => {
     return host
 }
 
+// 在 Tauri 环境下发送 SPA 报文以打开目标服务器端口
+// 该函数为幂等操作：失败仅记录错误，不抛出
+const ensureSpaPacketSent = async (rawAddress, securityCodeValue) => {
+    const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
+    if (!isTauri) return;
+
+    try {
+        const parsedHost = extractHost(rawAddress)
+        console.log('[Login] 自动发送 SPA 报文以开放端口', { host: parsedHost });
+
+        const deviceInfo = await invoke('get_device_info');
+        await sendSpaPacket(
+            parsedHost,
+            securityCodeValue.trim(),
+            deviceInfo.layered.hardware_hash,
+            '7f8e3d2a1c9b4e6f5a0d8c2b7e4f1a3c'
+        );
+        console.log('[Login] SPA 报文自动发送完成');
+    } catch (err) {
+        console.warn('[Login] SPA 报文自动发送失败（将在登录时重试）:', err);
+    }
+}
+
 const loadRemoteLoginConfig = async () => {
     try {
         const baseURL = localStorage.getItem('companyAddress') || import.meta.env.VITE_API_BASE_URL;
@@ -109,6 +132,22 @@ onMounted(async () => {
         currentStep.value = 'login';
         console.log('[Login] 已加载保存的公司地址:', savedAddress);
 
+        // 恢复已保存的用户名和密码（如果之前勾选了"记住我"）
+        const isRememberMe = localStorage.getItem('rememberMe') === 'true';
+        if (isRememberMe) {
+            const savedUsername = localStorage.getItem('savedUsername');
+            const savedPassword = localStorage.getItem('savedPassword');
+            if (savedUsername) {
+                username.value = savedUsername;
+                console.log('[Login] 已恢复保存的用户名');
+            }
+            if (savedPassword) {
+                password.value = savedPassword;
+                rememberMe.value = true;
+                console.log('[Login] 已恢复保存的密码');
+            }
+        }
+
         if (!isTauri) {
             await loadRemoteLoginConfig();
         }
@@ -129,43 +168,18 @@ const handleCompanySubmit = async () => {
 
     isCompanyLoading.value = true
 
-    // 解析用户输入的地址，提取 host 和 port
+    // 解析用户输入的地址
     const rawAddress = companyAddress.value.trim()
-    let parsedHost = rawAddress.replace(/^https?:\/\//, '').replace(/\/$/, '')
     let parsedPort = null
 
     // 检查是否包含端口号（:数字）
-    const portMatch = parsedHost.match(/:(\d+)$/)
+    const hostPart = rawAddress.replace(/^https?:\/\//, '').replace(/\/$/, '')
+    const portMatch = hostPart.match(/:(\d+)$/)
     if (portMatch) {
         parsedPort = portMatch[1]
-        parsedHost = parsedHost.replace(/:\d+$/, '')
     }
 
-    // 检测环境
-    const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
-
     try {
-        // 在 Tauri 环境下，先发送 SPA 报文
-        if (isTauri) {
-            console.log('[Login] 检测到 Tauri 环境，准备发送 SPA 报文', { host: parsedHost, port: parsedPort });
-
-            // 获取设备信息
-            const deviceInfo = await invoke('get_device_info');
-            console.log('[Login] 获取到设备信息:', deviceInfo);
-
-            // 发送 SPA 报文（SPA 使用 41234 端口）
-            // DeviceID: hardware_hash (32 字节 = 64 hex字符)
-            // LicenseID: 固定值 (16 字节 = 32 hex字符)
-            await sendSpaPacket(
-                parsedHost,
-                securityCode.value.trim(),
-                deviceInfo.layered.hardware_hash,
-                '7f8e3d2a1c9b4e6f5a0d8c2b7e4f1a3c'
-            );
-
-            console.log('[Login] SPA 报文发送完成');
-        }
-
         // 保存到 localStorage（保存完整地址，包括端口）
         localStorage.setItem('companyAddress', rawAddress)
         localStorage.setItem('companyPort', parsedPort || '80')
@@ -239,6 +253,12 @@ const handleLogin = async () => {
     try {
         // 获取保存的安全码
         const securityCode = localStorage.getItem('securityCode');
+        const companyAddress = localStorage.getItem('companyAddress');
+
+        // 在 Tauri 环境下登录前先发送 SPA 报文以打开目标端口（兜底保障）
+        if (isTauri && companyAddress && securityCode) {
+            await ensureSpaPacketSent(companyAddress, securityCode);
+        }
 
         const response = await request.post('/auth/login', {
             username: username.value,
@@ -261,6 +281,19 @@ const handleLogin = async () => {
         const access_token = rawData.access_token || rawData.token;
         const refresh_token = rawData.refresh_token;
         const user = rawData.user;
+
+        // 如果勾选了"记住我"，保存用户名和密码到 localStorage
+        if (rememberMe.value) {
+            localStorage.setItem('savedUsername', username.value);
+            localStorage.setItem('savedPassword', password.value);
+            localStorage.setItem('rememberMe', 'true');
+            console.log('[Login] ✓ 已保存用户名和密码');
+        } else {
+            // 如果没勾选，清除已保存的凭据
+            localStorage.removeItem('savedUsername');
+            localStorage.removeItem('savedPassword');
+            localStorage.removeItem('rememberMe');
+        }
 
         // 保存认证信息到 sessionStorage
         if (access_token) {
@@ -297,12 +330,91 @@ const handleLogin = async () => {
             isTauri: isTauri
         });
 
-        // 提供更有用的错误信息
+        // 英文消息转中文映射
+        const messageMap = {
+            // 用户不存在
+            'user does not exist': '用户不存在',
+            'user not found': '用户不存在',
+            'user doesn\'t exist': '用户不存在',
+            'user not exist': '用户不存在',
+            'no such user': '用户不存在',
+            'invalid user': '用户不存在',
+            // 用户名或密码错误
+            'invalid username or password': '用户名或密码错误',
+            'invalid credentials': '用户名或密码错误',
+            'invalid username or password: password or code is incorrect': '用户名或密码错误',
+            'username or password is incorrect': '用户名或密码错误',
+            'incorrect username or password': '用户名或密码错误',
+            'wrong username or password': '用户名或密码错误',
+            'password is incorrect': '密码错误',
+            'password incorrect': '密码错误',
+            // 账户状态
+            'account is disabled': '账户已被禁用',
+            'account disabled': '账户已被禁用',
+            'account locked': '账户已被锁定',
+            'account is locked': '账户已被锁定',
+            'account is inactive': '账户已停用',
+            // 登录限制
+            'too many login attempts': '登录尝试次数过多',
+            'too many failed attempts': '登录失败次数过多',
+            'rate limit exceeded': '请求过于频繁，请稍后再试',
+            // 授权相关
+            'unauthorized': '未授权，请重新登录',
+            'access denied': '访问被拒绝',
+            'forbidden': '禁止访问',
+            'permission denied': '权限不足',
+            // Token 相关
+            'token is invalid': '登录已过期，请重新登录',
+            'token expired': '登录已过期，请重新登录',
+            'invalid token': '登录已过期，请重新登录',
+            'expired token': '登录已过期，请重新登录',
+            'refresh token': '令牌刷新失败',
+            // 验证码相关
+            'invalid code': '验证码错误',
+            'code is incorrect': '验证码错误',
+            'incorrect code': '验证码错误',
+            'verification code': '验证码错误',
+            // 通用错误
+            'internal server error': '服务器内部错误，请稍后再试',
+            'service unavailable': '服务暂时不可用',
+            'bad request': '请求参数错误',
+            'validation failed': '数据验证失败'
+        };
+
+        // 统一转换为小写进行匹配
+        const getChineseMessage = (msg) => {
+            if (!msg) return null;
+            const lowerMsg = msg.toLowerCase();
+            for (const [key, value] of Object.entries(messageMap)) {
+                if (lowerMsg.includes(key.toLowerCase())) {
+                    // 提取剩余尝试次数
+                    const match = msg.match(/(\d+)\s*remaining/i);
+                    if (match) {
+                        return `${value}，剩余 ${match[1]} 次尝试机会`;
+                    }
+                    return value;
+                }
+            }
+            return msg; // 未匹配到则返回原始消息
+        };
+
+        // 根据 HTTP 状态码返回中文错误提示
+        const status = err.response?.status;
+        const backendMessage = err.response?.data?.message;
+
         if (!err.response) {
             // 网络错误 - 通常是 "empty response"
-            loginError.value = `网络请求失败，请检查公司地址是否正确配置。当前环境: ${isTauri ? 'Tauri 应用' : '浏览器'}`;
+            loginError.value = '网络请求失败，请检查公司地址是否正确配置';
+        } else if (status === 401) {
+            loginError.value = getChineseMessage(backendMessage) || '用户名或密码错误';
+        } else if (status === 403) {
+            loginError.value = getChineseMessage(backendMessage) || '账户已被禁用或无访问权限';
+        } else if (status === 429) {
+            loginError.value = getChineseMessage(backendMessage) || '登录尝试次数过多，请稍后再试';
+        } else if (status === 500) {
+            loginError.value = backendMessage || '服务器错误，请稍后再试';
         } else {
-            loginError.value = err?.response?.data?.message || '登录失败，请检查用户名和密码';
+            loginError.value = getChineseMessage(backendMessage) || '登录失败，请检查用户名和密码';
         }
     } finally {
         isLoading.value = false

@@ -15,9 +15,9 @@
       {
         "title": "零信任访问控制系统",
         "label": "main",
-        "width": 1024,
-        "height": 600,
-        "resizable": false,
+        "width": 1280,
+        "height": 720,
+        "resizable": true,
         "decorations": false,
         "transparent": false,
         "center": true,

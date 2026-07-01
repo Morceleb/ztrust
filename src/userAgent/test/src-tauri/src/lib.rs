@@ -124,21 +124,38 @@ async fn open_resource_window(
         .and_then(|v| v.as_str().map(|s| s.to_string()))
         .unwrap_or_default();
 
+    // 获取其他认证信息
+    let security_code = store.get("securityCode")
+        .and_then(|v| v.as_str().map(|s| s.to_string()))
+        .unwrap_or_default();
+    let device_id = store.get("deviceFingerprint")
+        .and_then(|v| v.as_str().map(|s| s.to_string()))
+        .unwrap_or_default();
+    let license_id = store.get("licenseId")
+        .and_then(|v| v.as_str().map(|s| s.to_string()))
+        .unwrap_or_default();
+
     use tauri::WebviewUrl;
 
     let proxy_url = if cfg!(debug_assertions) {
         format!(
-            "http://localhost:5173/resource-proxy.html?baseUrl={}&resourceId={}&authToken={}",
+            "http://localhost:5173/resource-proxy.html?baseUrl={}&resourceId={}&authToken={}&securityCode={}&deviceId={}&licenseId={}",
             urlencoding::encode(&raw_base),
             urlencoding::encode(&resource_id),
             urlencoding::encode(&token),
+            urlencoding::encode(&security_code),
+            urlencoding::encode(&device_id),
+            urlencoding::encode(&license_id),
         )
     } else {
         format!(
-            "resource:///resource-proxy.html?baseUrl={}&resourceId={}&authToken={}",
+            "resource:///resource-proxy.html?baseUrl={}&resourceId={}&authToken={}&securityCode={}&deviceId={}&licenseId={}",
             urlencoding::encode(&raw_base),
             urlencoding::encode(&resource_id),
             urlencoding::encode(&token),
+            urlencoding::encode(&security_code),
+            urlencoding::encode(&device_id),
+            urlencoding::encode(&license_id),
         )
     };
 
