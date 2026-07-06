@@ -105,9 +105,17 @@ pub fn send_spa_packet(
     device_id: &str,
     license_id: &str,
 ) -> Result<(), String> {
+    // 提取纯主机地址（移除协议和端口）
+    let pure_host = server_address
+        .trim_start_matches("http://")
+        .trim_start_matches("https://")
+        .split(':')
+        .next()
+        .unwrap_or(server_address);
+
     info!(
         "[SPA] 开始发送 SPA 报文到 {}:{}",
-        server_address, port
+        pure_host, port
     );
 
     // 派生 SpaKey (32字节)
@@ -189,6 +197,14 @@ pub fn send_spa_packet(
 
     info!("[SPA] 报文总长度: {} 字节", packet.len());
 
+    // 提取纯主机地址（移除协议和端口）
+    let pure_host = server_address
+        .trim_start_matches("http://")
+        .trim_start_matches("https://")
+        .split(':')
+        .next()
+        .unwrap_or(server_address);
+
     // 发送 UDP
     let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
     socket
@@ -196,7 +212,7 @@ pub fn send_spa_packet(
         .ok();
 
     socket
-        .send_to(&packet, format!("{}:{}", server_address, port))
+        .send_to(&packet, format!("{}:{}", pure_host, port))
         .map_err(|e| format!("UDP 发送失败: {}", e))?;
 
     info!("[SPA] SPA 报文发送成功!");

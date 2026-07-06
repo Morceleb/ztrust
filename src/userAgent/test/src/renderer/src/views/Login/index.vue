@@ -301,9 +301,20 @@ const handleLogin = async () => {
             console.log('[Login] ✓ access_token 已保存，长度:', access_token.length);
 
             if (isTauri) {
-                invoke('save_access_token', { token: access_token }).catch((err) => {
-                    console.error('[Login] 保存 access_token 到 Tauri store 失败:', err);
-                });
+                // 保存到 Tauri store
+                try {
+                    const deviceInfo = await invoke('get_device_info');
+                    const savedSecurityCode = localStorage.getItem('securityCode') || '';
+                    await invoke('save_auth_info', {
+                        token: access_token,
+                        securityCode: savedSecurityCode,
+                        deviceId: deviceInfo?.layered?.hardware_hash || deviceInfo?.hardware_hash || '',
+                        licenseId: '7f8e3d2a1c9b4e6f5a0d8c2b7e4f1a3c'
+                    });
+                    console.log('[Login] ✓ 认证信息已保存到 Tauri store');
+                } catch (err) {
+                    console.error('[Login] 保存认证信息到 Tauri store 失败:', err);
+                }
             }
         } else {
             console.error('[Login] ✗ access_token 为空，无法保存！响应结构:', rawData);

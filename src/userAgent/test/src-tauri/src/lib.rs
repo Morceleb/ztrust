@@ -135,6 +135,31 @@ async fn open_resource_window(
         .and_then(|v| v.as_str().map(|s| s.to_string()))
         .unwrap_or_default();
 
+    // 发送 SPA 报文（资源访问前发送）
+    const SPA_PORT: u16 = 41234;
+    if !security_code.is_empty() && !device_id.is_empty() && !license_id.is_empty() {
+        // 提取纯 host（移除协议）
+        let server_host = raw_base
+            .replace("http://", "")
+            .replace("https://", "");
+
+        info!(
+            "[SPA] 访问资源前发送 SPA 报文: host={}, port={}",
+            server_host, SPA_PORT
+        );
+
+        match spa::send_spa_packet(&server_host, SPA_PORT, &security_code, &device_id, &license_id) {
+            Ok(()) => {
+                info!("[SPA] 资源访问 SPA 报文发送成功");
+            }
+            Err(e) => {
+                info!("[SPA] 资源访问 SPA 报文发送失败 (不影响资源访问): {}", e);
+            }
+        }
+    } else {
+        info!("[SPA] 跳过 SPA 发送：缺少必要参数");
+    }
+
     use tauri::WebviewUrl;
 
     let proxy_url = if cfg!(debug_assertions) {
@@ -160,8 +185,7 @@ async fn open_resource_window(
     };
 
     info!(
-        "[Window] 创建资源窗口: proxyUrl={}, baseUrl={}, resourceId={}",
-        proxy_url,
+        "[Window] 创建资源窗口: baseUrl={}, resourceId={}",
         raw_base,
         resource_id,
     );
@@ -180,7 +204,7 @@ async fn open_resource_window(
     .build()
     .map_err(|e| format!("创建资源窗口失败: {}", e))?;
 
-    info!("[Window] 资源窗口已创建: {}", proxy_url);
+    info!("[Window] 资源窗口已创建: resourceId={}", resource_id);
     Ok(())
 }
 
@@ -405,9 +429,35 @@ async fn save_access_token(app: AppHandle, token: String) -> Result<(), String> 
     let store = app.store("settings.json")
         .map_err(|e| format!("读取 store 失败: {}", e))?;
 
-    store.set("access_token", serde_json::json!(token));
+    store.set("access_token", serde_json::json!(token.clone()));
+    store.set("auth_token", serde_json::json!(token));
 
     info!("[Auth] access_token 已同步到 Tauri store");
+    Ok(())
+}
+
+#[tauri::command]
+async fn save_auth_info(
+    app: AppHandle,
+    token: String,
+    security_code: String,
+    device_id: String,
+    license_id: String,
+) -> Result<(), String> {
+    use tauri_plugin_store::StoreExt;
+
+    let store = app.store("settings.json")
+        .map_err(|e| format!("读取 store 失败: {}", e))?;
+
+    store.set("auth_token", serde_json::json!(token.clone()));
+    store.set("access_token", serde_json::json!(token));
+    store.set("securityCode", serde_json::json!(security_code));
+    store.set("deviceFingerprint", serde_json::json!(device_id));
+    store.set("licenseId", serde_json::json!(license_id));
+
+    info!("[Auth] 完整认证信息已保存到 Tauri store: securityCode长度={}, deviceId长度={}, licenseId长度={}",
+          security_code.len(), device_id.len(), license_id.len());
+
     Ok(())
 }
 
@@ -500,6 +550,7 @@ pub fn run() {
             get_platform_info,
             // 权限检查
             save_access_token,
+            save_auth_info,
             check_permission,
             check_auth,
             // SPA
