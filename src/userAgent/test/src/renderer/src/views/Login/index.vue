@@ -1,7 +1,7 @@
 <!-- src/views/LoginPage.vue -->
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
 
 import './index.css'
@@ -14,8 +14,19 @@ import SocialLogin from '@/components/CustomUI/SocialLogin/index.vue'
 import request from '@/utils/request'
 import store from '@/store'
 import { sendSpaPacket } from '@/utils/spa'
+import {
+    saveSecurityCode,
+    getSecurityCode,
+    saveUsername,
+    getUsername,
+    savePassword,
+    getPassword,
+    keyringDelete,
+    clearLocalStorageCredentials,
+} from '@/utils/keyringService'
 
 const router = useRouter()
+const route = useRoute()
 
 // 步骤控制：'company' | 'login'
 const currentStep = ref('company')
@@ -124,27 +135,50 @@ onMounted(async () => {
     const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
     console.log('[Login] 页面加载，环境:', isTauri ? 'Tauri' : 'Browser');
 
+    // 总是先读取一次已保存的地址和安全码（无论是否走 mode=company）
     const savedAddress = localStorage.getItem('companyAddress');
-    const savedSecurityCode = localStorage.getItem('securityCode');
-    if (savedAddress && savedSecurityCode) {
+    if (savedAddress) {
         companyAddress.value = savedAddress;
-        securityCode.value = savedSecurityCode;
+        // 安全码：Tauri 从密钥库读，其他从 localStorage 读
+        if (isTauri) {
+            const savedSecurityCode = await getSecurityCode();
+            if (savedSecurityCode) securityCode.value = savedSecurityCode;
+        } else {
+            const savedSecurityCode = localStorage.getItem('securityCode');
+            if (savedSecurityCode) securityCode.value = savedSecurityCode;
+        }
+    }
+
+    // 若 URL 上带 mode=company（设置页"切换"触发），强制进入"接入地址/域名 + 安全码"页面
+    if (route.query.mode === 'company') {
+        currentStep.value = 'company'
+        return
+    }
+
+    // 正常登录流程：若有已保存地址 → 跳到第二步
+    if (savedAddress) {
         currentStep.value = 'login';
         console.log('[Login] 已加载保存的公司地址:', savedAddress);
 
-        // 恢复已保存的用户名和密码（如果之前勾选了"记住我"）
-        const isRememberMe = localStorage.getItem('rememberMe') === 'true';
-        if (isRememberMe) {
-            const savedUsername = localStorage.getItem('savedUsername');
-            const savedPassword = localStorage.getItem('savedPassword');
-            if (savedUsername) {
-                username.value = savedUsername;
-                console.log('[Login] 已恢复保存的用户名');
+        if (isTauri) {
+            const savedUsernameVal = await getUsername();
+            const savedPasswordVal = await getPassword();
+            if (savedUsernameVal) {
+                username.value = savedUsernameVal;
+                console.log('[Login] 已从密钥库恢复用户名');
             }
-            if (savedPassword) {
-                password.value = savedPassword;
+            if (savedPasswordVal) {
+                password.value = savedPasswordVal;
                 rememberMe.value = true;
-                console.log('[Login] 已恢复保存的密码');
+                console.log('[Login] 已从密钥库恢复密码');
+            }
+        } else {
+            const savedUsernameVal = localStorage.getItem('savedUsername');
+            const savedPasswordVal = localStorage.getItem('savedPassword');
+            if (savedUsernameVal) username.value = savedUsernameVal;
+            if (savedPasswordVal) {
+                password.value = savedPasswordVal;
+                rememberMe.value = true;
             }
         }
 
@@ -180,10 +214,17 @@ const handleCompanySubmit = async () => {
     }
 
     try {
+        // Tauri 环境：安全码存入密钥库
+        if (isTauri) {
+            await saveSecurityCode(securityCode.value.trim());
+        } else {
+            // 非 Tauri 环境：存入 localStorage（向后兼容）
+            localStorage.setItem('securityCode', securityCode.value.trim());
+        }
+
         // 保存到 localStorage（保存完整地址，包括端口）
         localStorage.setItem('companyAddress', rawAddress)
         localStorage.setItem('companyPort', parsedPort || '80')
-        localStorage.setItem('securityCode', securityCode.value.trim())
 
         // 切换到登录步骤
         currentStep.value = 'login'
@@ -251,19 +292,24 @@ const handleLogin = async () => {
     });
 
     try {
-        // 获取保存的安全码
-        const securityCode = localStorage.getItem('securityCode');
+        // 获取安全码（Tauri 环境从密钥库读取）
+        let currentSecurityCode;
+        if (isTauri) {
+            currentSecurityCode = await getSecurityCode();
+        } else {
+            currentSecurityCode = localStorage.getItem('securityCode');
+        }
         const companyAddress = localStorage.getItem('companyAddress');
 
         // 在 Tauri 环境下登录前先发送 SPA 报文以打开目标端口（兜底保障）
-        if (isTauri && companyAddress && securityCode) {
-            await ensureSpaPacketSent(companyAddress, securityCode);
+        if (isTauri && companyAddress && currentSecurityCode) {
+            await ensureSpaPacketSent(companyAddress, currentSecurityCode);
         }
 
         const response = await request.post('/auth/login', {
             username: username.value,
             password: password.value,
-            security_code: securityCode  // 同时发送安全码
+            security_code: currentSecurityCode  // 同时发送安全码
         })
 
         console.log('[Login] 登录响应原始:', JSON.stringify(response));
@@ -282,14 +328,24 @@ const handleLogin = async () => {
         const refresh_token = rawData.refresh_token;
         const user = rawData.user;
 
-        // 如果勾选了"记住我"，保存用户名和密码到 localStorage
+        // 如果勾选了"记住我"，保存用户名和密码到密钥库
         if (rememberMe.value) {
-            localStorage.setItem('savedUsername', username.value);
-            localStorage.setItem('savedPassword', password.value);
+            if (isTauri) {
+                await saveUsername(username.value);
+                await savePassword(password.value);
+                localStorage.setItem('rememberMe', 'true');
+            } else {
+                localStorage.setItem('savedUsername', username.value);
+                localStorage.setItem('savedPassword', password.value);
+            }
             localStorage.setItem('rememberMe', 'true');
             console.log('[Login] ✓ 已保存用户名和密码');
         } else {
             // 如果没勾选，清除已保存的凭据
+            if (isTauri) {
+                await keyringDelete('username');
+                await keyringDelete('password');
+            }
             localStorage.removeItem('savedUsername');
             localStorage.removeItem('savedPassword');
             localStorage.removeItem('rememberMe');
@@ -301,17 +357,16 @@ const handleLogin = async () => {
             console.log('[Login] ✓ access_token 已保存，长度:', access_token.length);
 
             if (isTauri) {
-                // 保存到 Tauri store
+                // 保存到 Tauri store（但不存安全码）
                 try {
                     const deviceInfo = await invoke('get_device_info');
-                    const savedSecurityCode = localStorage.getItem('securityCode') || '';
                     await invoke('save_auth_info', {
                         token: access_token,
-                        securityCode: savedSecurityCode,
+                        securityCode: currentSecurityCode || '',
                         deviceId: deviceInfo?.layered?.hardware_hash || deviceInfo?.hardware_hash || '',
                         licenseId: '7f8e3d2a1c9b4e6f5a0d8c2b7e4f1a3c'
                     });
-                    console.log('[Login] ✓ 认证信息已保存到 Tauri store');
+                    console.log('[Login] ✓ 认证信息已保存到 Tauri store（安全码仅存密钥库）');
                 } catch (err) {
                     console.error('[Login] 保存认证信息到 Tauri store 失败:', err);
                 }

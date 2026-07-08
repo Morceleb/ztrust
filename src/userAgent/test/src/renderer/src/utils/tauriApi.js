@@ -21,6 +21,7 @@ export const getActivityStats = () => invoke('activity_get_stats');
 
 // 设备信息
 export const getDeviceInfo = () => invoke('get_device_info');
+export const getLoginSessionInfo = () => invoke('get_login_session_info');
 export const scanWifiEnvironment = () => invoke('scan_wifi_environment');
 export const getPairedBluetoothDevices = () => invoke('get_paired_bluetooth_devices');
 
@@ -92,6 +93,7 @@ export default {
     logoutWithReport,
     getActivityStats,
     getDeviceInfo,
+    getLoginSessionInfo,
     scanWifiEnvironment,
     getPairedBluetoothDevices,
     dbQuery,

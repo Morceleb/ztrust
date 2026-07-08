@@ -345,6 +345,202 @@ async fn get_device_info(state: State<'_, AppState>) -> Result<DeviceInfo, Strin
     Ok(info.clone())
 }
 
+/// 获取实时登录会话信息（IP、登录时间等）
+#[tauri::command]
+async fn get_login_session_info() -> Result<serde_json::Value, String> {
+    // 获取真实公网 IP
+    let ip = get_public_ip().await.unwrap_or_else(|_| "未知".to_string());
+    // 获取本地 IP
+    let local_ip = get_local_ip();
+    // 根据 IP 查询地理位置
+    let location = get_ip_location(&ip).await;
+    // 当前时间
+    let login_time = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    Ok(serde_json::json!({
+        "ip": ip,
+        "localIp": local_ip,
+        "location": location,
+        "loginTime": login_time,
+    }))
+}
+
+async fn get_public_ip() -> Result<String, String> {
+    use tauri_plugin_http::reqwest::Client;
+    let client = Client::new();
+    // 尝试主 endpoint（支持系统代理）
+    if let Ok(resp) = client.get("https://api.ipify.org?format=text").send().await {
+        if let Ok(text) = resp.text().await {
+            let ip = text.trim();
+            if !ip.is_empty() && ip.len() <= 45 {
+                return Ok(ip.to_string());
+            }
+        }
+    }
+    // fallback：备用服务
+    if let Ok(resp) = client.get("https://ifconfig.me/ip").send().await {
+        if let Ok(text) = resp.text().await {
+            let ip = text.trim();
+            if !ip.is_empty() && ip.len() <= 45 {
+                return Ok(ip.to_string());
+            }
+        }
+    }
+    Err("无法获取公网IP".to_string())
+}
+
+/// 拼音 → 中文 映射（常见省份 + 城市）
+fn pinyin_to_chinese(pinyin: &str) -> Option<&'static str> {
+    match pinyin.to_lowercase().as_str() {
+        // 省份
+        "beijing" => Some("北京"),
+        "tianjin" => Some("天津"),
+        "hebei" => Some("河北"),
+        "shanxi" => Some("山西"),
+        "neimenggu" | "inner mongolia" => Some("内蒙古"),
+        "liaoning" => Some("辽宁"),
+        "jilin" => Some("吉林"),
+        "heilongjiang" => Some("黑龙江"),
+        "shanghai" => Some("上海"),
+        "jiangsu" => Some("江苏"),
+        "zhejiang" => Some("浙江"),
+        "anhui" => Some("安徽"),
+        "fujian" => Some("福建"),
+        "jiangxi" => Some("江西"),
+        "shandong" => Some("山东"),
+        "henan" => Some("河南"),
+        "hubei" => Some("湖北"),
+        "hunan" => Some("湖南"),
+        "guangdong" => Some("广东"),
+        "guangxi" => Some("广西"),
+        "hainan" => Some("海南"),
+        "chongqing" => Some("重庆"),
+        "sichuan" => Some("四川"),
+        "guizhou" => Some("贵州"),
+        "yunnan" => Some("云南"),
+        "xizang" | "tibet" => Some("西藏"),
+        "shanxi" | "shaanxi" => Some("陕西"),
+        "gansu" => Some("甘肃"),
+        "qinghai" => Some("青海"),
+        "ningxia" => Some("宁夏"),
+        "xinjiang" => Some("新疆"),
+        "hong kong" | "hongkong" | "xianggang" => Some("香港"),
+        "taiwan" | "taiwan province" => Some("台湾"),
+        "macau" | "aomen" => Some("澳门"),
+        // 城市
+        "nanjing" => Some("南京"),
+        "wuxi" => Some("无锡"),
+        "suzhou" => Some("苏州"),
+        "hangzhou" => Some("杭州"),
+        "ningbo" => Some("宁波"),
+        "shenzhen" => Some("深圳"),
+        "guangzhou" => Some("广州"),
+        "chengdu" => Some("成都"),
+        "xian" | "xi'an" => Some("西安"),
+        "wuhan" => Some("武汉"),
+        "changsha" => Some("长沙"),
+        "zhengzhou" => Some("郑州"),
+        "nanchang" => Some("南昌"),
+        "hefei" => Some("合肥"),
+        "nanchong" => Some("南充"),
+        "nanchansi" => Some("南充"),
+        "jinan" => Some("济南"),
+        "qingdao" => Some("青岛"),
+        "taiyuan" => Some("太原"),
+        "shijiazhuang" => Some("石家庄"),
+        "tangshan" => Some("唐山"),
+        "dalian" => Some("大连"),
+        "shenyang" => Some("沈阳"),
+        "changchun" => Some("长春"),
+        "harbin" => Some("哈尔滨"),
+        "fuzhou" => Some("福州"),
+        "xiamen" => Some("厦门"),
+        "guiyang" => Some("贵阳"),
+        "kunming" => Some("昆明"),
+        "lanzhou" => Some("兰州"),
+        "xining" => Some("西宁"),
+        "yinchuan" => Some("银川"),
+        "urumqi" | "wulumuqi" => Some("乌鲁木齐"),
+        "lasa" | "lhasa" => Some("拉萨"),
+        "baoding" => Some("保定"),
+        "langfang" => Some("廊坊"),
+        "baotou" => Some("包头"),
+        "huhehaote" => Some("呼和浩特"),
+        "sipailie" | "sipailieer" => Some("四排篱笆"),
+        "nanshi" => Some("南市"),
+        _ => None,
+    }
+}
+
+fn cn_location_name(region: &str, city: &str) -> String {
+    let r = pinyin_to_chinese(region).unwrap_or(region);
+    let c = pinyin_to_chinese(city).unwrap_or(city);
+    format!("{}{}", r, c)
+}
+
+/// 通过公网 IP 查询地理位置
+async fn get_ip_location(ip: &str) -> String {
+    use tauri_plugin_http::reqwest::Client;
+    let client = Client::new();
+    let url = format!("http://ip-api.com/json/{}", ip);
+    match client.get(&url).send().await {
+        Ok(resp) => {
+            if let Ok(text) = resp.text().await {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
+                    let country = json.get("countryCode").and_then(|v| v.as_str()).unwrap_or("");
+                    let region = json.get("regionName").and_then(|v| v.as_str()).unwrap_or("");
+                    let city = json.get("city").and_then(|v| v.as_str()).unwrap_or("");
+                    if country == "CN" && !region.is_empty() && !city.is_empty() {
+                        return cn_location_name(region, city);
+                    }
+                    if !region.is_empty() && !city.is_empty() {
+                        let r = pinyin_to_chinese(region).unwrap_or(region);
+                        let c = pinyin_to_chinese(city).unwrap_or(city);
+                        return format!("{}-{}", r, c);
+                    }
+                    if !country.is_empty() {
+                        return country.to_string();
+                    }
+                }
+            }
+        }
+        Err(_) => {}
+    }
+    // fallback：尝试 ip.sb
+    match client.get("https://ip.sb/geo").send().await {
+        Ok(resp) => {
+            if let Ok(text) = resp.text().await {
+                let region = text.lines()
+                    .find(|l| l.starts_with("region:"))
+                    .and_then(|l| l.split(':').nth(1))
+                    .map(|v| v.trim().trim_matches('"'))
+                    .unwrap_or("");
+                let city = text.lines()
+                    .find(|l| l.starts_with("city:"))
+                    .and_then(|l| l.split(':').nth(1))
+                    .map(|v| v.trim().trim_matches('"'))
+                    .unwrap_or("");
+                if !region.is_empty() && !city.is_empty() {
+                    return cn_location_name(region, city);
+                }
+            }
+        }
+        Err(_) => {}
+    }
+    "未知".to_string()
+}
+
+fn get_local_ip() -> String {
+    // 通过连接外网 Socket 自动获取本机出口 IP
+    if let Ok(socket) = std::net::UdpSocket::bind("0.0.0.0:0") {
+        if socket.connect("8.8.8.8:53").is_ok() {
+            if let Ok(addr) = socket.local_addr() {
+                return addr.ip().to_string();
+            }
+        }
+    }
+    "127.0.0.1".to_string()
+}
+
 
 #[tauri::command]
 async fn scan_wifi_environment() -> Result<Vec<WifiNetwork>, String> {
@@ -522,6 +718,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_keyring::init())
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             // 窗口控制
@@ -539,6 +736,7 @@ pub fn run() {
             activity_mark_batch_uploaded,
             // 设备信息
             get_device_info,
+            get_login_session_info,
             scan_wifi_environment,
             get_paired_bluetooth_devices,
             // 数据库

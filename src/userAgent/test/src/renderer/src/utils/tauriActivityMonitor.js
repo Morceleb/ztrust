@@ -8,6 +8,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { exit } from '@tauri-apps/plugin-process';
+import { keyringDelete, KeyringKeys } from '@/utils/keyringService';
 
 class ActivityMonitorClient {
     constructor() {
@@ -253,27 +254,23 @@ class ActivityMonitorClient {
             console.error('[ActivityMonitorClient] 注销报告失败:', error);
         }
 
-        // 保留 companyAddress、securityCode 和记住的用户凭据，清除其他 localStorage 数据
-        const savedAddress = localStorage.getItem('companyAddress');
-        const savedSecurityCode = localStorage.getItem('securityCode');
-        const savedUsername = localStorage.getItem('savedUsername');
-        const savedPassword = localStorage.getItem('savedPassword');
-        const rememberMe = localStorage.getItem('rememberMe');
+        // 保留 companyAddress、rememberMe 与 keyring 中的安全码（供下次登录使用）
+        // 仅当用户未勾选"记住我"时，清除用户名/密码等敏感凭据
+        const wasRemembered = localStorage.getItem('rememberMe') === 'true';
+        if (!wasRemembered) {
+            // 未记住我：清除密钥库中的用户名和密码
+            await keyringDelete(KeyringKeys.USERNAME);
+            await keyringDelete(KeyringKeys.PASSWORD);
+        }
+        // 清除其他 localStorage 数据（但保留 companyAddress 和 rememberMe 供下次登录使用）
+        const savedCompanyAddress = localStorage.getItem('companyAddress');
+        const savedRememberMe = localStorage.getItem('rememberMe');
         localStorage.clear();
-        if (savedAddress) {
-            localStorage.setItem('companyAddress', savedAddress);
+        if (savedCompanyAddress) {
+            localStorage.setItem('companyAddress', savedCompanyAddress);
         }
-        if (savedSecurityCode) {
-            localStorage.setItem('securityCode', savedSecurityCode);
-        }
-        if (savedUsername) {
-            localStorage.setItem('savedUsername', savedUsername);
-        }
-        if (savedPassword) {
-            localStorage.setItem('savedPassword', savedPassword);
-        }
-        if (rememberMe) {
-            localStorage.setItem('rememberMe', rememberMe);
+        if (savedRememberMe) {
+            localStorage.setItem('rememberMe', savedRememberMe);
         }
     }
 

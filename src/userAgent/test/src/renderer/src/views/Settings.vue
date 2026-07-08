@@ -16,7 +16,10 @@
                 <label class="setting-label">接入地址:</label>
                 <div class="setting-value">
                     <span>{{ accessAddress }}</span>
-                    <button type="button" class="link-btn" @click="showAccessModal = true">切换</button>
+                    <button v-if="!isAuthenticated" type="button" class="link-btn switch-btn" @click="handleSwitchAddress"
+                        title="切换接入地址">
+                        切换
+                    </button>
                 </div>
             </div>
             <div class="setting-item">
@@ -67,14 +70,18 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import store from '@/store'
 
 const router = useRouter()
 const accessAddress = ref(localStorage.getItem('companyAddress') || 'https://vpn.seu.edu.cn')
 const autoStart = ref(true)
 const version = ref('V0.50.0')
 const versionTip = ref('当前已为最新版本')
+
+// 是否已登录：仅在未登录时显示"切换"按钮
+const isAuthenticated = computed(() => store.getters['auth/isAuthenticated'])
 
 const showAccessModal = ref(false)
 const accessAddressInput = ref('')
@@ -98,6 +105,12 @@ const handleConfirmAccess = () => {
 
 const handleBack = () => {
     router.push('/')
+}
+
+// 切换接入地址：跳转到登录页"接入地址/域名 + 安全码"页面
+// 不清空已保存的地址（仅让用户能修改/重输），让 Login 页能预填上原值
+const handleSwitchAddress = () => {
+    router.push({ path: '/login', query: { mode: 'company' } })
 }
 </script>
 
@@ -197,6 +210,22 @@ const handleBack = () => {
 
 .link-btn:hover {
     text-decoration: underline;
+}
+
+.switch-btn {
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    padding: 4px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.switch-btn:hover {
+    background: #2563eb;
+    text-decoration: none;
 }
 
 /* 接入设置弹窗 */

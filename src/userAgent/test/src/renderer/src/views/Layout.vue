@@ -46,6 +46,21 @@
                 </ul>
             </nav>
 
+            <!-- 未登录：显示空头像 + 未登录文字（独立 v-if 分支） -->
+            <div v-if="!isAuthenticated" class="user-profile-wrapper">
+                <div class="user-profile not-logged-profile">
+                    <div class="avatar-wrapper avatar-empty" title="未登录">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                        </svg>
+                    </div>
+                    <span class="not-logged-text">未登录</span>
+                </div>
+            </div>
+
             <!-- 当前登录用户信息（悬停显示下拉菜单，后端接入后替换 currentUser 数据源即可） -->
             <div v-if="isAuthenticated" class="user-profile-wrapper" @mouseenter="showUserMenu = true"
                 @mouseleave="showUserMenu = false">
@@ -351,8 +366,39 @@ const toggleWorkbench = () => {
     line-height: 1;
 }
 
+.avatar-empty {
+    background: rgba(255, 255, 255, 0.18);
+    color: rgba(248, 250, 252, 0.75);
+}
+
+.not-logged-text {
+    font-size: 12px;
+    color: rgba(248, 250, 252, 0.65);
+    line-height: 1;
+    user-select: none;
+}
+
 .avatar-initial {
     line-height: 1;
+}
+
+/* 未登录空头像 */
+.not-logged-profile {
+    cursor: default;
+    pointer-events: none;
+}
+
+.avatar-empty {
+    background: rgba(248, 250, 252, 0.15);
+    border: 1px dashed rgba(248, 250, 252, 0.4);
+    color: rgba(248, 250, 252, 0.85);
+}
+
+.not-logged-text {
+    font-size: 12px;
+    color: rgba(248, 250, 252, 0.7);
+    font-weight: 500;
+    margin-top: 2px;
 }
 
 .username {

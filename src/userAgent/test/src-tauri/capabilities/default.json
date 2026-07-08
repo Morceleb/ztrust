@@ -53,6 +53,7 @@
     "http:allow-fetch-read-body",
     "http:allow-fetch-send",
     "store:default",
+    "keyring:default",
     "os:default",
     "process:default"
   ]

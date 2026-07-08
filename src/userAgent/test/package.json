@@ -12,7 +12,7 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
-    "@tauri-apps/api": "2.10",
+    "@tauri-apps/api": "2.11.1",
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-fs": "^2.2.0",
     "@tauri-apps/plugin-http": "^2.2.0",
@@ -21,6 +21,7 @@
     "@tauri-apps/plugin-process": "^2.2.0",
     "@tauri-apps/plugin-shell": "^2.2.0",
     "@tauri-apps/plugin-store": "^2.2.0",
+    "tauri-plugin-keyring-api": "^0.1",
     "axios": "^1.7.2",
     "casdoor-js-sdk": "^0.16.0",
     "casdoor-vue-sdk": "^1.6.0",

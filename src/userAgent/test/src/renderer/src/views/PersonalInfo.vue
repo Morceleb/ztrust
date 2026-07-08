@@ -12,23 +12,12 @@
 
         <div class="content">
             <div class="top-row">
-                <div class="avatar-wrap" @click="triggerAvatarUpload">
+                <div class="avatar-wrap">
                     <div class="avatar">
                         <img v-if="user.avatar" :src="user.avatar" alt="avatar" class="avatar-img" />
                         <span v-else class="avatar-initial">{{ userInitial }}</span>
                     </div>
-                    <div class="avatar-hover">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2">
-                            <path
-                                d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                            <circle cx="12" cy="13" r="4" />
-                        </svg>
-                        <span>更换头像</span>
-                    </div>
                 </div>
-                <input type="file" ref="avatarInput" @change="handleAvatarChange" accept="image/*"
-                    style="display: none;" />
                 <div class="name-wrap">
                     <div class="name">{{ nickname || username }}</div>
 
@@ -42,18 +31,10 @@
                     <div class="col">
                         <div class="kv">
                             <div class="k">昵称</div>
-                            <div class="v">
-                                {{ nickname || '-' }}
-                                <button class="edit-icon" @click="openEditField('nickname')" title="编辑">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-                                    </svg>
-                                </button>
-                            </div>
+                            <div class="v">{{ nickname || '-' }}</div>
                         </div>
                         <div class="kv">
-                            <div class="k">用户名</div>
+                            <div class="k">账号</div>
                             <div class="v">{{ username || '-' }}</div>
                         </div>
                     </div>
@@ -61,73 +42,13 @@
                     <div class="col right">
                         <div class="kv">
                             <div class="k">电子邮箱</div>
-                            <div class="v">
-                                {{ user.email || '-' }}
-                                <button class="edit-icon" @click="openEditField('email')" title="编辑">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-                                    </svg>
-                                </button>
-                            </div>
+                            <div class="v">{{ user.email || '-' }}</div>
                         </div>
                         <div class="kv">
                             <div class="k">手机号码</div>
-                            <div class="v">
-                                {{ user.phone || '-' }}
-                                <button class="edit-icon" @click="openEditField('phone')" title="编辑">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-                                    </svg>
-                                </button>
-                            </div>
+                            <div class="v">{{ user.phone || '-' }}</div>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <div class="info-section">
-                <h3 class="section-title">账号信息</h3>
-                <div class="info-grid">
-                    <div class="col">
-                        <div class="kv">
-                            <div class="k">创建时间</div>
-                            <div class="v">{{ user.created_at || '-' }}</div>
-                        </div>
-                    </div>
-                    <div class="col right">
-                        <div class="kv">
-                            <div class="k">更新时间</div>
-                            <div class="v">{{ user.updated_at || '-' }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 单字段编辑弹窗 -->
-        <div class="modal-overlay" v-if="showEditModal" @click.self="closeEditModal">
-            <div class="modal">
-                <div class="modal-header">
-                    <h3>编辑{{ fieldLabel }}</h3>
-                    <button class="modal-close" @click="closeEditModal">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label>{{ fieldLabel }} <span v-if="editingField === 'nickname'"
-                                class="required">*</span></label>
-                        <input v-if="editingField === 'nickname'" type="text" v-model="editForm.value"
-                            placeholder="请输入昵称" />
-                        <input v-else-if="editingField === 'email'" type="email" v-model="editForm.value"
-                            placeholder="请输入电子邮箱" />
-                        <input v-else-if="editingField === 'phone'" type="tel" v-model="editForm.value"
-                            placeholder="请输入手机号码" />
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn" @click="closeEditModal">取消</button>
-                    <button class="btn btn-primary" @click="saveField">保存</button>
                 </div>
             </div>
         </div>
@@ -135,14 +56,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import store from '@/store'
 
 const router = useRouter()
-const showEditModal = ref(false)
-const editingField = ref('')
-const avatarInput = ref(null)
 
 // 从 store 读取用户信息
 const user = computed(() => store.getters['auth/user'] || {})
@@ -153,22 +71,9 @@ const nickname = computed(() => user.value?.displayName || user.value?.name || '
 // 用户名（name）
 const username = computed(() => user.value?.name || '')
 
-const editForm = ref({
-    value: ''
-})
-
 const userInitial = computed(() => {
     const name = nickname.value || username.value
     return name ? name.charAt(0).toUpperCase() : '?'
-})
-
-const fieldLabel = computed(() => {
-    const map = {
-        nickname: '昵称',
-        email: '电子邮箱',
-        phone: '手机号码'
-    }
-    return map[editingField.value] || ''
 })
 
 const statusText = (status) => {
@@ -182,99 +87,6 @@ const statusText = (status) => {
 
 const handleBack = () => {
     router.push('/')
-}
-
-// 头像上传
-const triggerAvatarUpload = () => {
-    avatarInput.value?.click()
-}
-
-const handleAvatarChange = (event) => {
-    const file = event.target.files[0]
-    if (!file) return
-
-    // 验证文件类型
-    if (!file.type.startsWith('image/')) {
-        alert('请选择图片文件')
-        return
-    }
-
-    // 验证文件大小 (最大 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-        alert('图片大小不能超过 2MB')
-        return
-    }
-
-    // 使用 FileReader 读取本地图片并转换为 Base64
-    const reader = new FileReader()
-    reader.onload = (e) => {
-        const base64Image = e.target.result
-        // 更新 store 中的头像
-        store.commit('auth/SET_USER', {
-            ...user.value,
-            avatar: base64Image
-        })
-        // TODO: 调用后端接口上传头像
-        console.log('上传头像:', base64Image.substring(0, 50) + '...')
-    }
-    reader.onerror = () => {
-        alert('读取图片失败，请重试')
-    }
-    reader.readAsDataURL(file)
-
-    // 清空 input，允许重复选择同一文件
-    event.target.value = ''
-}
-
-// 单字段编辑
-const openEditField = (field) => {
-    editingField.value = field
-    editForm.value = {
-        value: field === 'nickname' ? (user.value?.displayName || '') :
-            field === 'email' ? (user.value?.email || '') :
-                (user.value?.phone || '')
-    }
-    showEditModal.value = true
-}
-
-const closeEditModal = () => {
-    showEditModal.value = false
-    editingField.value = ''
-}
-
-const saveField = () => {
-    const value = editForm.value.value.trim()
-
-    if (editingField.value === 'nickname') {
-        if (!value) {
-            alert('昵称不能为空')
-            return
-        }
-        // 更新 store 中的 displayName
-        store.commit('auth/SET_USER', {
-            ...user.value,
-            displayName: value
-        })
-    } else if (editingField.value === 'email') {
-        store.commit('auth/SET_USER', {
-            ...user.value,
-            email: value
-        })
-    } else if (editingField.value === 'phone') {
-        // 简单验证手机号格式
-        if (value && !/^1[3-9]\d{9}$/.test(value)) {
-            alert('请输入正确的手机号码')
-            return
-        }
-        store.commit('auth/SET_USER', {
-            ...user.value,
-            phone: value
-        })
-    }
-
-    // TODO: 调用后端接口更新用户信息
-    console.log('保存字段:', editingField.value, '=', value)
-    closeEditModal()
 }
 </script>
 
@@ -342,7 +154,7 @@ const saveField = () => {
     width: 64px;
     height: 64px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #60a5fa;
     display: grid;
     place-items: center;
     color: #ffffff;

@@ -33,12 +33,7 @@ pub fn generate_device_info() -> Result<DeviceInfo, String> {
     }
     .to_string();
 
-    let os_version = match std::env::consts::OS {
-        "windows" => "Windows 10/11".to_string(),
-        "macos" => "macOS 13+".to_string(),
-        "linux" => "Linux".to_string(),
-        _ => "Unknown".to_string(),
-    };
+    let os_version = get_real_os_version();
 
     let hostname = get_hostname();
     let cpu = get_cpu_info();
@@ -130,6 +125,50 @@ fn get_memory_info() -> String {
 
 fn get_screen_info() -> String {
     "1920x1080".to_string()
+}
+
+fn get_real_os_version() -> String {
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        // 使用 powershell 获取 Windows 完整版本，输出为 UTF-8
+        let output = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; (Get-CimInstance Win32_OperatingSystem | Select-Object Caption,Version | Format-List | Out-String).Trim()",
+            ])
+            .output();
+        if let Ok(out) = output {
+            let s = String::from_utf8_lossy(&out.stdout);
+            let caption = s.lines()
+                .find(|l| l.trim_start().starts_with("Caption"))
+                .and_then(|l| l.split(':').nth(1))
+                .map(|v| v.trim())
+                .unwrap_or("");
+            let version = s.lines()
+                .find(|l| l.trim_start().starts_with("Version"))
+                .and_then(|l| l.split(':').nth(1))
+                .map(|v| v.trim())
+                .unwrap_or("");
+            if !caption.is_empty() {
+                return format!("{} ({})", caption, version);
+            }
+        }
+        "Windows".to_string()
+    }
+    #[cfg(target_os = "macos")]
+    {
+        "macOS".to_string()
+    }
+    #[cfg(target_os = "linux")]
+    {
+        "Linux".to_string()
+    }
+    #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+    {
+        "Unknown".to_string()
+    }
 }
 
 fn generate_hash(data: &str) -> String {

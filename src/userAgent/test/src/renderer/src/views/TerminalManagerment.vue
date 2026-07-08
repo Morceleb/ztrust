@@ -14,71 +14,81 @@
                 授信终端（授信后该设备下次登录可免二次认证，如需取消可在此移除）
             </div>
 
-            <div class="section">
-                <div class="section-title">授信终端</div>
-                <div class="terminal-list">
-                    <div v-for="t in trustedTerminals" :key="t.id" class="terminal-row">
-                        <div class="terminal-left">
-                            <div class="os-icon" :class="t.os">
-                                <span class="os-text">{{ t.osLabel }}</span>
-                            </div>
-                        </div>
+            <!-- 加载中 -->
+            <div v-if="loading" class="terminal-loading">
+                <span>加载中...</span>
+            </div>
 
-                        <div class="terminal-main">
-                            <div class="terminal-top">
-                                <div class="terminal-name">{{ t.name }}</div>
-                                <span v-if="t.isCurrent" class="tag current">当前设备</span>
+            <template v-else>
+                <div class="section">
+                    <div class="section-title">授信终端</div>
+                    <div class="terminal-list">
+                        <div v-for="t in trustedTerminals" :key="t.id" class="terminal-row">
+                            <div class="terminal-left">
+                                <div class="os-icon" :class="t.os">
+                                    <span class="os-text">{{ t.osLabel }}</span>
+                                </div>
                             </div>
-                            <div class="terminal-meta">
-                                <span class="meta-item">设备类型：{{ t.deviceType }}</span>
-                                <span class="dot">•</span>
-                                <span class="meta-item">{{ t.location }}（{{ t.ip }}）</span>
-                                <span class="dot">•</span>
-                                <span class="meta-item">{{ t.lastSeen }}</span>
-                            </div>
-                        </div>
 
-                        <div class="terminal-right">
-                            <button
-                                type="button"
-                                class="danger-outline"
-                                @click="openRemoveConfirm(t)"
-                            >
-                                移除授信终端
-                            </button>
+                            <div class="terminal-main">
+                                <div class="terminal-top">
+                                    <div class="terminal-name">{{ t.name }}</div>
+                                    <span v-if="t.isCurrent" class="tag current">当前设备</span>
+                                </div>
+                                <div class="terminal-meta">
+                                    <span class="meta-item">设备类型：{{ t.deviceType }}</span>
+                                    <span class="dot">•</span>
+                                    <span class="meta-item">{{ t.location }}（{{ t.ip }}）</span>
+                                    <span class="dot">•</span>
+                                    <span class="meta-item">{{ t.lastSeen }}</span>
+                                </div>
+                            </div>
+
+                            <div class="terminal-right">
+                                <button
+                                    type="button"
+                                    class="danger-outline"
+                                    @click="openRemoveConfirm(t)"
+                                >
+                                    移除授信终端
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="section">
-                <div class="section-title">临时终端（临时登录设备及历史记录）</div>
-                <div class="terminal-list">
-                    <div v-for="t in temporaryTerminals" :key="t.id" class="terminal-row">
-                        <div class="terminal-left">
-                            <div class="os-icon" :class="t.os">
-                                <span class="os-text">{{ t.osLabel }}</span>
+                <div class="section">
+                    <div class="section-title">临时终端（临时登录设备及历史记录）</div>
+                    <div class="terminal-list">
+                        <div v-for="t in temporaryTerminals" :key="t.id" class="terminal-row">
+                            <div class="terminal-left">
+                                <div class="os-icon" :class="t.os">
+                                    <span class="os-text">{{ t.osLabel }}</span>
+                                </div>
                             </div>
+
+                            <div class="terminal-main">
+                                <div class="terminal-top">
+                                    <div class="terminal-name">{{ t.name }}</div>
+                                    <span v-if="t.isCurrent" class="tag current">当前设备</span>
+                                </div>
+                                <div class="terminal-meta">
+                                    <span class="meta-item">设备类型：{{ t.deviceType }}</span>
+                                    <span class="dot">•</span>
+                                    <span class="meta-item">{{ t.location }}（{{ t.ip }}）</span>
+                                    <span class="dot">•</span>
+                                    <span class="meta-item">{{ t.lastSeen }}</span>
+                                </div>
+                            </div>
+
+                            <div class="terminal-right" />
                         </div>
-
-                        <div class="terminal-main">
-                            <div class="terminal-top">
-                                <div class="terminal-name">{{ t.name }}</div>
-                                <span v-if="t.isCurrent" class="tag current">当前设备</span>
-                            </div>
-                            <div class="terminal-meta">
-                                <span class="meta-item">设备类型：{{ t.deviceType }}</span>
-                                <span class="dot">•</span>
-                                <span class="meta-item">{{ t.location }}（{{ t.ip }}）</span>
-                                <span class="dot">•</span>
-                                <span class="meta-item">{{ t.lastSeen }}</span>
-                            </div>
+                        <div v-if="temporaryTerminals.length === 0" class="terminal-empty">
+                            暂无临时终端记录
                         </div>
-
-                        <div class="terminal-right" />
                     </div>
                 </div>
-            </div>
+            </template>
         </div>
 
         <!-- 移除授信终端确认弹窗（格式与注销登录一致） -->
@@ -113,38 +123,87 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { getDeviceInfo, getLoginSessionInfo } from '@/utils/tauriApi'
+import store from '@/store'
 
 const router = useRouter()
 
-const trustedTerminals = ref([
-    {
-        id: 'trusted-1',
-        os: 'windows',
-        osLabel: '⊞',
-        name: 'Windows 11',
-        isCurrent: true,
-        deviceType: 'Windows 10.0.26200',
-        location: '中国·南京市',
-        ip: '39.144.157.107',
-        lastSeen: '2026-03-06 13:08:47',
-    },
-])
+const deviceInfo = ref(null)
+const sessionInfo = ref(null)
+const loading = ref(true)
+const locationLoading = ref(true)
 
-const temporaryTerminals = ref([
-    {
-        id: 'tmp-1',
-        os: 'apple',
-        osLabel: '',
-        name: 'Mobile Safari',
-        isCurrent: false,
-        deviceType: 'iOS 18.7',
-        location: '中国·温州市',
-        ip: '60.163.50.104',
-        lastSeen: '2026-02-28 14:48:39',
-    },
-])
+onMounted(async () => {
+    try {
+        // 快速数据先加载
+        const dev = await getDeviceInfo()
+        deviceInfo.value = dev
+        sessionInfo.value = { ip: '查询中...', localIp: '-', location: '查询中...', loginTime: '-' }
+        loading.value = false
+        // 登录时间同步获取
+        const now = new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(/\//g, '-')
+        if (sessionInfo.value) sessionInfo.value.loginTime = now
+        // 单独异步查询会话信息（含 IP + 位置）
+        getLoginSessionInfo().then(sess => {
+            if (sess) {
+                sessionInfo.value = sess
+            }
+        }).catch(() => {
+            if (sessionInfo.value) {
+                sessionInfo.value.ip = '获取失败'
+                sessionInfo.value.location = '未知'
+            }
+        }).finally(() => {
+            locationLoading.value = false
+        })
+    } catch (e) {
+        console.error('获取设备信息失败:', e)
+        loading.value = false
+    }
+})
+
+// 从 store 获取用户信息
+const user = computed(() => store.getters['auth/user'] || {})
+const lastLoginInfo = computed(() => user.value?.lastLoginInfo || {})
+
+// 根据 platform 返回 OS 类型
+const getOsClass = (platform) => {
+    const p = (platform || '').toLowerCase()
+    if (p.includes('windows')) return 'windows'
+    if (p.includes('mac') || p.includes('apple')) return 'apple'
+    return 'windows'
+}
+
+const getOsLabel = (platform) => {
+    const p = (platform || '').toLowerCase()
+    if (p.includes('mac') || p.includes('apple')) return ''
+    return '⊞'
+}
+
+// 授信终端 = 当前设备（从 getDeviceInfo + getLoginSessionInfo 获取真实信息）
+const trustedTerminals = computed(() => {
+    if (!deviceInfo.value) return []
+    const info = deviceInfo.value
+    const sess = sessionInfo.value || {}
+    return [
+        {
+            id: 'current-trusted',
+            os: getOsClass(info.platform),
+            osLabel: getOsLabel(info.platform),
+            name: info.os_version || 'Windows',
+            isCurrent: true,
+            deviceType: info.os_version || '',
+            location: sess.location || '-',
+            ip: sess.ip || '-',
+            lastSeen: sess.loginTime || '-',
+        },
+    ]
+})
+
+// 临时终端暂无后端数据，预留结构
+const temporaryTerminals = ref([])
 
 const showRemoveModal = ref(false)
 const terminalToRemove = ref(null)
@@ -225,6 +284,20 @@ const confirmRemoveTrusted = () => {
     font-size: 12px;
     color: rgba(15, 23, 42, 0.55);
     margin: 2px 0 14px;
+}
+
+.terminal-loading {
+    text-align: center;
+    padding: 32px 0;
+    font-size: 14px;
+    color: rgba(15, 23, 42, 0.45);
+}
+
+.terminal-empty {
+    text-align: center;
+    padding: 24px 0;
+    font-size: 13px;
+    color: rgba(15, 23, 42, 0.40);
 }
 
 .section + .section {
