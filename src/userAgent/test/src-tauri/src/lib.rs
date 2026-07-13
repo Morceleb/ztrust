@@ -128,12 +128,16 @@ async fn open_resource_window(
     let security_code = store.get("securityCode")
         .and_then(|v| v.as_str().map(|s| s.to_string()))
         .unwrap_or_default();
-    let device_id = store.get("deviceFingerprint")
+    // 读到的历史 store 数据可能仍含 UUID 连字符或短长度（16 字节），
+    // 这里规范化并升级到 32 字节 hex（防御性，确保 SPA 能拿到正确长度）
+    let device_id_raw = store.get("deviceFingerprint")
         .and_then(|v| v.as_str().map(|s| s.to_string()))
         .unwrap_or_default();
-    let license_id = store.get("licenseId")
+    let device_id = upgrade_to_64_hex(&normalize_hex_value(&device_id_raw));
+    let license_id_raw = store.get("licenseId")
         .and_then(|v| v.as_str().map(|s| s.to_string()))
         .unwrap_or_default();
+    let license_id = normalize_hex_value(&license_id_raw);
 
     // 发送 SPA 报文（资源访问前发送）
     const SPA_PORT: u16 = 41234;
@@ -633,17 +637,64 @@ async fn save_access_token(app: AppHandle, token: String) -> Result<(), String> 
 }
 
 #[tauri::command]
+async fn get_device_id(app: AppHandle) -> Result<String, String> {
+    let app_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
+    std::fs::create_dir_all(&app_dir).ok();
+    Ok(device::get_device_id(&app_dir))
+}
+
+#[tauri::command]
+async fn get_device_meta(app: AppHandle) -> Result<device::DeviceMeta, String> {
+    let app_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
+    std::fs::create_dir_all(&app_dir).ok();
+    Ok(device::get_device_meta(&app_dir))
+}
+
+/// 规范化 hex 字符串：去除空白、连字符、下划线、冒号等常见分隔符
+fn normalize_hex_value(s: &str) -> String {
+    s.chars()
+        .filter(|c| !c.is_whitespace() && *c != '-' && *c != '_' && *c != ':')
+        .collect()
+}
+
+/// 把任意长度的 hex 升级到 64 字符（32 字节）
+/// - 已经是 64 字符的，返回小写
+/// - 32 字符（UUID 去连字符）通过 SHA256 扩展
+/// - 其他长度通过 SHA256 派生一个稳定的 32 字节
+fn upgrade_to_64_hex(s: &str) -> String {
+    if s.len() == 64 {
+        return s.to_lowercase();
+    }
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(s.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
+#[tauri::command]
 async fn save_auth_info(
     app: AppHandle,
     token: String,
     security_code: String,
     device_id: String,
     license_id: String,
+    device_token: Option<String>,
 ) -> Result<(), String> {
     use tauri_plugin_store::StoreExt;
 
-    let store = app.store("settings.json")
+    let store = app
+        .store("settings.json")
         .map_err(|e| format!("读取 store 失败: {}", e))?;
+
+    // 存储时即规范化 hex，并升级 deviceId 到 64 字符 hex（32 字节）
+    let device_id = upgrade_to_64_hex(&normalize_hex_value(&device_id));
+    let license_id = normalize_hex_value(&license_id);
 
     store.set("auth_token", serde_json::json!(token.clone()));
     store.set("access_token", serde_json::json!(token));
@@ -651,8 +702,18 @@ async fn save_auth_info(
     store.set("deviceFingerprint", serde_json::json!(device_id));
     store.set("licenseId", serde_json::json!(license_id));
 
-    info!("[Auth] 完整认证信息已保存到 Tauri store: securityCode长度={}, deviceId长度={}, licenseId长度={}",
-          security_code.len(), device_id.len(), license_id.len());
+    if let Some(dt) = &device_token {
+        store.set("deviceToken", serde_json::json!(dt));
+        info!("[Auth] deviceToken 已保存到 Tauri store");
+    }
+
+    info!(
+        "[Auth] 完整认证信息已保存: securityCode长度={}, deviceId长度={}, licenseId长度={}, deviceToken存在={}",
+        security_code.len(),
+        device_id.len(),
+        license_id.len(),
+        device_token.is_some()
+    );
 
     Ok(())
 }
@@ -751,6 +812,9 @@ pub fn run() {
             save_auth_info,
             check_permission,
             check_auth,
+            // 设备身份
+            get_device_id,
+            get_device_meta,
             // SPA
             send_spa_packet,
         ])

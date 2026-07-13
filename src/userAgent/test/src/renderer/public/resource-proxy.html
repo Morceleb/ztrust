@@ -30,7 +30,7 @@
             border: 1px solid #e5e7eb;
             border-radius: 16px;
             padding: 28px 24px;
-            max-width: 420px;
+            max-width: 560px;
             width: 100%;
             box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
             text-align: center;
@@ -68,23 +68,46 @@
         }
 
         .target-url {
-            font-size: 13px;
-            color: #666;
+            font-size: 12px;
+            color: #475569;
             word-break: break-all;
-            background: #f5f5f5;
+            background: #f1f5f9;
             padding: 8px 12px;
             border-radius: 6px;
-            margin-top: 8px;
-            font-family: monospace;
+            margin-top: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            text-align: left;
+            white-space: pre-wrap;
         }
 
+        .error {
+            font-size: 13px;
+            color: #b91c1c;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin: 12px 0 0;
+            text-align: left;
+            white-space: pre-wrap;
+            word-break: break-word;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
 
         .actions {
             margin-top: 18px;
-            display: flex;
+            display: none;
             gap: 10px;
             justify-content: center;
             flex-wrap: wrap;
+        }
+
+        .actions.show {
+            display: flex;
         }
 
         button {
@@ -130,6 +153,11 @@
 <body>
     <div class="container">
         <div class="card">
+            <h1 class="title" id="title">资源加载中</h1>
+            <p class="status" id="status">正在准备...</p>
+            <div class="progress" id="progress"></div>
+            <div class="target-url" id="targetUrlDisplay"></div>
+            <div class="error" id="error"></div>
             <div class="actions" id="actions">
                 <button id="retryBtn">手动请求资源</button>
                 <button id="openOriginBtn" class="secondary">直接打开</button>
@@ -139,107 +167,183 @@
 
     <script>
         window.addEventListener('DOMContentLoaded', () => {
+            const titleEl = document.getElementById('title');
+            const statusEl = document.getElementById('status');
+            const progressEl = document.getElementById('progress');
+            const errorEl = document.getElementById('error');
+            const targetEl = document.getElementById('targetUrlDisplay');
+            const actionsEl = document.getElementById('actions');
+            const retryBtn = document.getElementById('retryBtn');
+            const openOriginBtn = document.getElementById('openOriginBtn');
+
+            function setError(message) {
+                errorEl.textContent = message;
+                errorEl.classList.add('show');
+                if (statusEl) statusEl.textContent = '资源加载失败';
+                if (progressEl) progressEl.style.display = 'none';
+                if (actionsEl) actionsEl.classList.add('show');
+                console.error('[Proxy] error:', message);
+            }
+
             try {
                 const params = new URLSearchParams(window.location.search);
-                const baseUrl = params.get('baseUrl');
-                const resourceId = params.get('resourceId');
-                const authToken = params.get('authToken');
-                const statusEl = document.getElementById('status');
-                const progressEl = document.getElementById('progress');
-                const errorEl = document.getElementById('error');
-                const actionsEl = document.getElementById('actions');
-                const retryBtn = document.getElementById('retryBtn');
-                const openOriginBtn = document.getElementById('openOriginBtn');
+                const baseUrl = params.get('baseUrl') || '';
+                const resourceId = params.get('resourceId') || '';
+                const authToken = params.get('authToken') || '';
 
                 console.log('[Proxy] baseUrl:', baseUrl);
                 console.log('[Proxy] resourceId:', resourceId);
                 console.log('[Proxy] authToken present:', !!authToken);
 
-                if (!baseUrl || !resourceId) {
-                    document.getElementById('status').textContent = '缺少参数';
-                    document.getElementById('error').textContent = 'URL 中缺少 baseUrl 或 resourceId';
+                // 规范化 baseUrl：去掉尾部斜杠，去掉可能存在的 /api 前缀
+                function normalizeBase(raw) {
+                    if (!raw) return '';
+                    let s = String(raw).trim();
+                    // 去掉末尾斜杠
+                    while (s.endsWith('/')) s = s.slice(0, -1);
+                    // 如果带 /api 后缀，去掉以便拼接目标接口
+                    if (s.endsWith('/api')) s = s.slice(0, -4);
+                    return s;
                 }
 
-                const targetUrl = baseUrl && resourceId ? `${baseUrl}/auth/access/${resourceId}` : '';
-                document.getElementById('targetUrlDisplay').textContent = targetUrl;
+                const cleanBase = normalizeBase(baseUrl);
 
-                const buildFetchOptions = () => {
+                function buildTargetUrl() {
+                    if (!cleanBase || !resourceId) return '';
+                    return cleanBase + '/auth/access/' + encodeURIComponent(resourceId);
+                }
+
+                function openOrigin() {
+                    if (!cleanBase) return;
+                    try {
+                        window.location.replace(cleanBase);
+                    } catch (e) {
+                        setError('打开原始地址失败: ' + (e && e.message));
+                    }
+                }
+
+                // 初始显示
+                if (titleEl && resourceId) titleEl.textContent = '资源加载中 (' + resourceId + ')';
+                if (targetEl) targetEl.textContent = buildTargetUrl() || '(参数缺失)';
+
+                if (!baseUrl || !resourceId) {
+                    setError('URL 中缺少 baseUrl 或 resourceId 参数');
+                    return;
+                }
+
+                if (openOriginBtn) openOriginBtn.addEventListener('click', openOrigin);
+                if (retryBtn) {
+                    retryBtn.addEventListener('click', () => {
+                        errorEl.classList.remove('show');
+                        errorEl.textContent = '';
+                        progressEl.style.display = 'block';
+                        actionsEl.classList.remove('show');
+                        if (statusEl) statusEl.textContent = '正在重试...';
+                        loadResource();
+                    });
+                }
+
+                function buildFetchOptions() {
                     const headers = new Headers();
                     headers.set('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8');
                     headers.set('Accept-Language', 'zh-CN,zh;q=0.9,en;q=0.8');
                     if (authToken) {
-                        headers.set('Authorization', `Bearer ${authToken}`);
+                        headers.set('Authorization', 'Bearer ' + authToken);
                     }
                     return { headers, redirect: 'manual' };
-                };
+                }
 
-                const openOrigin = () => {
-                    if (!baseUrl) return;
-                    window.location.replace(baseUrl);
-                };
-
-                const setError = (message) => {
-                    errorEl.textContent = message;
-                    statusEl.textContent = '资源加载失败';
-                    progressEl.style.display = 'none';
-                    actionsEl.style.display = 'flex';
-                };
-
-                retryBtn.addEventListener('click', () => {
-                    errorEl.textContent = '';
-                    progressEl.style.display = 'block';
-                    actionsEl.style.display = 'none';
-                    loadResource();
-                });
-
-                openOriginBtn.addEventListener('click', openOrigin);
-
-                const loadResource = async () => {
-                    if (!baseUrl || !resourceId) {
+                async function loadResource() {
+                    const targetUrl = buildTargetUrl();
+                    if (!targetUrl) {
                         setError('缺少目标地址参数');
                         return;
                     }
 
-                    const targetUrl = `${baseUrl}/auth/access/${resourceId}`;
                     console.log('[Proxy] 目标地址:', targetUrl);
 
-                    const req = new Request(targetUrl, buildFetchOptions());
-                    console.log('[Proxy] 请求头:', Object.fromEntries(req.headers.entries()));
-
                     try {
-                        statusEl.textContent = '正在请求目标资源...';
+                        if (statusEl) statusEl.textContent = '正在请求目标资源...';
+                        const req = new Request(targetUrl, buildFetchOptions());
+                        console.log('[Proxy] 请求头:', Object.fromEntries(req.headers.entries()));
+
                         const response = await fetch(req);
-                        statusEl.textContent = `收到响应: ${response.status}`;
+                        if (statusEl) statusEl.textContent = '收到响应: ' + response.status;
 
-                        if (response.status === 401 || response.status === 403) {
-                            setError(`访问被拒绝（${response.status}），请重新登录后重试`);
+                        if (response.status === 401) {
+                            setError('访问被拒绝 (401)，请重新登录后再试');
                             return;
                         }
-
-                        if (!response.ok) {
-                            setError(`请求失败（${response.status} ${response.statusText}）`);
+                        if (response.status === 403) {
+                            setError('访问被拒绝 (403)，请联系管理员确认权限');
                             return;
                         }
-
-                        const blob = await response.blob();
-
-                        if (blob.type && !blob.type.includes('text') && !blob.type.includes('html') && !blob.type.includes('json') && !blob.type.includes('xml')) {
+                        // 跨源重定向(opaque-redirect)处理
+                        if (response.type === 'opaqueredirect') {
                             openOrigin();
                             return;
                         }
 
-                        statusEl.textContent = '正在渲染页面...';
-                        const objectUrl = URL.createObjectURL(blob);
-                        window.location.replace(objectUrl);
+                        if (!response.ok) {
+                            setError('请求失败 (' + response.status + ' ' + response.statusText + ')');
+                            return;
+                        }
+
+                        const contentType = response.headers.get('content-type') || '';
+                        // 二进制资源直接交给浏览器
+                        if (
+                            contentType &&
+                            !contentType.includes('text') &&
+                            !contentType.includes('html') &&
+                            !contentType.includes('json') &&
+                            !contentType.includes('xml')
+                        ) {
+                            openOrigin();
+                            return;
+                        }
+
+                        // 把拿到的 HTML 注入当前页面，这样相对路径（CSS/JS/图片）
+                        // 都会以原始 baseUrl 为基准解析，不会出现 404。
+                        const html = await response.text();
+
+                        // 注入 <base> 标签兜底，防止资源 HTML 没有 <base href> 时相对路径乱解析
+                        let normalizedHtml = html;
+                        const baseTagRegex = /<base\s+[^>]*href\s*=\s*["'][^"']*["'][^>]*>/i;
+                        if (!baseTagRegex.test(normalizedHtml) && cleanBase) {
+                            const safeHref = cleanBase.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+                            const headMatch = normalizedHtml.match(/<head[^>]*>/i);
+                            const baseTag = `<base href="${safeHref}/">`;
+                            if (headMatch) {
+                                normalizedHtml = normalizedHtml.replace(
+                                    headMatch[0],
+                                    headMatch[0] + baseTag
+                                );
+                            } else {
+                                normalizedHtml = `<head>${baseTag}</head>` + normalizedHtml;
+                            }
+                        }
+
+                        // 用 document.open() + document.write() 在同一窗口直接渲染
+                        // 这样 base URL 仍为 resource-proxy.html 的 WebView URL，
+                        // 但 <base href> 会强制所有相对路径以原始服务器为基准解析。
+                        if (statusEl) statusEl.textContent = '正在渲染页面...';
+                        document.open();
+                        document.write(normalizedHtml);
+                        document.close();
+                        return;
                     } catch (error) {
-                        setError(error?.message || '未知错误');
+                        const msg = (error && (error.message || error.toString())) || '未知错误';
+                        setError('网络请求异常: ' + msg + '\n目标: ' + targetUrl);
                     }
-                };
+                }
 
                 loadResource();
             } catch (e) {
+                const msg = e && e.message ? e.message : String(e);
                 console.error('[Proxy] 初始化错误:', e);
-                document.body.innerHTML = '<pre style="padding:20px">加载错误: ' + e.message + '</pre>';
+                try { setError('初始化失败: ' + msg); } catch (_) {
+                    document.body.innerHTML = '<pre style="padding:20px">加载错误: ' + msg + '</pre>';
+                }
             }
         });
     </script>

@@ -30,6 +30,7 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 tokio = { version = "1", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
+hostname = "0.4"
 log = "0.4"
 env_logger = "0.11"
 sha2 = "0.10"

@@ -79,7 +79,7 @@ impl Database {
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS device_info (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                device_id TEXT UNIQUE NOT NULL,
+                device_id TEXT,
                 fingerprint TEXT NOT NULL,
                 user_id TEXT,
                 last_login TEXT,

@@ -24,6 +24,7 @@ import {
     keyringDelete,
     clearLocalStorageCredentials,
 } from '@/utils/keyringService'
+import { getDeviceId, getDeviceMeta, getDeviceToken, saveDeviceToken } from '@/utils/deviceService'
 
 const router = useRouter()
 const route = useRoute()
@@ -55,6 +56,8 @@ const isCompanyLoading = ref(false)
 // 安全码相关
 const securityCode = ref('')
 const securityCodeError = ref('')
+const needSecurityCode = ref(false)   // 是否降级要求输入安全码
+const trustedDeviceHint = ref('')     // 设备可信提示
 
 // 登录表单相关
 const username = ref('')
@@ -276,41 +279,90 @@ const validate = () => {
     return valid
 }
 
-// 处理登录
-const handleLogin = async () => {
-    if (!validate()) return
-
-    isLoading.value = true
-    loginError.value = ''
-
-    // 检测环境
+/**
+ * 发送 SPA 报文（每次登录前都发，幂等）
+ */
+const sendLoginSpa = async () => {
     const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
-    console.log('[Login] 开始登录，环境:', isTauri ? 'Tauri' : 'Browser');
-    console.log('[Login] 请求配置:', {
-        baseURL: localStorage.getItem('companyAddress') || import.meta.env.VITE_API_BASE_URL,
-        username: username.value
+    if (!isTauri) return;
+    const rawAddress = localStorage.getItem('companyAddress');
+    if (!rawAddress) return;
+    try {
+        const securityCode = await getSecurityCode();
+        if (!securityCode) return;
+        await ensureSpaPacketSent(rawAddress, securityCode);
+    } catch (e) {
+        console.warn('[Login] SPA 报文发送失败:', e);
+    }
+};
+
+/**
+ * 乐观登录第一步：静默发登录请求（不带安全码）
+ * 成功 → 直接进主页
+ * 1007/1005 → 需要安全码，降级
+ */
+const tryLoginSilent = async () => {
+    const deviceId = await getDeviceId();
+    const deviceToken = getDeviceToken();
+
+    return request.post('/auth/login', {
+        username: username.value,
+        password: password.value,
+        device_id: deviceId,
+        device_token: deviceToken || undefined,
     });
+};
+
+/**
+ * 降级登录：带安全码重发
+ */
+const tryLoginWithSecurityCode = async (securityCodeVal) => {
+    const deviceId = await getDeviceId();
+
+    return request.post('/auth/login', {
+        username: username.value,
+        password: password.value,
+        security_code: securityCodeVal,
+        device_id: deviceId,
+    });
+};
+
+/**
+ * 处理登录（乐观 + 按需降级安全码）
+ */
+const handleLogin = async () => {
+    if (!validate()) return;
+
+    isLoading.value = true;
+    loginError.value = '';
+    needSecurityCode.value = false;
+    trustedDeviceHint.value = '';
+
+    // 每次登录前都发 SPA 报文打开目标端口
+    await sendLoginSpa();
+
+    const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
 
     try {
-        // 获取安全码（Tauri 环境从密钥库读取）
-        let currentSecurityCode;
-        if (isTauri) {
-            currentSecurityCode = await getSecurityCode();
-        } else {
-            currentSecurityCode = localStorage.getItem('securityCode');
-        }
-        const companyAddress = localStorage.getItem('companyAddress');
+        // ---- 第一步：静默尝试（不带安全码）----
+        let response;
+        let deviceTrusted = false;
 
-        // 在 Tauri 环境下登录前先发送 SPA 报文以打开目标端口（兜底保障）
-        if (isTauri && companyAddress && currentSecurityCode) {
-            await ensureSpaPacketSent(companyAddress, currentSecurityCode);
+        try {
+            response = await tryLoginSilent();
+            // 没抛异常说明成功了（可能是免安全码直接通过）
+            const rawData = response.data?.data || response.data || {};
+            deviceTrusted = rawData.device_trusted === true;
+        } catch (err) {
+            // 降级：安全码缺失或不可信
+            if (err.response?.status === 400 && (err.response?.data?.code === '1007' || err.response?.data?.code === '1005')) {
+                needSecurityCode.value = true;
+                isLoading.value = false;
+                return;
+            }
+            // 其他错误继续抛出去
+            throw err;
         }
-
-        const response = await request.post('/auth/login', {
-            username: username.value,
-            password: password.value,
-            security_code: currentSecurityCode  // 同时发送安全码
-        })
 
         console.log('[Login] 登录响应原始:', JSON.stringify(response));
         console.log('[Login] 响应结构分析:', {
@@ -322,13 +374,24 @@ const handleLogin = async () => {
         });
 
         // 提取 token 和 user
-        // 后端返回: { code, message, data: { access_token, refresh_token, expires_in, token_type, user } }
         const rawData = response.data?.data || response.data || {};
         const access_token = rawData.access_token || rawData.token;
         const refresh_token = rawData.refresh_token;
         const user = rawData.user;
+        const newDeviceToken = rawData.device_token;   // 仅新签发时有
 
-        // 如果勾选了"记住我"，保存用户名和密码到密钥库
+        // 保存 device_token（若有新签发）
+        if (newDeviceToken) {
+            saveDeviceToken(newDeviceToken);
+            console.log('[Login] ✓ device_token 已保存（首次安全码通过）');
+        }
+
+        // 若此次可信设备登录成功，提示用户
+        if (deviceTrusted) {
+            trustedDeviceHint.value = '已记住此设备，下次无需安全码';
+        }
+
+        // 若勾选记住我，保存用户名和密码
         if (rememberMe.value) {
             if (isTauri) {
                 await saveUsername(username.value);
@@ -341,7 +404,6 @@ const handleLogin = async () => {
             localStorage.setItem('rememberMe', 'true');
             console.log('[Login] ✓ 已保存用户名和密码');
         } else {
-            // 如果没勾选，清除已保存的凭据
             if (isTauri) {
                 await keyringDelete('username');
                 await keyringDelete('password');
@@ -353,20 +415,26 @@ const handleLogin = async () => {
 
         // 保存认证信息到 sessionStorage
         if (access_token) {
-            sessionStorage.setItem('auth_token', access_token)
+            sessionStorage.setItem('auth_token', access_token);
             console.log('[Login] ✓ access_token 已保存，长度:', access_token.length);
 
             if (isTauri) {
-                // 保存到 Tauri store（但不存安全码）
                 try {
-                    const deviceInfo = await invoke('get_device_info');
+                    const deviceId = await getDeviceId();
+                    const deviceMeta = await getDeviceMeta();
+                    const deviceToken = getDeviceToken();
+
+                    // Tauri 环境：安全码从密钥库读（仅第一步成功后才存）
+                    const storedSecurityCode = await getSecurityCode();
+
                     await invoke('save_auth_info', {
                         token: access_token,
-                        securityCode: currentSecurityCode || '',
-                        deviceId: deviceInfo?.layered?.hardware_hash || deviceInfo?.hardware_hash || '',
-                        licenseId: '7f8e3d2a1c9b4e6f5a0d8c2b7e4f1a3c'
+                        securityCode: storedSecurityCode || '',
+                        deviceId: deviceId,
+                        licenseId: '7f8e3d2a1c9b4e6f5a0d8c2b7e4f1a3c',
+                        deviceToken: deviceToken || null,
                     });
-                    console.log('[Login] ✓ 认证信息已保存到 Tauri store（安全码仅存密钥库）');
+                    console.log('[Login] ✓ 认证信息已保存到 Tauri store');
                 } catch (err) {
                     console.error('[Login] 保存认证信息到 Tauri store 失败:', err);
                 }
@@ -374,38 +442,36 @@ const handleLogin = async () => {
         } else {
             console.error('[Login] ✗ access_token 为空，无法保存！响应结构:', rawData);
         }
+
         if (refresh_token) {
-            sessionStorage.setItem('refresh_token', refresh_token)
+            sessionStorage.setItem('refresh_token', refresh_token);
             console.log('[Login] ✓ refresh_token 已保存');
         }
         if (user) {
-            sessionStorage.setItem('user_info', JSON.stringify(user))
+            sessionStorage.setItem('user_info', JSON.stringify(user));
             console.log('[Login] ✓ 用户信息已保存:', user);
         }
 
         // 登录成功
-        await store.dispatch('auth/loginSuccess', user)
-        // 用 replace 而非 push，避免后退按钮返回到登录页
-        router.replace('/index')
+        await store.dispatch('auth/loginSuccess', user);
+        router.replace('/index');
     } catch (err) {
         console.error('[Login] 登录失败:', {
             message: err.message,
             code: err.code,
             status: err.response?.status,
             responseData: err.response?.data,
-            isTauri: isTauri
+            isTauri: isTauri,
         });
 
-        // 英文消息转中文映射
+        // 错误映射（同原有逻辑）
         const messageMap = {
-            // 用户不存在
             'user does not exist': '用户不存在',
             'user not found': '用户不存在',
             'user doesn\'t exist': '用户不存在',
             'user not exist': '用户不存在',
             'no such user': '用户不存在',
             'invalid user': '用户不存在',
-            // 用户名或密码错误
             'invalid username or password': '用户名或密码错误',
             'invalid credentials': '用户名或密码错误',
             'invalid username or password: password or code is incorrect': '用户名或密码错误',
@@ -414,62 +480,50 @@ const handleLogin = async () => {
             'wrong username or password': '用户名或密码错误',
             'password is incorrect': '密码错误',
             'password incorrect': '密码错误',
-            // 账户状态
             'account is disabled': '账户已被禁用',
             'account disabled': '账户已被禁用',
             'account locked': '账户已被锁定',
             'account is locked': '账户已被锁定',
             'account is inactive': '账户已停用',
-            // 登录限制
             'too many login attempts': '登录尝试次数过多',
             'too many failed attempts': '登录失败次数过多',
             'rate limit exceeded': '请求过于频繁，请稍后再试',
-            // 授权相关
             'unauthorized': '未授权，请重新登录',
             'access denied': '访问被拒绝',
             'forbidden': '禁止访问',
             'permission denied': '权限不足',
-            // Token 相关
             'token is invalid': '登录已过期，请重新登录',
             'token expired': '登录已过期，请重新登录',
             'invalid token': '登录已过期，请重新登录',
             'expired token': '登录已过期，请重新登录',
             'refresh token': '令牌刷新失败',
-            // 验证码相关
             'invalid code': '验证码错误',
             'code is incorrect': '验证码错误',
             'incorrect code': '验证码错误',
             'verification code': '验证码错误',
-            // 通用错误
             'internal server error': '服务器内部错误，请稍后再试',
             'service unavailable': '服务暂时不可用',
             'bad request': '请求参数错误',
-            'validation failed': '数据验证失败'
+            'validation failed': '数据验证失败',
         };
 
-        // 统一转换为小写进行匹配
         const getChineseMessage = (msg) => {
             if (!msg) return null;
             const lowerMsg = msg.toLowerCase();
             for (const [key, value] of Object.entries(messageMap)) {
                 if (lowerMsg.includes(key.toLowerCase())) {
-                    // 提取剩余尝试次数
                     const match = msg.match(/(\d+)\s*remaining/i);
-                    if (match) {
-                        return `${value}，剩余 ${match[1]} 次尝试机会`;
-                    }
+                    if (match) return `${value}，剩余 ${match[1]} 次尝试机会`;
                     return value;
                 }
             }
-            return msg; // 未匹配到则返回原始消息
+            return msg;
         };
 
-        // 根据 HTTP 状态码返回中文错误提示
         const status = err.response?.status;
         const backendMessage = err.response?.data?.message;
 
         if (!err.response) {
-            // 网络错误 - 通常是 "empty response"
             loginError.value = '网络请求失败，请检查公司地址是否正确配置';
         } else if (status === 401) {
             loginError.value = getChineseMessage(backendMessage) || '用户名或密码错误';
@@ -483,9 +537,137 @@ const handleLogin = async () => {
             loginError.value = getChineseMessage(backendMessage) || '登录失败，请检查用户名和密码';
         }
     } finally {
-        isLoading.value = false
+        isLoading.value = false;
     }
-}
+};
+
+/**
+ * 处理安全码提交（降级流程第二步）
+ */
+const handleSecurityCodeSubmit = async () => {
+    if (!securityCode.value.trim()) {
+        securityCodeError.value = '请输入安全码';
+        return;
+    }
+    securityCodeError.value = '';
+    isLoading.value = true;
+    loginError.value = '';
+    needSecurityCode.value = false;
+    trustedDeviceHint.value = '';
+
+    // 发送 SPA 报文
+    await sendLoginSpa();
+
+    const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
+
+    try {
+        // 带安全码重发
+        const response = await tryLoginWithSecurityCode(securityCode.value.trim());
+
+        const rawData = response.data?.data || response.data || {};
+        const access_token = rawData.access_token || rawData.token;
+        const refresh_token = rawData.refresh_token;
+        const user = rawData.user;
+        const newDeviceToken = rawData.device_token;
+
+        // 保存 device_token（服务端新签发）
+        if (newDeviceToken) {
+            saveDeviceToken(newDeviceToken);
+            trustedDeviceHint.value = '已记住此设备，下次无需安全码';
+            console.log('[Login] ✓ device_token 已保存');
+        }
+
+        // 若勾选记住我，保存用户名和密码
+        if (rememberMe.value) {
+            if (isTauri) {
+                await saveUsername(username.value);
+                await savePassword(password.value);
+                localStorage.setItem('rememberMe', 'true');
+            } else {
+                localStorage.setItem('savedUsername', username.value);
+                localStorage.setItem('savedPassword', password.value);
+            }
+            localStorage.setItem('rememberMe', 'true');
+        }
+
+        // 保存认证信息
+        if (access_token) {
+            sessionStorage.setItem('auth_token', access_token);
+
+            if (isTauri) {
+                try {
+                    const deviceId = await getDeviceId();
+                    const deviceToken = getDeviceToken();
+                    await invoke('save_auth_info', {
+                        token: access_token,
+                        securityCode: securityCode.value.trim(),
+                        deviceId: deviceId,
+                        licenseId: '7f8e3d2a1c9b4e6f5a0d8c2b7e4f1a3c',
+                        deviceToken: deviceToken || null,
+                    });
+                    // 安全码通过后存到密钥库，下次免安全码
+                    await saveSecurityCode(securityCode.value.trim());
+                } catch (err) {
+                    console.error('[Login] 保存认证信息失败:', err);
+                }
+            }
+        }
+        if (refresh_token) {
+            sessionStorage.setItem('refresh_token', refresh_token);
+        }
+        if (user) {
+            sessionStorage.setItem('user_info', JSON.stringify(user));
+        }
+
+        await store.dispatch('auth/loginSuccess', user);
+        router.replace('/index');
+    } catch (err) {
+        console.error('[Login] 安全码登录失败:', err);
+        const status = err.response?.status;
+        const backendMessage = err.response?.data?.message;
+
+        if (!err.response) {
+            loginError.value = '网络请求失败，请检查公司地址是否正确配置';
+        } else if (status === 400 && err.response?.data?.code === '1005') {
+            loginError.value = '安全码不匹配，请重新输入';
+        } else if (status === 401) {
+            loginError.value = getChineseMessage(backendMessage) || '用户名或密码错误';
+        } else if (status === 403) {
+            loginError.value = getChineseMessage(backendMessage) || '账户已被禁用或无访问权限';
+        } else {
+            loginError.value = getChineseMessage(backendMessage) || '登录失败，请重试';
+        }
+    } finally {
+        isLoading.value = false;
+    }
+};
+
+const getChineseMessage = (msg) => {
+    if (!msg) return null;
+    const lowerMsg = msg.toLowerCase();
+    const messageMap = {
+        'user does not exist': '用户不存在',
+        'user not found': '用户不存在',
+        'invalid username or password': '用户名或密码错误',
+        'invalid credentials': '用户名或密码错误',
+        'username or password is incorrect': '用户名或密码错误',
+        'incorrect username or password': '用户名或密码错误',
+        'account is disabled': '账户已被禁用',
+        'account locked': '账户已被锁定',
+        'unauthorized': '未授权，请重新登录',
+        'forbidden': '禁止访问',
+        'permission denied': '权限不足',
+        'token expired': '登录已过期，请重新登录',
+        'invalid token': '登录已过期，请重新登录',
+        'internal server error': '服务器内部错误，请稍后再试',
+        'service unavailable': '服务暂时不可用',
+        'rate limit exceeded': '请求过于频繁，请稍后再试',
+    };
+    for (const [key, value] of Object.entries(messageMap)) {
+        if (lowerMsg.includes(key.toLowerCase())) return value;
+    }
+    return msg;
+};
 
 // 社交登录
 const handleSocialClick = (provider) => {
@@ -634,14 +816,47 @@ const handleLoginKeydown = (e) => {
                     </div>
                 </Transition>
 
+                <!-- 可信设备提示 -->
+                <Transition name="alert-slide">
+                    <div v-if="trustedDeviceHint" class="login-success-hint">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                            <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                        <span>{{ trustedDeviceHint }}</span>
+                    </div>
+                </Transition>
+
+                <!-- 降级安全码输入 -->
+                <Transition name="fade-slide">
+                    <div v-if="needSecurityCode" class="form-group" :class="{ 'has-error': securityCodeError }">
+                        <label class="form-label">请输入安全码完成身份验证</label>
+                        <div class="input-wrapper">
+                            <div class="input-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                </svg>
+                            </div>
+                            <input v-model="securityCode" type="text" class="form-input" placeholder="请输入安全码"
+                                @input="clearSecurityCodeError" @keydown="handleLoginKeydown" />
+                        </div>
+                        <p v-if="securityCodeError" class="error-msg">{{ securityCodeError }}</p>
+                    </div>
+                </Transition>
+
                 <!-- 加载状态按钮 -->
                 <div v-if="isLoading" class="login-btn loading">
                     <span class="loading-dots">
                         <span></span><span></span><span></span>
                     </span>
                 </div>
-                <LoginButton v-else-if="config.loginButton?.show" :text="config.loginButton.text"
-                    @click="handleLogin" />
+                <LoginButton v-else-if="config.loginButton?.show"
+                    :text="needSecurityCode ? '确认登录' : config.loginButton.text"
+                    @click="needSecurityCode ? handleSecurityCodeSubmit() : handleLogin()" />
 
                 <!-- 分割线 -->
                 <LoginDivider v-if="config.divider?.show" :text="config.divider.text" />

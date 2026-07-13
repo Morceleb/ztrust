@@ -3,12 +3,21 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
 };
 use log::info;
+use sha2::{Digest, Sha256};
 use std::net::UdpSocket;
 use std::time::SystemTime;
 
 const TOKEN_CODE_CHARS: &str = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
 const SALT: &[u8] = b"zerotrust-spa";
 const INFO: &[u8] = b"spa-token";
+
+/// 把短字段扩展为 32 字节（SHA256）
+/// 用于兼容历史数据中设备指纹为 16 字节 UUID 的情况
+fn sha256_expand(bytes: &[u8]) -> Vec<u8> {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hasher.finalize().to_vec()
+}
 
 fn decode_base32(code: &str) -> Vec<u8> {
     let mut char_map = std::collections::HashMap::new();
@@ -71,24 +80,32 @@ fn derive_spa_token(token_code: &str) -> Vec<u8> {
     hkdf_sha256(&ikm, 32)
 }
 
-fn hex_to_bytes(hex: &str) -> Result<Vec<u8>, String> {
-    // 移除所有空白字符
-    let hex = hex.trim();
-    if hex.is_empty() {
-        return Err("Hex string is empty".to_string());
-    }
-    if hex.len() % 2 != 0 {
-        return Err(format!("Hex string has odd length: {}", hex.len()));
+    // 规范化 hex：去除所有空白和连字符（UUID 等格式常带 '-' 分隔符）
+    fn normalize_hex(input: &str) -> String {
+        input
+            .chars()
+            .filter(|c| !c.is_whitespace() && *c != '-' && *c != '_' && *c != ':')
+            .collect()
     }
 
-    (0..hex.len())
-        .step_by(2)
-        .map(|i| {
-            u8::from_str_radix(&hex[i..i + 2], 16)
-                .map_err(|e| format!("Invalid hex at position {}: {}", i, e))
-        })
-        .collect()
-}
+    fn hex_to_bytes(hex: &str) -> Result<Vec<u8>, String> {
+        // 先规范化输入：去掉空白、连字符、下划线、冒号等分隔符
+        let hex = normalize_hex(hex);
+        if hex.is_empty() {
+            return Err("Hex string is empty".to_string());
+        }
+        if hex.len() % 2 != 0 {
+            return Err(format!("Hex string has odd length: {}", hex.len()));
+        }
+
+        (0..hex.len())
+            .step_by(2)
+            .map(|i| {
+                u8::from_str_radix(&hex[i..i + 2], 16)
+                    .map_err(|e| format!("Invalid hex at position {}: {}", i, e))
+            })
+            .collect()
+    }
 
 /// 发送 SPA 报文到指定地址
 ///
@@ -123,10 +140,30 @@ pub fn send_spa_packet(
     info!("[SPA] SpaKey 派生完成: {}", hex::encode(&spa_key));
 
     // 解析 DeviceID (32字节) 和 LicenseID (16字节)
-    let device_id_bytes = hex_to_bytes(device_id)
+    info!(
+        "[SPA] DeviceID 输入: 长度={}, 预览={}",
+        device_id.len(),
+        &device_id.chars().take(8).collect::<String>()
+    );
+    info!(
+        "[SPA] LicenseID 输入: 长度={}, 预览={}",
+        license_id.len(),
+        &license_id.chars().take(8).collect::<String>()
+    );
+    let mut device_id_bytes = hex_to_bytes(device_id)
         .map_err(|e| format!("DeviceID 解析失败: {}", e))?;
-    let license_id_bytes = hex_to_bytes(license_id)
+    let mut license_id_bytes = hex_to_bytes(license_id)
         .map_err(|e| format!("LicenseID 解析失败: {}", e))?;
+
+    // 长度自适应：兼容历史数据（设备指纹曾经是 16 字节 UUID）
+    if device_id_bytes.len() == 16 {
+        info!("[SPA] DeviceID 为 16 字节，SHA256 扩展到 32 字节以兼容新协议");
+        device_id_bytes = sha256_expand(&device_id_bytes);
+    }
+    if license_id_bytes.len() == 8 {
+        info!("[SPA] LicenseID 为 8 字节，SHA256 扩展到 16 字节以兼容新协议");
+        license_id_bytes = sha256_expand(&license_id_bytes);
+    }
 
     // 验证长度
     if device_id_bytes.len() != 32 {
