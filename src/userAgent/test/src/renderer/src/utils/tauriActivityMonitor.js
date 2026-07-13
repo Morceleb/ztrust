@@ -262,15 +262,24 @@ class ActivityMonitorClient {
             await keyringDelete(KeyringKeys.USERNAME);
             await keyringDelete(KeyringKeys.PASSWORD);
         }
-        // 清除其他 localStorage 数据（但保留 companyAddress 和 rememberMe 供下次登录使用）
+        // 清除其他 localStorage 数据（但保留 companyAddress、rememberMe、
+        // 以及设备可信登录状态 ztrust_device_id / ztrust_device_token，供下次登录复用）
         const savedCompanyAddress = localStorage.getItem('companyAddress');
         const savedRememberMe = localStorage.getItem('rememberMe');
+        const savedDeviceId = localStorage.getItem('ztrust_device_id');
+        const savedDeviceToken = localStorage.getItem('ztrust_device_token');
         localStorage.clear();
         if (savedCompanyAddress) {
             localStorage.setItem('companyAddress', savedCompanyAddress);
         }
         if (savedRememberMe) {
             localStorage.setItem('rememberMe', savedRememberMe);
+        }
+        if (savedDeviceId) {
+            localStorage.setItem('ztrust_device_id', savedDeviceId);
+        }
+        if (savedDeviceToken) {
+            localStorage.setItem('ztrust_device_token', savedDeviceToken);
         }
     }
 

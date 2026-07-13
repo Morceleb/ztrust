@@ -1,6 +1,6 @@
 <!-- src/views/LoginPage.vue -->
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
 
@@ -24,13 +24,16 @@ import {
     keyringDelete,
     clearLocalStorageCredentials,
 } from '@/utils/keyringService'
-import { getDeviceId, getDeviceMeta, getDeviceToken, saveDeviceToken } from '@/utils/deviceService'
+import { getDeviceId, getDeviceMeta, getDeviceToken, saveDeviceToken, clearDeviceToken, hasCompleteDeviceCredentials } from '@/utils/deviceService'
 
 const router = useRouter()
 const route = useRoute()
 
 // 步骤控制：'company' | 'login'
 const currentStep = ref('company')
+
+// 公司地址 step 提交后是否自动接着调用 handleLogin（用于"登录失败回退到图1重输安全码 → 提交后自动重试"）
+const autoLoginAfterCompanySubmit = ref(false)
 
 // 配置对象 - 支持从后端动态加载
 const config = ref({
@@ -58,6 +61,8 @@ const securityCode = ref('')
 const securityCodeError = ref('')
 const needSecurityCode = ref(false)   // 是否降级要求输入安全码
 const trustedDeviceHint = ref('')     // 设备可信提示
+const deviceUntrustedNotice = ref('') // 设备不可信提示（localStorage 里有 id+token 但服务端拒绝时使用）
+const deviceTokenInvalidDialog = ref(false) // device_token 存在但服务端校验不通过时的弹窗
 
 // 登录表单相关
 const username = ref('')
@@ -138,7 +143,9 @@ onMounted(async () => {
     const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
     console.log('[Login] 页面加载，环境:', isTauri ? 'Tauri' : 'Browser');
 
-    // 总是先读取一次已保存的地址和安全码（无论是否走 mode=company）
+    // 总是先读取一次已保存的地址和安全码
+    // 安全码现在只在"账号密码页 + 降级安全码框"里用，不再用于 company step
+    // 但仍然提前预填，方便下次打开程序就进图 2 时安全码有默认内容（连按确认即可）
     const savedAddress = localStorage.getItem('companyAddress');
     if (savedAddress) {
         companyAddress.value = savedAddress;
@@ -158,10 +165,14 @@ onMounted(async () => {
         return
     }
 
-    // 正常登录流程：若有已保存地址 → 跳到第二步
-    if (savedAddress) {
+    // 正常登录流程：
+    //   - 没有可信设备凭证（device_token） → 必须先去 company step 输入安全码
+    //   - 有 device_token → 跳过安全码，直达 username/password 页（尝试免二次认证）
+    const hasDeviceToken = !!getDeviceToken();
+
+    if (savedAddress && hasDeviceToken) {
         currentStep.value = 'login';
-        console.log('[Login] 已加载保存的公司地址:', savedAddress);
+        console.log('[Login] 已加载保存的公司地址（可信设备免安全码）:', savedAddress);
 
         if (isTauri) {
             const savedUsernameVal = await getUsername();
@@ -188,10 +199,15 @@ onMounted(async () => {
         if (!isTauri) {
             await loadRemoteLoginConfig();
         }
+
+        // 设备字段检查仅用于统计/诊断；图 2 没有降级安全码框了（安全码统一在图 1 输入）
+        console.log('[Login] 设备字段完整? ', hasCompleteDeviceCredentials(),
+                    '| needSecurityCode=' + needSecurityCode.value + '（图 2 已无降级框，本值不再影响 UI）');
     }
 });
 
 // 保存公司地址并切换到登录步骤
+// 注意：安全码输入框在"接入地址/域名"页（company step），与账号密码登录分离
 const handleCompanySubmit = async () => {
     if (!companyAddress.value.trim()) {
         companyError.value = '请输入公司地址'
@@ -233,6 +249,14 @@ const handleCompanySubmit = async () => {
         currentStep.value = 'login'
         await loadRemoteLoginConfig()
 
+        // 如果是因为"登录需要安全码"回退到图1再回到这里的，自动接着登录（保留用户名密码）
+        if (autoLoginAfterCompanySubmit.value && username.value && password.value) {
+            console.log('[Login] 回退后自动重试登录');
+            autoLoginAfterCompanySubmit.value = false;
+            // 切到 login step 后表单刚渲染，给 Vue 一点反应时间再触发 handleLogin
+            await nextTick();
+            await handleLogin();
+        }
     } catch (error) {
         console.error('[Login] 初始化失败:', error);
         companyError.value = `连接失败: ${error.message || error}`;
@@ -243,6 +267,19 @@ const handleCompanySubmit = async () => {
 
 const clearCompanyError = () => {
     companyError.value = ''
+}
+
+/**
+ * 弹窗"设备令牌验证失败"的确认处理：
+ *   1. 关闭弹窗
+ *   2. 切到 company step（输入安全码 + 接入地址的页面）
+ *   3. 标记 autoLoginAfterCompanySubmit=true → 用户改完安全码点"下一步"自动接着登录
+ */
+const confirmDeviceTokenInvalidDialog = () => {
+    deviceTokenInvalidDialog.value = false;
+    autoLoginAfterCompanySubmit.value = true;
+    securityCodeError.value = '设备令牌验证失败，请重新输入安全码';
+    currentStep.value = 'company';
 }
 
 const clearSecurityCodeError = () => {
@@ -297,35 +334,46 @@ const sendLoginSpa = async () => {
 };
 
 /**
- * 乐观登录第一步：静默发登录请求（不带安全码）
- * 成功 → 直接进主页
- * 1007/1005 → 需要安全码，降级
+ * 登录请求：device_token 存在时**不**带 security_code，走"可信设备免安全码"路径
+ *
+ * 路径选择：
+ *   - device_token 存在 → 只带 device_id + device_token，让 8900 调 Identity verify，
+ *     verify=true 则跳过安全码直接登录成功，verify=false 才回 1007 让我们回图 1
+ *   - device_token 不存在 → 带 device_id + security_code，让 8900 走 Casdoor 安全码校验，
+ *     校验通过后 remember 设备并下发新的 device_token
+ *
+ * 回退链：
+ *   1007（缺安全码）/ 1005（设备凭证失效）→ 切到 company step 让用户重输安全码，
+ *   自动 autoLoginAfterCompanySubmit=true → 提交后自动重试登录。
+ *   重试时 device_token 仍为空（重输安全码不会生成新 device_token），所以仍会带 security_code。
  */
 const tryLoginSilent = async () => {
     const deviceId = await getDeviceId();
     const deviceToken = getDeviceToken();
+    const hasToken = !!(deviceToken && deviceToken.trim());
 
-    return request.post('/auth/login', {
+    const payload = {
         username: username.value,
         password: password.value,
         device_id: deviceId,
-        device_token: deviceToken || undefined,
-    });
+    };
+
+    if (hasToken) {
+        // 可信设备：只带 device_token，不带 security_code（让 8900 走 verify 路径）
+        payload.device_token = deviceToken;
+    } else {
+        // 不可信或首次：带安全码让 8900 走 Casdoor 校验 + Identity remember
+        const securityCode = await getSecurityCode() || '';
+        payload.security_code = securityCode || undefined;
+    }
+
+    return request.post('/auth/login', payload);
 };
 
 /**
- * 降级登录：带安全码重发
+ * （旧）带安全码重发 —— 已不再使用，安全码统一在图 1 输入并随 tryLoginSilent 一同发出。
+ * 留空函数体但保留变量定义可让旧引用不报错；若严格 lint，可整段删除。
  */
-const tryLoginWithSecurityCode = async (securityCodeVal) => {
-    const deviceId = await getDeviceId();
-
-    return request.post('/auth/login', {
-        username: username.value,
-        password: password.value,
-        security_code: securityCodeVal,
-        device_id: deviceId,
-    });
-};
 
 /**
  * 处理登录（乐观 + 按需降级安全码）
@@ -335,6 +383,7 @@ const handleLogin = async () => {
 
     isLoading.value = true;
     loginError.value = '';
+    deviceUntrustedNotice.value = '';
     needSecurityCode.value = false;
     trustedDeviceHint.value = '';
 
@@ -354,10 +403,35 @@ const handleLogin = async () => {
             const rawData = response.data?.data || response.data || {};
             deviceTrusted = rawData.device_trusted === true;
         } catch (err) {
-            // 降级：安全码缺失或不可信
-            if (err.response?.status === 400 && (err.response?.data?.code === '1007' || err.response?.data?.code === '1005')) {
-                needSecurityCode.value = true;
+            // 服务端要求安全码（1007）或带的安全码/设备凭证失效（1005）
+            const status = err.response?.status;
+            const code = err.response?.data?.code;
+            if (status === 400 && (code === '1007' || code === '1005')) {
+                const deviceTokenSent = !!getDeviceToken();
+
+                if (deviceTokenSent) {
+                    // 带 device_token 仍被拒 → 设备不可信 → 清掉本地 token 避免下次踩坑
+                    console.warn('[Login] 带 device_token 仍被拒绝 (code=' + code + ')，判定设备不可信，清除本地 device_token');
+                    clearDeviceToken();
+                    // 弹窗提示：要求用户确认后再跳到安全码输入页
+                    deviceUntrustedNotice.value = '';
+                    securityCodeError.value = '';
+                    deviceTokenInvalidDialog.value = true;
+                    isLoading.value = false;
+                    loginError.value = '';
+                    return;
+                }
+
+                // 没带 device_token 时（如首次登录 1007）：直接跳 company step，不需要弹窗
+                deviceUntrustedNotice.value = '';
+                securityCodeError.value = code === '1005'
+                    ? '设备或安全码无效，请重新输入安全码'
+                    : '服务端要求安全码，请输入安全码';
+                // 切到 company step；保留 username/password；提交后会自动接着登录
+                autoLoginAfterCompanySubmit.value = true;
+                currentStep.value = 'company';
                 isLoading.value = false;
+                loginError.value = '';
                 return;
             }
             // 其他错误继续抛出去
@@ -472,12 +546,14 @@ const handleLogin = async () => {
             'user not exist': '用户不存在',
             'no such user': '用户不存在',
             'invalid user': '用户不存在',
-            'invalid username or password': '用户名或密码错误',
-            'invalid credentials': '用户名或密码错误',
-            'invalid username or password: password or code is incorrect': '用户名或密码错误',
-            'username or password is incorrect': '用户名或密码错误',
-            'incorrect username or password': '用户名或密码错误',
-            'wrong username or password': '用户名或密码错误',
+            'invalid username or password': '密码错误',
+            'invalid credentials': '密码错误',
+            'invalid username or password: password or code is incorrect': '密码错误',
+            'username or password is incorrect': '密码错误',
+            'incorrect username or password': '密码错误',
+            'wrong username or password': '密码错误',
+            'wrong password': '密码错误',
+            'bad password': '密码错误',
             'password is incorrect': '密码错误',
             'password incorrect': '密码错误',
             'account is disabled': '账户已被禁用',
@@ -510,10 +586,20 @@ const handleLogin = async () => {
         const getChineseMessage = (msg) => {
             if (!msg) return null;
             const lowerMsg = msg.toLowerCase();
+            // 提取剩余次数（同时支持 "remaining" 和 "chances" 两种关键词）
+            const remainingMatch =
+                msg.match(/(\d+)\s*remaining/i) ||
+                msg.match(/(\d+)\s*chances?/i);
             for (const [key, value] of Object.entries(messageMap)) {
                 if (lowerMsg.includes(key.toLowerCase())) {
-                    const match = msg.match(/(\d+)\s*remaining/i);
-                    if (match) return `${value}，剩余 ${match[1]} 次尝试机会`;
+                    if (remainingMatch) {
+                        // 带剩余次数的"用户不存在/密码错误"统一显示"密码错误，还剩 N 次机会"，
+                        // 因为 Casdoor 在密码错时也可能返 "the user does not exist"。
+                        if (value === '用户不存在' || value === '密码错误') {
+                            return `密码错误，还剩 ${remainingMatch[1]} 次机会`;
+                        }
+                        return `${value}，还剩 ${remainingMatch[1]} 次机会`;
+                    }
                     return value;
                 }
             }
@@ -541,106 +627,8 @@ const handleLogin = async () => {
     }
 };
 
-/**
- * 处理安全码提交（降级流程第二步）
- */
-const handleSecurityCodeSubmit = async () => {
-    if (!securityCode.value.trim()) {
-        securityCodeError.value = '请输入安全码';
-        return;
-    }
-    securityCodeError.value = '';
-    isLoading.value = true;
-    loginError.value = '';
-    needSecurityCode.value = false;
-    trustedDeviceHint.value = '';
-
-    // 发送 SPA 报文
-    await sendLoginSpa();
-
-    const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
-
-    try {
-        // 带安全码重发
-        const response = await tryLoginWithSecurityCode(securityCode.value.trim());
-
-        const rawData = response.data?.data || response.data || {};
-        const access_token = rawData.access_token || rawData.token;
-        const refresh_token = rawData.refresh_token;
-        const user = rawData.user;
-        const newDeviceToken = rawData.device_token;
-
-        // 保存 device_token（服务端新签发）
-        if (newDeviceToken) {
-            saveDeviceToken(newDeviceToken);
-            trustedDeviceHint.value = '已记住此设备，下次无需安全码';
-            console.log('[Login] ✓ device_token 已保存');
-        }
-
-        // 若勾选记住我，保存用户名和密码
-        if (rememberMe.value) {
-            if (isTauri) {
-                await saveUsername(username.value);
-                await savePassword(password.value);
-                localStorage.setItem('rememberMe', 'true');
-            } else {
-                localStorage.setItem('savedUsername', username.value);
-                localStorage.setItem('savedPassword', password.value);
-            }
-            localStorage.setItem('rememberMe', 'true');
-        }
-
-        // 保存认证信息
-        if (access_token) {
-            sessionStorage.setItem('auth_token', access_token);
-
-            if (isTauri) {
-                try {
-                    const deviceId = await getDeviceId();
-                    const deviceToken = getDeviceToken();
-                    await invoke('save_auth_info', {
-                        token: access_token,
-                        securityCode: securityCode.value.trim(),
-                        deviceId: deviceId,
-                        licenseId: '7f8e3d2a1c9b4e6f5a0d8c2b7e4f1a3c',
-                        deviceToken: deviceToken || null,
-                    });
-                    // 安全码通过后存到密钥库，下次免安全码
-                    await saveSecurityCode(securityCode.value.trim());
-                } catch (err) {
-                    console.error('[Login] 保存认证信息失败:', err);
-                }
-            }
-        }
-        if (refresh_token) {
-            sessionStorage.setItem('refresh_token', refresh_token);
-        }
-        if (user) {
-            sessionStorage.setItem('user_info', JSON.stringify(user));
-        }
-
-        await store.dispatch('auth/loginSuccess', user);
-        router.replace('/index');
-    } catch (err) {
-        console.error('[Login] 安全码登录失败:', err);
-        const status = err.response?.status;
-        const backendMessage = err.response?.data?.message;
-
-        if (!err.response) {
-            loginError.value = '网络请求失败，请检查公司地址是否正确配置';
-        } else if (status === 400 && err.response?.data?.code === '1005') {
-            loginError.value = '安全码不匹配，请重新输入';
-        } else if (status === 401) {
-            loginError.value = getChineseMessage(backendMessage) || '用户名或密码错误';
-        } else if (status === 403) {
-            loginError.value = getChineseMessage(backendMessage) || '账户已被禁用或无访问权限';
-        } else {
-            loginError.value = getChineseMessage(backendMessage) || '登录失败，请重试';
-        }
-    } finally {
-        isLoading.value = false;
-    }
-};
+// handleSecurityCodeSubmit 已移除 —— 安全码输入统一在图 1（接入地址/域名页），
+// 登录失败需要安全码时回退到图 1 重输，然后 handleCompanySubmit 自动接着重试登录。
 
 const getChineseMessage = (msg) => {
     if (!msg) return null;
@@ -648,12 +636,20 @@ const getChineseMessage = (msg) => {
     const messageMap = {
         'user does not exist': '用户不存在',
         'user not found': '用户不存在',
-        'invalid username or password': '用户名或密码错误',
-        'invalid credentials': '用户名或密码错误',
-        'username or password is incorrect': '用户名或密码错误',
-        'incorrect username or password': '用户名或密码错误',
+        'invalid username or password': '密码错误',
+        'invalid credentials': '密码错误',
+        'username or password is incorrect': '密码错误',
+        'incorrect username or password': '密码错误',
+        'wrong username or password': '密码错误',
+        'wrong password': '密码错误',
+        'bad password': '密码错误',
+        'password is incorrect': '密码错误',
+        'password incorrect': '密码错误',
         'account is disabled': '账户已被禁用',
+        'account disabled': '账户已被禁用',
         'account locked': '账户已被锁定',
+        'account is locked': '账户已被锁定',
+        'account is inactive': '账户已停用',
         'unauthorized': '未授权，请重新登录',
         'forbidden': '禁止访问',
         'permission denied': '权限不足',
@@ -664,7 +660,18 @@ const getChineseMessage = (msg) => {
         'rate limit exceeded': '请求过于频繁，请稍后再试',
     };
     for (const [key, value] of Object.entries(messageMap)) {
-        if (lowerMsg.includes(key.toLowerCase())) return value;
+        if (lowerMsg.includes(key.toLowerCase())) {
+            const remainingMatch =
+                msg.match(/(\d+)\s*remaining/i) ||
+                msg.match(/(\d+)\s*chances?/i);
+            if (remainingMatch) {
+                if (value === '用户不存在' || value === '密码错误') {
+                    return `密码错误，还剩 ${remainingMatch[1]} 次机会`;
+                }
+                return `${value}，还剩 ${remainingMatch[1]} 次机会`;
+            }
+            return value;
+        }
     }
     return msg;
 };
@@ -828,25 +835,50 @@ const handleLoginKeydown = (e) => {
                     </div>
                 </Transition>
 
-                <!-- 降级安全码输入 -->
-                <Transition name="fade-slide">
-                    <div v-if="needSecurityCode" class="form-group" :class="{ 'has-error': securityCodeError }">
-                        <label class="form-label">请输入安全码完成身份验证</label>
-                        <div class="input-wrapper">
-                            <div class="input-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                </svg>
-                            </div>
-                            <input v-model="securityCode" type="text" class="form-input" placeholder="请输入安全码"
-                                @input="clearSecurityCodeError" @keydown="handleLoginKeydown" />
-                        </div>
-                        <p v-if="securityCodeError" class="error-msg">{{ securityCodeError }}</p>
+                <!-- 设备不可信提示（带 device_token 仍被服务端拒绝） -->
+                <Transition name="alert-slide">
+                    <div v-if="deviceUntrustedNotice" class="login-error-alert">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <span>{{ deviceUntrustedNotice }}</span>
                     </div>
                 </Transition>
+
+                <!--
+                  说明：图 2（账号密码页）原本有"降级安全码框"（v-if=needSecurityCode）。
+                  现在安全码只放在图 1（company step）输入，所以这里删掉降级框。
+                  若登录请求需要安全码（1007/1005），应回退到图 1 让用户重新输入安全码。
+                -->
+
+                <!--
+                  设备令牌验证失败弹窗（账号密码页 → 弹窗 → 确认 → 跳到 company step）
+                  触发条件：本地 device_token 存在，服务端 verify 失败返 1005
+                -->
+                <Teleport to="body">
+                    <Transition name="alert-slide">
+                        <div v-if="deviceTokenInvalidDialog" class="ztrust-modal-mask" @click.self="confirmDeviceTokenInvalidDialog">
+                            <div class="ztrust-modal-card" role="alertdialog" aria-modal="true">
+                                <div class="ztrust-modal-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="12" y1="8" x2="12" y2="12" />
+                                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                                    </svg>
+                                </div>
+                                <div class="ztrust-modal-title">设备令牌验证失败</div>
+                                <div class="ztrust-modal-desc">请重新输入安全码</div>
+                                <button class="ztrust-modal-confirm" type="button"
+                                    @click="confirmDeviceTokenInvalidDialog">确认</button>
+                            </div>
+                        </div>
+                    </Transition>
+                </Teleport>
 
                 <!-- 加载状态按钮 -->
                 <div v-if="isLoading" class="login-btn loading">
@@ -855,8 +887,8 @@ const handleLoginKeydown = (e) => {
                     </span>
                 </div>
                 <LoginButton v-else-if="config.loginButton?.show"
-                    :text="needSecurityCode ? '确认登录' : config.loginButton.text"
-                    @click="needSecurityCode ? handleSecurityCodeSubmit() : handleLogin()" />
+                    :text="config.loginButton.text"
+                    @click="handleLogin()" />
 
                 <!-- 分割线 -->
                 <LoginDivider v-if="config.divider?.show" :text="config.divider.text" />
