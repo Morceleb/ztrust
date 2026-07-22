@@ -112,8 +112,12 @@
                             <span class="remove-modal-text">确定要移除此授信终端吗?</span>
                         </div>
                         <div class="remove-modal-footer">
-                            <button type="button" class="remove-btn-confirm" @click="confirmRemoveTrusted">确定</button>
-                            <button type="button" class="remove-btn-cancel" @click="closeRemoveConfirm">取消</button>
+                            <div v-if="removeError" class="remove-error">{{ removeError }}</div>
+                            <button type="button" class="remove-btn-confirm" :disabled="removeLoading" @click="confirmRemoveTrusted">
+                                <span v-if="removeLoading">移除中...</span>
+                                <span v-else>确定</span>
+                            </button>
+                            <button type="button" class="remove-btn-cancel" :disabled="removeLoading" @click="closeRemoveConfirm">取消</button>
                         </div>
                     </div>
                 </div>
@@ -189,7 +193,7 @@ const trustedTerminals = computed(() => {
     const sess = sessionInfo.value || {}
     return [
         {
-            id: 'current-trusted',
+            id: localStorage.getItem('ztrust_device_id') || '',
             os: getOsClass(info.platform),
             osLabel: getOsLabel(info.platform),
             name: info.os_version || 'Windows',
@@ -207,13 +211,33 @@ const temporaryTerminals = ref([])
 
 const showRemoveModal = ref(false)
 const terminalToRemove = ref(null)
+const removeLoading = ref(false)
+const removeError = ref('')
+
+// 辅助函数：构建完整 API 地址
+// companyAddress 可能是 47.120.25.166:8900 格式或完整 URL
+const buildApiUrl = (path) => {
+    const companyAddress = localStorage.getItem('companyAddress')
+    if (!companyAddress) {
+        console.warn('[终端管理] companyAddress 为空')
+        return null
+    }
+    // 如果已经是完整 URL
+    if (companyAddress.startsWith('http')) {
+        return `${companyAddress}${path}`
+    }
+    // 如果只是 host:port，添加 http://
+    return `http://${companyAddress}${path}`
+}
 
 const handleBack = () => {
     router.push('/')
 }
 
 const openRemoveConfirm = (t) => {
+    console.log('[终端管理] 打开移除确认, 设备:', t)
     terminalToRemove.value = t
+    removeError.value = ''
     showRemoveModal.value = true
 }
 
@@ -222,11 +246,50 @@ const closeRemoveConfirm = () => {
     terminalToRemove.value = null
 }
 
-const confirmRemoveTrusted = () => {
-    if (terminalToRemove.value) {
-        trustedTerminals.value = trustedTerminals.value.filter((x) => x.id !== terminalToRemove.value.id)
+const confirmRemoveTrusted = async () => {
+    if (!terminalToRemove.value) {
+        console.error('[终端管理] terminalToRemove 为空')
+        return
     }
-    closeRemoveConfirm()
+
+    const deviceId = terminalToRemove.value.id
+    console.log('[终端管理] 开始移除授信终端, 设备ID:', deviceId)
+
+    removeLoading.value = true
+    removeError.value = ''
+
+    try {
+        const apiUrl = buildApiUrl(`/auth/devices/${deviceId}`)
+        if (!apiUrl) {
+            removeError.value = '未配置公司地址'
+            return
+        }
+        console.log('[终端管理] 请求地址:', apiUrl)
+        const token = sessionStorage.getItem('auth_token')
+        const res = await fetch(apiUrl, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            },
+        })
+
+        console.log('[终端管理] 响应状态:', res.status)
+        const result = await res.json()
+        console.log('[终端管理] 响应数据:', result)
+
+        if (res.ok || result.code === 200) {
+            console.log('[终端管理] 移除成功')
+            closeRemoveConfirm()
+        } else {
+            removeError.value = result.message || '移除失败，请重试'
+        }
+    } catch (err) {
+        console.error('[终端管理] 请求失败:', err)
+        removeError.value = '移除失败，请检查网络'
+    } finally {
+        removeLoading.value = false
+    }
 }
 </script>
 
