@@ -233,6 +233,14 @@ const handleCompanySubmit = async () => {
     }
 
     try {
+        // 比对地址：若发生变化，清除旧的 device_token（切换了公司）
+        const previousAddress = localStorage.getItem('companyAddress')
+        if (previousAddress && previousAddress !== rawAddress) {
+            console.log('[Login] 接入地址已变更, 清除旧设备的 device_token')
+            clearDeviceToken()
+            localStorage.removeItem('ztrust_device_token')
+        }
+
         // Tauri 环境：安全码存入密钥库
         if (isTauri) {
             await saveSecurityCode(securityCode.value.trim());
