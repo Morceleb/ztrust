@@ -139,30 +139,8 @@ async fn open_resource_window(
         .unwrap_or_default();
     let license_id = normalize_hex_value(&license_id_raw);
 
-    // 发送 SPA 报文（资源访问前发送）
-    const SPA_PORT: u16 = 41234;
-    if !security_code.is_empty() && !device_id.is_empty() && !license_id.is_empty() {
-        // 提取纯 host（移除协议）
-        let server_host = raw_base
-            .replace("http://", "")
-            .replace("https://", "");
-
-        info!(
-            "[SPA] 访问资源前发送 SPA 报文: host={}, port={}",
-            server_host, SPA_PORT
-        );
-
-        match spa::send_spa_packet(&server_host, SPA_PORT, &security_code, &device_id, &license_id) {
-            Ok(()) => {
-                info!("[SPA] 资源访问 SPA 报文发送成功");
-            }
-            Err(e) => {
-                info!("[SPA] 资源访问 SPA 报文发送失败 (不影响资源访问): {}", e);
-            }
-        }
-    } else {
-        info!("[SPA] 跳过 SPA 发送：缺少必要参数");
-    }
+    // 资源访问时不再发送 SPA 报文（SPA 仅在登录时发送一次，端口开放后持续有效）
+    // 保留读取 security_code/device_id/license_id 是因为 resource-proxy.html 仍需要这些参数
 
     use tauri::WebviewUrl;
 

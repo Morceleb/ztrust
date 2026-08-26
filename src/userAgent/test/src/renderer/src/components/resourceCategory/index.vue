@@ -53,6 +53,7 @@ import './index.css'
 import defaultIcon from '@/assets/vue.svg'
 
 import request from '../../utils/request'
+import { ensureSpaSent } from '@/utils/spa'
 
 const props = defineProps({
     type: { type: String, required: true },
@@ -89,6 +90,10 @@ const isPostMethod = (item) => {
 
 // 统一点击处理
 const handleCardClick = (item) => {
+    // 访问资源前先发送 SPA 报文以开放服务端端口（非阻塞）
+    ensureSpaSent({ reason: 'resource-click' })
+        .catch((e) => console.warn('[ResourceCategory] SPA 报文发送失败（继续访问）:', e))
+
     if (isPostMethod(item)) {
         // POST：打开模态框输入 body
         currentResource.value = item
@@ -152,6 +157,10 @@ const submitPost = async () => {
 
     const resourceId = currentResource.value.resourceId
     const body = JSON.parse(postBody.value)
+
+    // POST 提交前再敲一次门，确保新窗口打开时端口仍开着
+    ensureSpaSent({ reason: 'resource-post-submit' })
+        .catch((e) => console.warn('[ResourceCategory] SPA 报文发送失败（继续提交）:', e))
 
     try {
         // 使用封装后的 request（axios）

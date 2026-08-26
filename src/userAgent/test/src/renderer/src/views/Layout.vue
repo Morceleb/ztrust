@@ -180,12 +180,13 @@
 </template>
 
 <script setup>
-import { ref, computed, provide } from 'vue'
+import { ref, computed, provide, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/utils/request'
 import store from '@/store'
 
 import tittleBar from '@/components/TittleBar/index.vue'
+import { startSpaHeartbeat } from '@/utils/spa'
 
 
 const isExpanded = ref(true)
@@ -199,6 +200,36 @@ const isAuthenticated = computed(() => store.getters['auth/isAuthenticated'])
 // 当前登录用户：从 store 读取
 const currentUser = computed(() => store.getters['auth/user'] || { name: '用户', role: '用户' })
 const userInitial = computed(() => currentUser.value?.name ? currentUser.value.name.charAt(0) : '?')
+
+// SPA 心跳定时器句柄
+let spaHeartbeat = null
+const startSpaHeartbeatIfLoggedIn = () => {
+    if (spaHeartbeat) return
+    if (!isAuthenticated.value) return
+    spaHeartbeat = startSpaHeartbeat({ intervalMs: 3 * 60 * 1000 })
+    console.log('[Layout] 已启动 SPA 心跳定时器（每 3 分钟一次）')
+}
+const stopSpaHeartbeat = () => {
+    if (spaHeartbeat) {
+        spaHeartbeat.stop()
+        spaHeartbeat = null
+        console.log('[Layout] 已停止 SPA 心跳定时器')
+    }
+}
+
+onMounted(() => {
+    startSpaHeartbeatIfLoggedIn()
+})
+
+// 登录态变化时启停心跳
+watch(isAuthenticated, (now) => {
+    if (now) startSpaHeartbeatIfLoggedIn()
+    else stopSpaHeartbeat()
+})
+
+onUnmounted(() => {
+    stopSpaHeartbeat()
+})
 
 const handleLogout = () => {
     showLogoutModal.value = true

@@ -143,21 +143,13 @@ onMounted(async () => {
     const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
     console.log('[Login] 页面加载，环境:', isTauri ? 'Tauri' : 'Browser');
 
-    // 总是先读取一次已保存的地址和安全码
-    // 安全码现在只在"账号密码页 + 降级安全码框"里用，不再用于 company step
-    // 但仍然提前预填，方便下次打开程序就进图 2 时安全码有默认内容（连按确认即可）
+    // 总是先读取一次已保存的地址
+    // 安全码永远以空白展示（只在用户输入时显示输入内容），不在 onMounted 时回填
     const savedAddress = localStorage.getItem('companyAddress');
     if (savedAddress) {
         companyAddress.value = savedAddress;
-        // 安全码：Tauri 从密钥库读，其他从 localStorage 读
-        if (isTauri) {
-            const savedSecurityCode = await getSecurityCode();
-            if (savedSecurityCode) securityCode.value = savedSecurityCode;
-        } else {
-            const savedSecurityCode = localStorage.getItem('securityCode');
-            if (savedSecurityCode) securityCode.value = savedSecurityCode;
-        }
     }
+    securityCode.value = '';
 
     // 若 URL 上带 mode=company（设置页"切换"触发），强制进入"接入地址/域名 + 安全码"页面
     if (route.query.mode === 'company') {
@@ -214,7 +206,9 @@ const handleCompanySubmit = async () => {
         return
     }
 
-    if (!securityCode.value.trim()) {
+    // 有 device_token 时跳过安全码验证（已经通过安全码登录过了）
+    const hasDeviceToken = !!getDeviceToken();
+    if (!hasDeviceToken && !securityCode.value.trim()) {
         securityCodeError.value = '请输入安全码'
         return
     }
@@ -242,11 +236,15 @@ const handleCompanySubmit = async () => {
         }
 
         // Tauri 环境：安全码存入密钥库
-        if (isTauri) {
-            await saveSecurityCode(securityCode.value.trim());
-        } else {
-            // 非 Tauri 环境：存入 localStorage（向后兼容）
-            localStorage.setItem('securityCode', securityCode.value.trim());
+        // 注意：只有当用户实际输入了安全码时才保存，避免空字符串覆盖原有真实安全码
+        const trimmedSecurityCode = securityCode.value.trim();
+        if (trimmedSecurityCode) {
+            if (isTauri) {
+                await saveSecurityCode(trimmedSecurityCode);
+            } else {
+                // 非 Tauri 环境：存入 localStorage（向后兼容）
+                localStorage.setItem('securityCode', trimmedSecurityCode);
+            }
         }
 
         // 保存到 localStorage（保存完整地址，包括端口）
@@ -326,16 +324,26 @@ const validate = () => {
 
 /**
  * 发送 SPA 报文（每次登录前都发，幂等）
+ * 即使已有 device_token 也发送，保证目标端口持续开放
  */
 const sendLoginSpa = async () => {
     const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
     if (!isTauri) return;
     const rawAddress = localStorage.getItem('companyAddress');
-    if (!rawAddress) return;
+    if (!rawAddress) {
+        console.warn('[Login] 未找到 companyAddress，跳过 SPA 报文发送');
+        return;
+    }
+
     try {
+        // 从存储层读取安全码（不依赖 UI 上的 securityCode.value，UI 上永远是空白）
         const securityCode = await getSecurityCode();
-        if (!securityCode) return;
+        if (!securityCode) {
+            console.warn('[Login] 未找到安全码，跳过 SPA 报文发送');
+            return;
+        }
         await ensureSpaPacketSent(rawAddress, securityCode);
+        console.log('[Login] SPA 报文已发送');
     } catch (e) {
         console.warn('[Login] SPA 报文发送失败:', e);
     }
