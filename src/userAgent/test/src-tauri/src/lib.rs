@@ -5,6 +5,28 @@ mod wifi;
 mod bluetooth;
 mod spa;
 
+/// 计算字符串在终端的视觉宽度（ASCII=1，中文/全角=2）
+fn visual_width(s: &str) -> usize {
+    s.chars().map(|c| {
+        if c.is_ascii() { 1 } else { 2 }
+    }).sum()
+}
+
+/// 将字符串填充到指定视觉宽度（用于框线对齐）
+fn pad_right(s: &str, width: usize) -> String {
+    let vw = visual_width(s);
+    if vw >= width {
+        s.to_string()
+    } else {
+        format!("{}{}", s, " ".repeat(width - vw))
+    }
+}
+
+/// 填充并在末尾追加右边界 `║`
+fn pad_row(content: &str, width: usize) -> String {
+    format!("{}║", pad_right(content, width))
+}
+
 use activity::{ActivityConfig, ActivityMonitor};
 use bluetooth::BluetoothDevice;
 use database::Database;
@@ -46,7 +68,6 @@ fn get_or_init_device_info<'a>(device_guard: &'a mut MutexGuard<'_, Option<Devic
     if device_guard.is_none() {
         info!("设备信息延迟初始化开始");
         **device_guard = Some(device::generate_device_info()?);
-        info!("设备信息延迟初始化完成");
     }
 
     device_guard
@@ -323,7 +344,27 @@ async fn activity_get_stats(state: State<'_, AppState>) -> Result<Option<activit
 async fn get_device_info(state: State<'_, AppState>) -> Result<DeviceInfo, String> {
     let mut device = state.device_info.lock().map_err(|e| e.to_string())?;
     let info = get_or_init_device_info(&mut device)?;
-    info!("[DeviceFingerprint] Tauri 设备信息: {:?}", info);
+
+    println!("\n╔══════════════════════════════════════════════════════════════╗");
+    println!("║                 DeviceFingerprint 采集结果                  ║");
+    println!("╠══════════════════════════════════════════════════════════════╣");
+    println!("║ Platform: {}", pad_right(&info.platform, 48));
+    println!("║ OS Version: {}", pad_right(&info.os_version, 47));
+    println!("║ DisplayVersion: {}", pad_right(&info.display_version, 44));
+    println!("║ UBR: {}", pad_right(&info.ubr, 54));
+    println!("║ BuildNumber: {}", pad_right(&info.build_number, 47));
+    println!("║ HotFix Count: {}", pad_right(&info.hotfix_list.len().to_string(), 46));
+    println!("║ Hostname: {}", pad_right(&info.hostname, 50));
+    println!("║ CPU: {}", pad_right(&info.cpu, 55));
+    println!("║ Memory: {}", pad_right(&info.memory, 52));
+    println!("║ Screen: {}", pad_right(&info.screen, 52));
+    println!("║ ElectronVersion: {}", pad_right(&info.electron_version, 43));
+    println!("║ HardwareHash: {}", pad_right(&info.layered.hardware_hash, 46));
+    println!("║ SoftwareHash: {}", pad_right(&info.layered.software_hash, 46));
+    println!("║ GeneratedAt: {}", pad_right(&info.generated_at, 50));
+    println!("╚══════════════════════════════════════════════════════════════╝\n");
+
+    log::info!("[DeviceFingerprint] 采集完成");
     Ok(info.clone())
 }
 
@@ -400,7 +441,7 @@ fn pinyin_to_chinese(pinyin: &str) -> Option<&'static str> {
         "guizhou" => Some("贵州"),
         "yunnan" => Some("云南"),
         "xizang" | "tibet" => Some("西藏"),
-        "shanxi" | "shaanxi" => Some("陕西"),
+        "shaanxi" => Some("陕西"),
         "gansu" => Some("甘肃"),
         "qinghai" => Some("青海"),
         "ningxia" => Some("宁夏"),
@@ -527,7 +568,21 @@ fn get_local_ip() -> String {
 #[tauri::command]
 async fn scan_wifi_environment() -> Result<Vec<WifiNetwork>, String> {
     let networks = wifi::scan_top_wifi_networks(5)?;
-    info!("[WifiEnvironment] 扫描到的前五 Wi‑Fi: {:?}", networks);
+    println!("\n╔══════════════════════════════════════════════════════════════╗");
+    println!("║                  WifiEnvironment 采集结果                   ║");
+    println!("╠══════════════════════════════════════════════════════════════╣");
+    println!("║ {}", pad_right(&format!("扫描到的前五 Wi‑Fi 网络 (共 {} 个):", networks.len()), 61));
+    if networks.is_empty() {
+        println!("║ {}", pad_right("(无)", 61));
+    } else {
+        for (idx, n) in networks.iter().enumerate() {
+            let line = format!("{}. {} (signal: {})", idx + 1, n.ssid, n.signal);
+            println!("║ {}", pad_right(&line, 61));
+        }
+    }
+    println!("╚══════════════════════════════════════════════════════════════╝\n");
+
+    log::info!("[WifiEnvironment] 采集完成，共 {} 个网络", networks.len());
     Ok(networks)
 }
 

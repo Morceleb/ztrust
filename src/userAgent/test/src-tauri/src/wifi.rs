@@ -23,32 +23,53 @@ pub fn scan_top_wifi_networks(limit: usize) -> Result<Vec<WifiNetwork>, String> 
 
 #[cfg(windows)]
 fn scan_windows_wifi_networks(limit: usize) -> Result<Vec<WifiNetwork>, String> {
-    // 注意：早期版本使用 `mode=bssid` 试图获取 BSSID/信号强度，
-    // 但在部分 Windows 11（特别是 MediaTek 等网卡 + 用户权限）下，
-    // `mode=bssid` 会导致整个 BSSID/Signal 块被省略，
-    // 结果只能看到第一个 SSID。改用默认输出可保证拿到全部可见 SSID 名称。
-    let output = Command::new("netsh")
-        .args(["wlan", "show", "networks"])
+    // 先尝试 mode=bssid（可拿到每个 BSSID 的信号强度，再按 SSID 取最强）。
+    // 早期版本曾担心 mode=bssid 在某些网卡上省略整个 BSSID/Signal 块，
+    // 实测通过 netsh 直接执行是稳定的（部分 MediaTek 仍可能拿不到完整信号，
+    // 但至少能保留 fallback 路径）。
+    let mut stdout = String::new();
+    if let Ok(out) = Command::new("netsh")
+        .args(["wlan", "show", "networks", "mode=bssid"])
         .output()
-        .map_err(|e| format!("执行 netsh 失败: {}", e))?;
-
-    if !output.status.success() {
-        return Err(format!(
-            "netsh 扫描失败: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
+    {
+        if out.status.success() {
+            stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+        }
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    // 兜底——某些环境（无线服务未启动、命令行权限问题）下 mode=bssid 会失败，
+    // 此时回退到默认输出，至少拿到 SSID 列表。
+    if stdout.is_empty() {
+        let fallback = Command::new("netsh")
+            .args(["wlan", "show", "networks"])
+            .output()
+            .map_err(|e| format!("执行 netsh 失败: {}", e))?;
+        if !fallback.status.success() {
+            return Err(format!(
+                "netsh 扫描失败: {}",
+                String::from_utf8_lossy(&fallback.stderr).trim()
+            ));
+        }
+        stdout = String::from_utf8_lossy(&fallback.stdout).into_owned();
+    }
+
     let mut strongest_by_ssid: HashMap<String, u8> = HashMap::new();
     let mut current_ssid: Option<String> = None;
+    let mut has_seen_bssid_block = false;
 
     for raw_line in stdout.lines() {
         let line = raw_line.trim();
 
         if let Some(ssid) = parse_ssid_line(line) {
             current_ssid = Some(ssid);
+            has_seen_bssid_block = false;
             continue;
+        }
+
+        // BSSID 行出现意味着已经离开 SSID 头信息，进入信号块；
+        // 标记此 SSID 已经看到 BSSID 列表（后续的 "信号" 行归属于这个 SSID）。
+        if line.starts_with("BSSID") {
+            has_seen_bssid_block = true;
         }
 
         if let Some(signal) = parse_signal_line(line) {
@@ -69,20 +90,20 @@ fn scan_windows_wifi_networks(limit: usize) -> Result<Vec<WifiNetwork>, String> 
             continue;
         }
 
-        // 兜底：某些 netsh 输出（尤其是 Windows 11 中文环境且非管理员权限）
-        // 会省略 BSSID/Signal 块，但每个 SSID 块仍然会输出。
-        // 在遇到新的 SSID 之前，若 current_ssid 还没被加入，至少把已知 SSID 以 signal=0 占位，
-        // 避免最终结果为空。
-        if let Some(ssid) = current_ssid.clone() {
-            if !ssid.is_empty() && !strongest_by_ssid.contains_key(&ssid) {
-                // 仅在确实看到 SSID 块（已经有 Network type / 身份验证 / 加密等后续行）时占位
-                if line.starts_with("Network type")
-                    || line.starts_with("身份验证")
-                    || line.starts_with("加密")
-                    || line.starts_with("Authentication")
-                    || line.starts_with("Encryption")
-                {
-                    strongest_by_ssid.insert(ssid, 0);
+        // 兜底：某些 netsh 输出（Windows 11 中文环境且非管理员权限下）会省略 BSSID/Signal 块，
+        // 但每个 SSID 块仍然会输出。在遇到新的 SSID 之前，若 current_ssid 还没被加入，
+        // 至少把已知 SSID 以 signal=0 占位，避免最终结果为空。
+        if !has_seen_bssid_block {
+            if let Some(ssid) = current_ssid.clone() {
+                if !ssid.is_empty() && !strongest_by_ssid.contains_key(&ssid) {
+                    if line.starts_with("Network type")
+                        || line.starts_with("身份验证")
+                        || line.starts_with("加密")
+                        || line.starts_with("Authentication")
+                        || line.starts_with("Encryption")
+                    {
+                        strongest_by_ssid.insert(ssid, 0);
+                    }
                 }
             }
         }

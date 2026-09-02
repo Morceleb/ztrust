@@ -2,6 +2,17 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 
+/// 计算字符串在终端的视觉宽度（ASCII=1，中文/全角=2）
+fn visual_width(s: &str) -> usize {
+    s.chars().map(|c| if c.is_ascii() { 1 } else { 2 }).sum()
+}
+
+/// 将字符串填充到指定视觉宽度
+fn pad_right(s: &str, width: usize) -> String {
+    let vw = visual_width(s);
+    if vw >= width { s.to_string() } else { format!("{}{}", s, " ".repeat(width - vw)) }
+}
+
 static DEVICE_ID_FILE: &str = "device_id.txt";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,6 +26,11 @@ pub struct DeviceInfo {
     pub layered: LayeredFingerprint,
     pub platform: String,
     pub os_version: String,
+    // 新增：OS 详细信息
+    pub display_version: String,   // 功能更新版本，如 "23H2"
+    pub ubr: String,               // 补丁修订号，如 "4391"
+    pub build_number: String,      // 构建号，如 "22631"
+    pub hotfix_list: Vec<String>,  // 已安装的 KB 补丁列表
     pub hostname: String,
     pub cpu: String,
     pub memory: String,
@@ -28,6 +44,15 @@ pub struct DeviceMeta {
     pub hostname: String,
     pub cpu: String,
     pub machine_id: String,
+}
+
+/// OS 详细信息结构体
+#[derive(Debug, Clone)]
+pub struct OsDetails {
+    pub display_version: String,  // 功能更新版本，如 "23H2"
+    pub ubr: String,              // 补丁修订号，如 "4391"
+    pub build_number: String,     // 构建号，如 "22631"
+    pub hotfix_list: Vec<String>, // 已安装的 KB 补丁列表
 }
 
 fn device_id_file_path(app_dir: &PathBuf) -> PathBuf {
@@ -104,11 +129,38 @@ pub fn generate_device_info() -> Result<DeviceInfo, String> {
     .to_string();
 
     let os_version = get_real_os_version();
+    let os_details = get_os_details();
     let hostname = get_hostname();
     let cpu = get_cpu_info();
     let memory = get_memory_info();
     let screen = get_screen_info();
+    let ip_info = get_ip_info();
     let electron_version = "Tauri 2.0".to_string();
+
+    // 打印 OS 详细信息到控制台
+    println!("\n╔══════════════════════════════════════════════════════════════╗");
+    println!("║                    OS 信息采集结果                           ║");
+    println!("╠══════════════════════════════════════════════════════════════╣");
+    let hotfix_display = if os_details.hotfix_list.is_empty() {
+        "无".to_string()
+    } else if os_details.hotfix_list.len() <= 3 {
+        os_details.hotfix_list.join(", ")
+    } else {
+        format!("{}... (+{} more)",
+            os_details.hotfix_list.iter().take(3).cloned().collect::<Vec<_>>().join(", "),
+            os_details.hotfix_list.len() - 3)
+    };
+
+    println!("║ OS 版本: {}", pad_right(&os_version, 56));
+    println!("║ DisplayVersion: {}", pad_right(&os_details.display_version, 45));
+    println!("║ UBR (补丁修订号): {}", pad_right(&os_details.ubr, 47));
+    println!("║ BuildNumber: {}", pad_right(&os_details.build_number, 47));
+    println!("║ 已安装补丁数量: {}", pad_right(&os_details.hotfix_list.len().to_string(), 47));
+    println!("║ 补丁列表: {}", pad_right(&hotfix_display, 51));
+    println!("║ Hostname: {}", pad_right(&hostname, 50));
+    println!("║ 本地 IP (首选): {}", pad_right(&ip_info.local_ip, 45));
+    println!("║ 公网 IP: {}", pad_right(&ip_info.public_ip, 50));
+    println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     let hardware_data = format!("{}|{}|{}", hostname, cpu, screen);
     let hardware_hash = generate_hash(&hardware_data);
@@ -125,6 +177,10 @@ pub fn generate_device_info() -> Result<DeviceInfo, String> {
         layered,
         platform,
         os_version,
+        display_version: os_details.display_version,
+        ubr: os_details.ubr,
+        build_number: os_details.build_number,
+        hotfix_list: os_details.hotfix_list,
         hostname,
         cpu,
         memory,
@@ -156,15 +212,57 @@ fn get_hostname() -> String {
 fn get_cpu_info() -> String {
     #[cfg(windows)]
     {
-        "Intel/AMD Processor".to_string()
+        use std::process::Command;
+        // 通过 WMI 读取 CPU 名称、核心数、逻辑处理器、最大频率
+        let ps_cmd = "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; \
+            $p = Get-CimInstance Win32_Processor; \
+            if ($null -eq $p) { '' } else { \
+                $name = $p.Name.Trim(); \
+                $cores = $p.NumberOfCores; \
+                $logical = $p.NumberOfLogicalProcessors; \
+                $ghz = if ($p.MaxClockSpeed) { [math]::Round($p.MaxClockSpeed / 1000.0, 2) } else { 0 }; \
+                \"{0} @ {1}GHz ({2}核/{3}线程)\" -f $name, $ghz, $cores, $logical \
+            }";
+        if let Ok(out) = Command::new("powershell")
+            .args(["-NoProfile", "-Command", ps_cmd])
+            .output()
+        {
+            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !s.is_empty() {
+                return s;
+            }
+        }
+        "Unknown CPU".to_string()
     }
     #[cfg(target_os = "macos")]
     {
-        "Apple Silicon/Intel".to_string()
+        use std::process::Command;
+        if let Ok(out) = Command::new("sysctl")
+            .args(["-n", "machdep.cpu.brand_string"])
+            .output()
+        {
+            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !s.is_empty() {
+                return s;
+            }
+        }
+        "Unknown CPU".to_string()
     }
     #[cfg(target_os = "linux")]
     {
-        "Linux CPU".to_string()
+        if let Ok(content) = std::fs::read_to_string("/proc/cpuinfo") {
+            let model = content
+                .lines()
+                .find(|l| l.starts_with("model name"))
+                .and_then(|l| l.split(':').nth(1))
+                .map(|s| s.trim())
+                .unwrap_or("");
+            let count = content.lines().filter(|l| l.starts_with("processor")).count();
+            if !model.is_empty() {
+                return format!("{} ({} 核)", model, count);
+            }
+        }
+        "Unknown CPU".to_string()
     }
     #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
     {
@@ -175,15 +273,75 @@ fn get_cpu_info() -> String {
 fn get_memory_info() -> String {
     #[cfg(windows)]
     {
-        "8GB/16GB".to_string()
+        use std::process::Command;
+        // 通过 WMI 同时拿总物理内存与可用内存，返回 "总 XGB / 可用 YGB"
+        let ps_cmd = "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; \
+            $cs = Get-CimInstance Win32_ComputerSystem; \
+            $os = Get-CimInstance Win32_OperatingSystem; \
+            if ($null -eq $cs -or $null -eq $os) { '' } else { \
+                $total = [math]::Round($cs.TotalPhysicalMemory / 1GB, 1); \
+                $free  = [math]::Round($os.FreePhysicalMemory  / 1MB / 1024.0, 1); \
+                \"总 {0}GB / 可用 {1}GB\" -f $total, $free \
+            }";
+        if let Ok(out) = Command::new("powershell")
+            .args(["-NoProfile", "-Command", ps_cmd])
+            .output()
+        {
+            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !s.is_empty() {
+                return s;
+            }
+        }
+        "Unknown".to_string()
     }
     #[cfg(target_os = "macos")]
     {
-        "8GB/16GB/32GB".to_string()
+        use std::process::Command;
+        if let Ok(out) = Command::new("sysctl")
+            .args(["-n", "hw.memsize"])
+            .output()
+        {
+            let total_bytes: u64 = String::from_utf8_lossy(&out.stdout)
+                .trim()
+                .parse()
+                .unwrap_or(0);
+            if total_bytes > 0 {
+                let total_gb = total_bytes as f64 / 1024.0 / 1024.0 / 1024.0;
+                return format!("总 {:.1}GB", total_gb);
+            }
+        }
+        "Unknown".to_string()
     }
     #[cfg(target_os = "linux")]
     {
-        "4GB/8GB/16GB".to_string()
+        if let Ok(content) = std::fs::read_to_string("/proc/meminfo") {
+            let total_kb = content
+                .lines()
+                .find(|l| l.starts_with("MemTotal"))
+                .and_then(|l| {
+                    l.split_whitespace()
+                        .nth(1)
+                        .and_then(|v| v.parse::<u64>().ok())
+                })
+                .unwrap_or(0);
+            let avail_kb = content
+                .lines()
+                .find(|l| l.starts_with("MemAvailable"))
+                .and_then(|l| {
+                    l.split_whitespace()
+                        .nth(1)
+                        .and_then(|v| v.parse::<u64>().ok())
+                })
+                .unwrap_or(0);
+            if total_kb > 0 {
+                return format!(
+                    "总 {:.1}GB / 可用 {:.1}GB",
+                    total_kb as f64 / 1024.0 / 1024.0,
+                    avail_kb as f64 / 1024.0 / 1024.0
+                );
+            }
+        }
+        "Unknown".to_string()
     }
     #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
     {
@@ -238,6 +396,172 @@ fn get_real_os_version() -> String {
     {
         "Unknown".to_string()
     }
+}
+
+/// 获取本地首选 IPv4（通过 UDP Socket 探测出口 IP）+ 公网 IP（同步 HTTP 探测）。
+/// 公网 IP 获取失败时返回 "N/A"，不影响整体采集。
+fn get_ip_info() -> IpInfo {
+    let local_ip = get_local_ip();
+    let public_ip = get_public_ip_blocking();
+    IpInfo { local_ip, public_ip }
+}
+
+/// 用 UDP Socket 连 8.8.8.8 拿本机首选出口 IP（不同 Wi‑Fi 时优先返回当前活动网卡）
+fn get_local_ip() -> String {
+    if let Ok(socket) = std::net::UdpSocket::bind("0.0.0.0:0") {
+        if socket.connect("8.8.8.8:53").is_ok() {
+            if let Ok(addr) = socket.local_addr() {
+                return addr.ip().to_string();
+            }
+        }
+    }
+    "N/A".to_string()
+}
+
+/// 同步获取公网 IP（短超时，失败时回落到 N/A）。
+/// 这里只做"采集结果展示"，不参与网络通讯，避免阻塞采集流程。
+fn get_public_ip_blocking() -> String {
+    let candidates = [
+        ("https://api.ipify.org?format=text", 64),
+        ("https://ifconfig.me/ip", 64),
+        ("https://ipv4.icanhazip.com", 64),
+    ];
+
+    for (url, max_len) in candidates {
+        // 走 cmd /c curl，避免在 Tauri 里额外引入 reqwest 阻塞客户端
+        if let Ok(out) = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                &format!(
+                    "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; \
+                     try {{ \
+                         $ProgressPreference='SilentlyContinue'; \
+                         $r = Invoke-WebRequest -Uri '{}' -UseBasicParsing -TimeoutSec 4 -MaximumRedirection 3; \
+                         $r.Content.Trim() \
+                     }} catch {{ '' }}",
+                    url
+                ),
+            ])
+            .output()
+        {
+            if out.status.success() {
+                let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !s.is_empty() && s.len() <= max_len {
+                    return s;
+                }
+            }
+        }
+    }
+
+    "N/A".to_string()
+}
+
+/// 获取 OS 详细信息：DisplayVersion, UBR, BuildNumber, HotFixID 列表
+fn get_os_details() -> OsDetails {
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+
+        let mut details = OsDetails {
+            display_version: String::new(),
+            ubr: String::new(),
+            build_number: String::new(),
+            hotfix_list: Vec::new(),
+        };
+
+        // 1. 从注册表获取 DisplayVersion
+        if let Ok(output) = Command::new("reg")
+            .args([
+                "query",
+                r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+                "/v",
+                "DisplayVersion",
+            ])
+            .output()
+        {
+            let s = String::from_utf8_lossy(&output.stdout);
+            if let Some(line) = s.lines().find(|l| l.contains("DisplayVersion")) {
+                if let Some(value) = line.split_whitespace().last() {
+                    details.display_version = value.trim().to_string();
+                }
+            }
+        }
+
+        // 2. 从注册表获取 UBR (Update Build Revision)
+        if let Ok(output) = Command::new("reg")
+            .args([
+                "query",
+                r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+                "/v",
+                "UBR",
+            ])
+            .output()
+        {
+            let s = String::from_utf8_lossy(&output.stdout);
+            if let Some(line) = s.lines().find(|l| l.contains("UBR")) {
+                if let Some(value) = line.split_whitespace().last() {
+                    details.ubr = value.trim().to_string();
+                }
+            }
+        }
+
+        // 3. 从 Win32_OperatingSystem 获取 BuildNumber
+        if let Ok(output) = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; (Get-CimInstance Win32_OperatingSystem | Select-Object -ExpandProperty BuildNumber)",
+            ])
+            .output()
+        {
+            let s = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !s.is_empty() {
+                details.build_number = s;
+            }
+        }
+
+        // 4. 获取 HotFixID 列表
+        if let Ok(output) = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; (Get-CimInstance Win32_QuickFixEngineering | Select-Object -ExpandProperty HotFixID | ConvertTo-Json -Compress)",
+            ])
+            .output()
+        {
+            let s = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !s.is_empty() {
+                // 解析 JSON 数组
+                if s.starts_with('[') {
+                    if let Ok(list) = serde_json::from_str::<Vec<String>>(&s) {
+                        details.hotfix_list = list;
+                    }
+                } else if !s.starts_with('{') {
+                    // 单个元素的情况，JSON 解析会失败，当作字符串处理
+                    details.hotfix_list = vec![s.clone()];
+                }
+            }
+        }
+
+        details
+    }
+    #[cfg(not(windows))]
+    {
+        OsDetails {
+            display_version: "N/A".to_string(),
+            ubr: "N/A".to_string(),
+            build_number: std::env::consts::OS.to_string(),
+            hotfix_list: Vec::new(),
+        }
+    }
+}
+
+/// IP 采集结果：本地首选 + 公网出口 IP
+#[derive(Debug, Clone)]
+pub struct IpInfo {
+    pub local_ip: String,
+    pub public_ip: String,
 }
 
 fn generate_hash(data: &str) -> String {

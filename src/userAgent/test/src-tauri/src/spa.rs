@@ -208,11 +208,11 @@ pub fn send_spa_packet(
     // AES-256-GCM 加密
     let cipher = Aes256Gcm::new_from_slice(&spa_key).map_err(|e| e.to_string())?;
     let nonce_array: [u8; 12] = nonce.clone().try_into().map_err(|_| "Nonce length error")?;
-    let nonce = Nonce::from_slice(&nonce_array);
+    let nonce = Nonce::from(nonce_array);
 
     let ciphertext = cipher
         .encrypt(
-            nonce,
+            &nonce,
             Payload {
                 msg: &payload,
                 aad: &aad,
@@ -257,6 +257,7 @@ pub fn send_spa_packet(
 }
 
 /// 异步发送 SPA 报文（带超时和重试）
+#[allow(dead_code)]
 pub fn send_spa_packet_with_retry(
     server_address: &str,
     port: u16,
