@@ -2,16 +2,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 
-/// 计算字符串在终端的视觉宽度（ASCII=1，中文/全角=2）
-fn visual_width(s: &str) -> usize {
-    s.chars().map(|c| if c.is_ascii() { 1 } else { 2 }).sum()
-}
-
-/// 将字符串填充到指定视觉宽度
-fn pad_right(s: &str, width: usize) -> String {
-    let vw = visual_width(s);
-    if vw >= width { s.to_string() } else { format!("{}{}", s, " ".repeat(width - vw)) }
-}
+pub use crate::device_security::{collect_device_security, DeviceSecurity, format_software_summary};
 
 static DEVICE_ID_FILE: &str = "device_id.txt";
 
@@ -23,6 +14,8 @@ pub struct LayeredFingerprint {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceInfo {
+    /// 设备唯一ID（ztrust_device_id）：UUID v4 → SHA256 → 64字符hex（32字节）
+    pub device_id: String,
     pub layered: LayeredFingerprint,
     pub platform: String,
     pub os_version: String,
@@ -37,6 +30,11 @@ pub struct DeviceInfo {
     pub screen: String,
     pub electron_version: String,
     pub generated_at: String,
+    // 网络位置信息（本地/公网）
+    pub local_ip: String,
+    pub public_ip: String,
+    // 设备上下文（安全状态 / 磁盘加密 / 软件清单）
+    pub security: DeviceSecurity,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -119,7 +117,7 @@ pub fn get_device_meta(app_dir: &PathBuf) -> DeviceMeta {
     }
 }
 
-pub fn generate_device_info() -> Result<DeviceInfo, String> {
+pub fn generate_device_info(app_dir: &PathBuf) -> Result<DeviceInfo, String> {
     let platform = match std::env::consts::OS {
         "windows" => "Windows",
         "macos" => "macOS",
@@ -127,6 +125,9 @@ pub fn generate_device_info() -> Result<DeviceInfo, String> {
         _ => "Unknown",
     }
     .to_string();
+
+    // ── 设备唯一 ID：UUID v4 → SHA256 → 64 字符 hex，写到 app_dir/device_id.txt
+    let device_id = read_or_create_device_id(app_dir);
 
     let os_version = get_real_os_version();
     let os_details = get_os_details();
@@ -137,30 +138,8 @@ pub fn generate_device_info() -> Result<DeviceInfo, String> {
     let ip_info = get_ip_info();
     let electron_version = "Tauri 2.0".to_string();
 
-    // 打印 OS 详细信息到控制台
-    println!("\n╔══════════════════════════════════════════════════════════════╗");
-    println!("║                    OS 信息采集结果                           ║");
-    println!("╠══════════════════════════════════════════════════════════════╣");
-    let hotfix_display = if os_details.hotfix_list.is_empty() {
-        "无".to_string()
-    } else if os_details.hotfix_list.len() <= 3 {
-        os_details.hotfix_list.join(", ")
-    } else {
-        format!("{}... (+{} more)",
-            os_details.hotfix_list.iter().take(3).cloned().collect::<Vec<_>>().join(", "),
-            os_details.hotfix_list.len() - 3)
-    };
-
-    println!("║ OS 版本: {}", pad_right(&os_version, 56));
-    println!("║ DisplayVersion: {}", pad_right(&os_details.display_version, 45));
-    println!("║ UBR (补丁修订号): {}", pad_right(&os_details.ubr, 47));
-    println!("║ BuildNumber: {}", pad_right(&os_details.build_number, 47));
-    println!("║ 已安装补丁数量: {}", pad_right(&os_details.hotfix_list.len().to_string(), 47));
-    println!("║ 补丁列表: {}", pad_right(&hotfix_display, 51));
-    println!("║ Hostname: {}", pad_right(&hostname, 50));
-    println!("║ 本地 IP (首选): {}", pad_right(&ip_info.local_ip, 45));
-    println!("║ 公网 IP: {}", pad_right(&ip_info.public_ip, 50));
-    println!("╚══════════════════════════════════════════════════════════════╝\n");
+    // ── 采集设备上下文（安全状态 / 磁盘加密 / 软件清单）──────────────────
+    let security = collect_device_security();
 
     let hardware_data = format!("{}|{}|{}", hostname, cpu, screen);
     let hardware_hash = generate_hash(&hardware_data);
@@ -174,6 +153,7 @@ pub fn generate_device_info() -> Result<DeviceInfo, String> {
     };
 
     Ok(DeviceInfo {
+        device_id,
         layered,
         platform,
         os_version,
@@ -187,6 +167,9 @@ pub fn generate_device_info() -> Result<DeviceInfo, String> {
         screen,
         electron_version,
         generated_at: chrono::Utc::now().to_rfc3339(),
+        local_ip: ip_info.local_ip,
+        public_ip: ip_info.public_ip,
+        security,
     })
 }
 

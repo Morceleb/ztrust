@@ -1,5 +1,6 @@
 mod database;
 mod device;
+pub mod device_security;
 mod activity;
 mod wifi;
 mod bluetooth;
@@ -20,11 +21,6 @@ fn pad_right(s: &str, width: usize) -> String {
     } else {
         format!("{}{}", s, " ".repeat(width - vw))
     }
-}
-
-/// 填充并在末尾追加右边界 `║`
-fn pad_row(content: &str, width: usize) -> String {
-    format!("{}║", pad_right(content, width))
 }
 
 use activity::{ActivityConfig, ActivityMonitor};
@@ -64,10 +60,13 @@ fn get_or_init_db<'a>(db_guard: &'a mut MutexGuard<'_, Option<Database>>) -> Res
         .ok_or_else(|| "数据库未初始化".to_string())
 }
 
-fn get_or_init_device_info<'a>(device_guard: &'a mut MutexGuard<'_, Option<DeviceInfo>>) -> Result<&'a DeviceInfo, String> {
+fn get_or_init_device_info<'a>(
+    app_dir: &std::path::PathBuf,
+    device_guard: &'a mut MutexGuard<'_, Option<DeviceInfo>>,
+) -> Result<&'a DeviceInfo, String> {
     if device_guard.is_none() {
         info!("设备信息延迟初始化开始");
-        **device_guard = Some(device::generate_device_info()?);
+        **device_guard = Some(device::generate_device_info(app_dir)?);
     }
 
     device_guard
@@ -341,30 +340,126 @@ async fn activity_get_stats(state: State<'_, AppState>) -> Result<Option<activit
 // ==================== 设备信息命令 ====================
 
 #[tauri::command]
-async fn get_device_info(state: State<'_, AppState>) -> Result<DeviceInfo, String> {
-    let mut device = state.device_info.lock().map_err(|e| e.to_string())?;
-    let info = get_or_init_device_info(&mut device)?;
+async fn get_device_info(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<DeviceInfo, String> {
+    // 拿到 Tauri 应用数据目录（用于持久化 ztrust_device_id）
+    let app_dir: std::path::PathBuf = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("无法获取 app_data_dir: {}", e))?;
+    if let Err(e) = std::fs::create_dir_all(&app_dir) {
+        log::warn!("[DeviceInfo] 创建 app_data_dir 失败: {}", e);
+    }
 
+    let mut device = state.device_info.lock().map_err(|e| e.to_string())?;
+    let info = get_or_init_device_info(&app_dir, &mut device)?;
+
+    // ═══════════ 设备上下文（按指定顺序，仅这 8 个字段）═══════════
     println!("\n╔══════════════════════════════════════════════════════════════╗");
-    println!("║                 DeviceFingerprint 采集结果                  ║");
+    println!("║                      设备上下文采集结果                      ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║ Platform: {}", pad_right(&info.platform, 48));
-    println!("║ OS Version: {}", pad_right(&info.os_version, 47));
-    println!("║ DisplayVersion: {}", pad_right(&info.display_version, 44));
-    println!("║ UBR: {}", pad_right(&info.ubr, 54));
-    println!("║ BuildNumber: {}", pad_right(&info.build_number, 47));
-    println!("║ HotFix Count: {}", pad_right(&info.hotfix_list.len().to_string(), 46));
-    println!("║ Hostname: {}", pad_right(&info.hostname, 50));
-    println!("║ CPU: {}", pad_right(&info.cpu, 55));
-    println!("║ Memory: {}", pad_right(&info.memory, 52));
-    println!("║ Screen: {}", pad_right(&info.screen, 52));
-    println!("║ ElectronVersion: {}", pad_right(&info.electron_version, 43));
-    println!("║ HardwareHash: {}", pad_right(&info.layered.hardware_hash, 46));
-    println!("║ SoftwareHash: {}", pad_right(&info.layered.software_hash, 46));
-    println!("║ GeneratedAt: {}", pad_right(&info.generated_at, 50));
+
+    // ① 设备ID
+    println!("║ ① 设备ID: {}", pad_right(&info.device_id, 52));
+
+    // ② 设备类型（基于平台 + CPU 简单判断 PC/Mac/Linux）
+    let device_type = match info.platform.as_str() {
+        "Windows" => "台式机/笔记本 (PC)",
+        "macOS" => "Mac",
+        "Linux" => "Linux 主机",
+        _ => "未知设备",
+    };
+    println!("║ ② 设备类型: {}", pad_right(device_type, 50));
+
+    // ③ 操作系统版本与补丁级别（OS版本 + DisplayVersion + UBR + BuildNumber + 补丁数）
+    let hotfix_n = info.hotfix_list.len();
+    let os_with_patch = format!(
+        "{} | {} | UBR {} | Build {} | 补丁 {} 个",
+        info.os_version, info.display_version, info.ubr, info.build_number, hotfix_n
+    );
+    println!("║ ③ OS版本与补丁: {}", pad_right(&os_with_patch, 44));
+
+    // ④ 防火墙状态
+    let fw_status = if info.security.firewall.all_enabled {
+        "已全部启用 ✅"
+    } else if info.security.firewall.profile_states.is_empty() {
+        "未启用 ❌"
+    } else {
+        "部分启用 ⚠️"
+    };
+    let fw_detail = if info.security.firewall.profile_states.is_empty() {
+        info.security.firewall.raw_summary.chars().take(30).collect::<String>()
+    } else {
+        info.security
+            .firewall
+            .profile_states
+            .iter()
+            .map(|(k, v)| format!("{}:{}", k, v))
+            .collect::<Vec<_>>()
+            .join(" / ")
+    };
+    println!(
+        "║ ④ 防火墙: {} | {}",
+        pad_right(fw_status, 16),
+        pad_right(&fw_detail, 30)
+    );
+
+    // ⑤ 磁盘加密状态
+    let disk_status = &info.security.disk_encryption.status;
+    let disk_detail = if info.security.disk_encryption.volumes.is_empty() {
+        "无卷".to_string()
+    } else {
+        info.security
+            .disk_encryption
+            .volumes
+            .iter()
+            .map(|v| format!("{}: {}% {} {}", v.volume.trim_end_matches('\\'), v.percentage, v.method, v.protection))
+            .collect::<Vec<_>>()
+            .join(" | ")
+    };
+    println!(
+        "║ ⑤ 磁盘加密: {} | {}",
+        pad_right(disk_status, 16),
+        pad_right(&disk_detail, 30)
+    );
+
+    // ⑥ Root / 越狱状态（Desktop OS 一般不适用，用 system_integrity 兜底展示）
+    let root_status = if info.security.security_state.system_integrity.is_empty()
+        || info.security.security_state.system_integrity == "N/A"
+    {
+        "N/A (桌面系统)".to_string()
+    } else {
+        info.security.security_state.system_integrity.clone()
+    };
+    println!("║ ⑥ Root/越狱状态: {}", pad_right(&root_status, 45));
+
+    // ⑦ 已安装软件列表（总数 + 前 5 个）
+    let sw_count = info.security.software_list.count;
+    let sw_summary = device::format_software_summary(&info.security.software_list, 5);
+    println!(
+        "║ ⑦ 已安装软件: {} 个 | 前5: {}",
+        pad_right(&sw_count.to_string(), 49),
+        pad_right(&sw_summary, 14)
+    );
+
+    // ⑧ 网络位置（本地 IP + 公网 IP + 防火墙整体）
+    let net_location = format!(
+        "本地 {} | 公网 {} | 防火墙 {}",
+        info.local_ip,
+        info.public_ip,
+        if info.security.security_state.security_level.contains("高") {
+            "启用"
+        } else {
+            "未启用"
+        }
+    );
+    println!("║ ⑧ 网络位置: {}", pad_right(&net_location, 50));
+
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
-    log::info!("[DeviceFingerprint] 采集完成");
+    log::info!("[DeviceInfo] 设备上下文采集完成 (device_id={})", &info.device_id);
     Ok(info.clone())
 }
 
