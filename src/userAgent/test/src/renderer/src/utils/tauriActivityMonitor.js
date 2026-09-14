@@ -165,6 +165,82 @@ class ActivityMonitorClient {
         }
     }
 
+    // ==================== 快捷键记录 ====================
+
+    /**
+     * 记录快捷键操作
+     * @param {string} keyCombo - 快捷键组合，如 'Ctrl+D', 'Delete', 'Ctrl+Shift+P'
+     */
+    async recordShortcut(keyCombo) {
+        try {
+            console.log('[ActivityMonitorClient] 记录快捷键:', keyCombo);
+            await invoke('activity_record_shortcut', { keyCombo });
+            console.log('[ActivityMonitorClient] 快捷键记录成功');
+        } catch (error) {
+            console.error('[ActivityMonitorClient] 快捷键记录失败:', error);
+        }
+    }
+
+    /**
+     * 记录命令调用
+     * @param {string} commandName - 命令名称，如 'download', 'upload', 'delete'
+     */
+    async recordCommand(commandName) {
+        try {
+            console.log('[ActivityMonitorClient] 记录命令:', commandName);
+            await invoke('activity_record_command', { commandName });
+            console.log('[ActivityMonitorClient] 命令记录成功');
+        } catch (error) {
+            console.error('[ActivityMonitorClient] 命令记录失败:', error);
+        }
+    }
+
+    /**
+     * 记录文件操作
+     * @param {string} path - 文件路径
+     * @param {string} operation - 操作类型，如 'open', 'create', 'delete', 'rename'
+     */
+    async recordFile(path, operation) {
+        try {
+            console.log('[ActivityMonitorClient] 记录文件操作:', { path, operation });
+            await invoke('activity_record_file', { path, operation });
+            console.log('[ActivityMonitorClient] 文件操作记录成功');
+        } catch (error) {
+            console.error('[ActivityMonitorClient] 文件操作记录失败:', error);
+        }
+    }
+
+    /**
+     * 记录资源打开事件
+     * @param {string} resourceId - 资源ID
+     * @param {string} title - 资源标题
+     */
+    async recordResourceOpen(resourceId, title) {
+        try {
+            console.log('[ActivityMonitorClient] 记录资源打开:', { resourceId, title });
+            await invoke('activity_record_resource_open', { resourceId, title });
+            console.log('[ActivityMonitorClient] 资源打开记录成功');
+        } catch (error) {
+            console.error('[ActivityMonitorClient] 资源打开记录失败:', error);
+        }
+    }
+
+    /**
+     * 获取频率聚合报告
+     * @returns {Promise<Object>} 频率聚合数据
+     */
+    async getFrequencyReport() {
+        try {
+            console.log('[ActivityMonitorClient] 获取频率聚合报告...');
+            const report = await invoke('activity_get_frequency_report');
+            console.log('[ActivityMonitorClient] 频率报告:', report);
+            return report;
+        } catch (error) {
+            console.error('[ActivityMonitorClient] 获取频率报告失败:', error);
+            return null;
+        }
+    }
+
     // ==================== 数据处理 ====================
 
     handleTimeout(data) {

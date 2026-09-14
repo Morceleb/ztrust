@@ -210,6 +210,40 @@ async fn open_resource_window(
     Ok(())
 }
 
+#[tauri::command]
+async fn close_resource_window(
+    app: AppHandle,
+    resource_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    info!("[Window] 关闭资源窗口: resourceId={}", resource_id);
+
+    // 记录资源关闭事件到活动监控
+    {
+        let monitor = state.activity_monitor.lock().map_err(|e| e.to_string())?;
+        if let Some(ref m) = *monitor {
+            m.record_resource_close(&resource_id);
+        }
+    }
+
+    // 查找并关闭包含此资源ID的窗口
+    let windows = app.webview_windows();
+    for (label, window) in windows {
+        if label.starts_with("resource_") {
+            // 获取窗口的 URL，检查是否包含此 resource_id
+            if let Ok(url) = window.url() {
+                if url.to_string().contains(&resource_id) {
+                    info!("[Window] 关闭资源窗口: label={}", label);
+                    window.close().map_err(|e| e.to_string())?;
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 // ==================== 活动监控命令 ====================
 
 #[tauri::command]
@@ -293,11 +327,11 @@ async fn activity_set_login_state(
         *user = user_info;
     }
     
-    let monitor = state.activity_monitor.lock().map_err(|e| e.to_string())?;
-    if let Some(ref m) = *monitor {
+    let mut monitor = state.activity_monitor.lock().map_err(|e| e.to_string())?;
+    if let Some(ref mut m) = *monitor {
         m.set_login_state(is_logged_in);
     }
-    
+
     Ok(())
 }
 
@@ -307,9 +341,9 @@ async fn activity_logout(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     info!("[Activity] 注销: {}", logout_type);
-    
-    let monitor = state.activity_monitor.lock().map_err(|e| e.to_string())?;
-    if let Some(ref m) = *monitor {
+
+    let mut monitor = state.activity_monitor.lock().map_err(|e| e.to_string())?;
+    if let Some(ref mut m) = *monitor {
         m.report_logout(&logout_type);
     }
     
@@ -868,14 +902,81 @@ async fn activity_mark_batch_uploaded(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     info!("[Activity] 标记批量上传完成: {:?}", batch_ids);
-    
+
     let monitor = state.activity_monitor.lock().map_err(|e| e.to_string())?;
     if let Some(ref m) = *monitor {
         m.clear_uploaded_records(&batch_ids);
         info!("[Activity] 已清除 {} 条已上传记录", batch_ids.len());
     }
-    
+
     Ok(())
+}
+
+/// 记录快捷键操作（采集端做语义映射）
+#[tauri::command]
+async fn activity_record_shortcut(
+    key_combo: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let monitor = state.activity_monitor.lock().map_err(|e| e.to_string())?;
+    if let Some(ref m) = *monitor {
+        m.record_shortcut(&key_combo);
+    }
+    Ok(())
+}
+
+/// 记录命令调用（采集端做语义映射为 Execute）
+#[tauri::command]
+async fn activity_record_command(
+    command_name: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let monitor = state.activity_monitor.lock().map_err(|e| e.to_string())?;
+    if let Some(ref m) = *monitor {
+        m.record_command_call(&command_name);
+    }
+    Ok(())
+}
+
+/// 记录文件操作（采集端做语义映射）
+#[tauri::command]
+async fn activity_record_file(
+    path: String,
+    operation: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let monitor = state.activity_monitor.lock().map_err(|e| e.to_string())?;
+    if let Some(ref m) = *monitor {
+        m.record_file_operation(&path, &operation);
+    }
+    Ok(())
+}
+
+/// 记录资源打开事件
+#[tauri::command]
+async fn activity_record_resource_open(
+    resource_id: String,
+    title: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let monitor = state.activity_monitor.lock().map_err(|e| e.to_string())?;
+    if let Some(ref m) = *monitor {
+        m.record_resource_open(&resource_id, &title);
+    }
+    Ok(())
+}
+
+/// 获取频率聚合报告
+#[tauri::command]
+async fn activity_get_frequency_report(
+    state: State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let monitor = state.activity_monitor.lock().map_err(|e| e.to_string())?;
+    if let Some(ref m) = *monitor {
+        Ok(m.get_frequency_report())
+    } else {
+        Ok(serde_json::json!({}))
+    }
 }
 
 // ==================== 应用启动 ====================
@@ -914,6 +1015,7 @@ pub fn run() {
             window_control,
             window_start_dragging,
             open_resource_window,
+            close_resource_window,
             // 活动监控
             activity_init,
             activity_start,
@@ -923,6 +1025,11 @@ pub fn run() {
             activity_logout,
             activity_get_stats,
             activity_mark_batch_uploaded,
+            activity_record_shortcut,
+            activity_record_command,
+            activity_record_file,
+            activity_record_resource_open,
+            activity_get_frequency_report,
             // 设备信息
             get_device_info,
             get_login_session_info,
