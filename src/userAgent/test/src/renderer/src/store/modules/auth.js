@@ -1,6 +1,9 @@
 import request from '@/utils/request'
 import activityMonitor from '@/utils/activityMonitorWrapper'
 import { SecurityConfig } from '@/config/security'
+import sessionActivityCollector from '@/utils/sessionActivityCollector'
+import { clearSession, saveSession } from '@/api/auth'
+import { saveDeviceToken } from '@/utils/deviceService'
 
 const state = {
     isLoggedIn: false,
@@ -38,6 +41,9 @@ const actions = {
         commit('SET_USER', user)
         console.log('[Auth/Action] loginSuccess: SET_USER 已提交, 当前 isLoggedIn:', this.state.auth.isLoggedIn);
 
+        // 启动会话活动采集器（首次登录时）
+        sessionActivityCollector.startPeriodicFlush();
+
         // 初始化并启动行为监控
         if (SecurityConfig.activityMonitor.enabled) {
             activityMonitor.init({
@@ -54,13 +60,29 @@ const actions = {
 
     // 登出
     logout({ commit }) {
+        // 先打点 logout（登出活动要在清掉 session_id 之前入队）
+        sessionActivityCollector.record({
+            type: 'logout',
+            action: 'manual',
+            payload: {
+                username: this.state?.auth?.user?.name,
+            },
+        });
+
+        // 立即 flushNow（不等 10s 周期）—— 登出时 buffer 里的活动要尽快上报
+        sessionActivityCollector.flushNow().catch(() => {});
+
         // 先更新 Vuex 状态
         commit('LOGOUT')
+
         // 停止行为监控
         activityMonitor.stop()
         activityMonitor.performLogout('manual')
         // 重置登录状态，停止失活计时
         activityMonitor.setLoginState(false)
+
+        // 清除会话凭证（session_id / auth_strength / token / user_info）
+        clearSession()
     },
 
     // 超时自动注销

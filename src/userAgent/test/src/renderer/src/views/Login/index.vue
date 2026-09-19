@@ -25,6 +25,8 @@ import {
     clearLocalStorageCredentials,
 } from '@/utils/keyringService'
 import { getDeviceId, getDeviceMeta, getDeviceToken, saveDeviceToken, clearDeviceToken, hasCompleteDeviceCredentials } from '@/utils/deviceService'
+import { saveSession, getAuthStrength } from '@/api/auth'
+import sessionActivityCollector, { extractResourceId } from '@/utils/sessionActivityCollector'
 
 const router = useRouter()
 const route = useRoute()
@@ -475,6 +477,27 @@ const handleLogin = async () => {
             saveDeviceToken(newDeviceToken);
             console.log('[Login] ✓ device_token 已保存（首次安全码通过）');
         }
+
+        // ── 保存会话凭证（session_id / auth_strength / device_id）──
+        saveSession(rawData);
+        if (rawData.session_id) {
+            console.log('[Login] ✓ session_id 已保存:', rawData.session_id);
+        }
+
+        // ── 登录活动打点 ──
+        sessionActivityCollector.record({
+            type: 'login',
+            action: getAuthStrength() || (rawData.auth_strength) || 'password',
+            payload: {
+                username: username.value,
+                deviceTrusted,
+                hasDeviceToken: !!newDeviceToken,
+                screenW: window.screen?.width,
+                screenH: window.screen?.height,
+                platform: navigator.platform,
+                userAgent: navigator.userAgent,
+            },
+        });
 
         // 若此次可信设备登录成功，提示用户
         if (deviceTrusted) {

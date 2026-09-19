@@ -6,6 +6,8 @@
 
 import axios from 'axios';
 import SecurityConfig from '@/config/security';
+import { getSessionId, getCachedDeviceId } from '@/api/auth';
+import sessionActivityCollector, { extractResourceId } from '@/utils/sessionActivityCollector';
 
 // 检测是否是 Tauri 环境
 const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
@@ -144,6 +146,18 @@ request.interceptors.request.use(
         // 添加请求时间戳
         config.headers['X-Request-Time'] = Date.now();
 
+        // ── 会话级标识：所有受保护请求必须带 ──
+        const sessionId = getSessionId();
+        if (sessionId) {
+            config.headers['X-Session-Id'] = sessionId;
+        }
+
+        // ── 设备级标识：用于服务端 8900 跨层识别设备 ──
+        const deviceId = getCachedDeviceId();
+        if (deviceId) {
+            config.headers['X-Device-Id'] = deviceId;
+        }
+
         // 获取公司地址作为租户 ID（保存完整地址）
         const companyAddress = currentBaseURL || envBaseURL;
         if (companyAddress) {
@@ -154,8 +168,24 @@ request.interceptors.request.use(
             method: config.method,
             url: config.url,
             baseURL: config.baseURL || '(无)',
-            hasToken: !!token
+            hasToken: !!token,
+            hasSessionId: !!sessionId,
+            hasDeviceId: !!deviceId
         });
+
+        // ── 资源访问尝试打点（access_attempt）──
+        if (typeof config.url === 'string' && config.url.includes('/auth/access/')) {
+            const resourceId = extractResourceId(config.url);
+            sessionActivityCollector.record({
+                type: 'access_attempt',
+                action: (config.method || 'get').toUpperCase(),
+                resourceId,
+                payload: {
+                    url: config.url,
+                    hasToken: !!token,
+                },
+            });
+        }
 
         return config;
     },
@@ -172,10 +202,46 @@ request.interceptors.response.use(
             status: response.status,
             url: response.config?.url,
         });
+
+        // ── 资源访问成功打点（access_granted）──
+        const url = response.config?.url || '';
+        if (typeof url === 'string' && url.includes('/auth/access/')) {
+            const resourceId = extractResourceId(url);
+            sessionActivityCollector.record({
+                type: 'access_granted',
+                action: (response.config.method || 'get').toUpperCase(),
+                resourceId,
+                payload: {
+                    url,
+                    status: response.status,
+                },
+            });
+        }
         return response;
     },
     async (error) => {
         const originalRequest = error.config;
+
+        // ── 资源访问失败打点 ──
+        const url = originalRequest?.url || '';
+        if (typeof url === 'string' && url.includes('/auth/access/')) {
+            const resourceId = extractResourceId(url);
+            const status = error.response?.status;
+            let type = 'access_error';
+            if (status === 401 || status === 403) {
+                type = 'access_denied';
+            }
+            sessionActivityCollector.record({
+                type,
+                action: (originalRequest.method || 'get').toUpperCase(),
+                resourceId,
+                payload: {
+                    url,
+                    status: status || 'network_error',
+                    message: error.message,
+                },
+            });
+        }
 
         // 详细记录错误信息
         console.error('[Request] 响应错误:', {
