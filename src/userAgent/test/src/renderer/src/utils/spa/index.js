@@ -5,6 +5,7 @@
 
 import { invoke } from '@tauri-apps/api/core'
 import { getSecurityCode } from '@/utils/keyringService'
+import activityMonitor from '@/utils/activityMonitorWrapper'
 
 /** 硬编码 SPA 端口（与 Rust 端 send_spa_packet 默认值一致） */
 const SPA_PORT = 41234
@@ -165,8 +166,17 @@ export async function ensureSpaSent(options = {}) {
 
             let deviceId
             try {
-                const deviceInfo = await invoke('get_device_info')
-                deviceId = deviceInfo?.layered?.hardware_hash
+                // 优先复用 activityMonitor 已缓存的设备信息，避免重复 invoke 触发 Rust 端采集
+                const cached = activityMonitor?.deviceInfo
+                if (cached?.layered?.hardware_hash) {
+                    deviceId = cached.layered.hardware_hash
+                } else {
+                    const deviceInfo = await invoke('get_device_info')
+                    deviceId = deviceInfo?.layered?.hardware_hash
+                    if (deviceInfo && activityMonitor) {
+                        activityMonitor.deviceInfo = deviceInfo
+                    }
+                }
             } catch (e) {
                 console.warn(`[SPA] (${reason}) 获取设备信息失败:`, e)
             }

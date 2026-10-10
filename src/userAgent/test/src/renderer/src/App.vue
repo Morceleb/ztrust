@@ -31,12 +31,17 @@ const handleTimeout = () => {
 onMounted(async () => {
     activityMonitor.onTimeout(handleTimeout)
 
-    try {
-        const fingerprints = await collectFingerprints()
-        console.log('[App] 双指纹与无线环境已生成:', fingerprints)
-    } catch (error) {
-        console.error('[App] 初始化双指纹失败:', error)
-    }
+    // 后台异步采集指纹/Wi-Fi/蓝牙，不要阻塞首屏渲染或登录按钮可用。
+    // - 采集结果会被缓存到 activityMonitor.deviceInfo，
+    //   后续需要设备信息时直接复用，不会重复触发 Rust 端 PowerShell/netsh。
+    // - 失败仅记录日志，不影响页面与登录。
+    collectFingerprints()
+        .then((fingerprints) => {
+            console.log('[App] 双指纹与无线环境已生成:', fingerprints)
+        })
+        .catch((error) => {
+            console.error('[App] 初始化双指纹失败:', error)
+        })
 });
 
 onUnmounted(() => {

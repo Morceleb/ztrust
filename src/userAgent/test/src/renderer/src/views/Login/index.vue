@@ -27,6 +27,7 @@ import {
 import { getDeviceId, getDeviceMeta, getDeviceToken, saveDeviceToken, clearDeviceToken, hasCompleteDeviceCredentials } from '@/utils/deviceService'
 import { saveSession, getAuthStrength } from '@/api/auth'
 import sessionActivityCollector, { extractResourceId } from '@/utils/sessionActivityCollector'
+import activityMonitor from '@/utils/activityMonitorWrapper'
 
 const router = useRouter()
 const route = useRoute()
@@ -95,6 +96,8 @@ const extractHost = (address) => {
 
 // 在 Tauri 环境下发送 SPA 报文以打开目标服务器端口
 // 该函数为幂等操作：失败仅记录错误，不抛出
+// ⚠️ 不要在这里再调 get_device_info——前端 activityMonitor 已经缓存了，
+// 重复调用会再次触发 Rust 端 PowerShell/netsh 采集并重复打印采集框。
 const ensureSpaPacketSent = async (rawAddress, securityCodeValue) => {
     const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
     if (!isTauri) return;
@@ -103,7 +106,16 @@ const ensureSpaPacketSent = async (rawAddress, securityCodeValue) => {
         const parsedHost = extractHost(rawAddress)
         console.log('[Login] 自动发送 SPA 报文以开放端口', { host: parsedHost });
 
-        const deviceInfo = await invoke('get_device_info');
+        // 优先复用 activityMonitor 已缓存的设备信息（App.vue onMounted 已采集过）
+        // 缓存里没有时再向 Rust 端取一次（兜底）
+        let deviceInfo = activityMonitor?.deviceInfo
+        if (!deviceInfo) {
+            deviceInfo = await invoke('get_device_info')
+            if (deviceInfo && activityMonitor) {
+                activityMonitor.deviceInfo = deviceInfo
+            }
+        }
+
         await sendSpaPacket(
             parsedHost,
             securityCodeValue.trim(),
@@ -405,8 +417,10 @@ const handleLogin = async () => {
     needSecurityCode.value = false;
     trustedDeviceHint.value = '';
 
-    // 每次登录前都发 SPA 报文打开目标端口
-    await sendLoginSpa();
+    // 发送 SPA 报文打开目标端口——不再阻塞登录请求。
+    // 后台异步跑即可：失败仅记录日志，登录本身不依赖 SPA 完成。
+    // 如果未来 SPA 服务端校验不通，再回退到错误处理。
+    sendLoginSpa().catch((e) => console.warn('[Login] SPA 报文发送失败:', e));
 
     const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
 

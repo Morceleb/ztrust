@@ -38,6 +38,7 @@ pub struct AppState {
     pub db: Mutex<Option<Database>>,
     pub activity_monitor: Mutex<Option<ActivityMonitor>>,
     pub device_info: Mutex<Option<DeviceInfo>>,
+    pub wifi_cache: Mutex<Option<Vec<WifiNetwork>>>,
     pub is_logged_in: Mutex<bool>,
     pub user_info: Mutex<Option<UserInfo>>,
 }
@@ -371,26 +372,8 @@ async fn activity_get_stats(state: State<'_, AppState>) -> Result<Option<activit
     }
 }
 
-// ==================== 设备信息命令 ====================
-
-#[tauri::command]
-async fn get_device_info(
-    app: AppHandle,
-    state: State<'_, AppState>,
-) -> Result<DeviceInfo, String> {
-    // 拿到 Tauri 应用数据目录（用于持久化 ztrust_device_id）
-    let app_dir: std::path::PathBuf = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("无法获取 app_data_dir: {}", e))?;
-    if let Err(e) = std::fs::create_dir_all(&app_dir) {
-        log::warn!("[DeviceInfo] 创建 app_data_dir 失败: {}", e);
-    }
-
-    let mut device = state.device_info.lock().map_err(|e| e.to_string())?;
-    let info = get_or_init_device_info(&app_dir, &mut device)?;
-
-    // ═══════════ 设备上下文（按指定顺序，仅这 8 个字段）═══════════
+/// 把设备上下文采集结果按 8 个字段可视化打印到终端（仅在初始化或显式刷新时调用，避免重复打印）
+fn print_device_context(info: &DeviceInfo) {
     println!("\n╔══════════════════════════════════════════════════════════════╗");
     println!("║                      设备上下文采集结果                      ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
@@ -492,7 +475,114 @@ async fn get_device_info(
     println!("║ ⑧ 网络位置: {}", pad_right(&net_location, 50));
 
     println!("╚══════════════════════════════════════════════════════════════╝\n");
+}
 
+/// 把 Wi‑Fi 扫描结果可视化打印到终端（仅在首次扫描或显式刷新时调用）
+fn print_wifi_context(networks: &[WifiNetwork]) {
+    println!("\n╔══════════════════════════════════════════════════════════════╗");
+    println!("║                  WifiEnvironment 采集结果                   ║");
+    println!("╠══════════════════════════════════════════════════════════════╣");
+    println!("║ {}", pad_right(&format!("扫描到的前五 Wi‑Fi 网络 (共 {} 个):", networks.len()), 61));
+    if networks.is_empty() {
+        println!("║ {}", pad_right("(无)", 61));
+    } else {
+        for (idx, n) in networks.iter().enumerate() {
+            let line = format!("{}. {} (signal: {})", idx + 1, n.ssid, n.signal);
+            println!("║ {}", pad_right(&line, 61));
+        }
+    }
+    println!("╚══════════════════════════════════════════════════════════════╝\n");
+}
+
+/// 后台初始化设备信息 + Wi‑Fi 扫描，结果落到 cache 中。
+/// - 调用即开始，不阻塞调用方
+/// - 同一时间多个调用方共用同一采集任务（去重）
+fn spawn_background_collection(app: AppHandle) {
+    info!("[Startup] 后台启动设备信息 + Wi‑Fi 采集任务");
+
+    // 取得 app_data_dir
+    let app_dir = match app.path().app_data_dir() {
+        Ok(p) => p,
+        Err(e) => {
+            log::warn!("[Startup] 无法获取 app_data_dir，后台采集中止: {}", e);
+            return;
+        }
+    };
+    if let Err(e) = std::fs::create_dir_all(&app_dir) {
+        log::warn!("[Startup] 创建 app_data_dir 失败: {}", e);
+    }
+
+    let app_handle = app.clone();
+    std::thread::spawn(move || {
+        // 1) 设备信息采集（慢，主要时间花在 PowerShell + netsh + 公网 IP 探测）
+        let device_res = device::generate_device_info(&app_dir);
+        match device_res {
+            Ok(info) => {
+                // 首次采集：打印可视化框 + 写日志
+                print_device_context(&info);
+                info!(
+                    "[Startup] 设备上下文采集完成 (device_id={})",
+                    &info.device_id
+                );
+                // 写入缓存
+                let state = app_handle.state::<AppState>();
+                if let Ok(mut guard) = state.device_info.lock() {
+                    *guard = Some(info);
+                };
+            }
+            Err(e) => {
+                log::error!("[Startup] 设备信息采集失败: {}", e);
+            }
+        }
+
+        // 2) Wi‑Fi 扫描
+        match wifi::scan_top_wifi_networks(5) {
+            Ok(networks) => {
+                print_wifi_context(&networks);
+                info!("[Startup] Wi‑Fi 环境采集完成，共 {} 个网络", networks.len());
+                let state = app_handle.state::<AppState>();
+                if let Ok(mut guard) = state.wifi_cache.lock() {
+                    *guard = Some(networks);
+                };
+            }
+            Err(e) => {
+                log::warn!("[Startup] Wi‑Fi 扫描失败: {}", e);
+            }
+        }
+    });
+}
+
+// ==================== 设备信息命令 ====================
+
+/// 获取设备信息（从缓存读取，缓存未就绪时同步兜底采集一次）。
+/// 不再重复打印采集框——只在采集发生时打印一次。
+#[tauri::command]
+async fn get_device_info(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<DeviceInfo, String> {
+    // 优先读缓存（后台任务已经在跑了）
+    {
+        let guard = state.device_info.lock().map_err(|e| e.to_string())?;
+        if let Some(ref info) = *guard {
+            return Ok(info.clone());
+        }
+    }
+
+    // 缓存未就绪：兜底同步采集一次（只在确实没有后台任务在跑时才走这里）
+    let app_dir: std::path::PathBuf = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("无法获取 app_data_dir: {}", e))?;
+    if let Err(e) = std::fs::create_dir_all(&app_dir) {
+        log::warn!("[DeviceInfo] 创建 app_data_dir 失败: {}", e);
+    }
+
+    let mut device = state.device_info.lock().map_err(|e| e.to_string())?;
+    let info = get_or_init_device_info(&app_dir, &mut device)?;
+
+    // 兜底路径上打印一次（让用户仍能看到框），正常情况不会到这里
+    print_device_context(info);
     log::info!("[DeviceInfo] 设备上下文采集完成 (device_id={})", &info.device_id);
     Ok(info.clone())
 }
@@ -695,23 +785,22 @@ fn get_local_ip() -> String {
 
 
 #[tauri::command]
-async fn scan_wifi_environment() -> Result<Vec<WifiNetwork>, String> {
-    let networks = wifi::scan_top_wifi_networks(5)?;
-    println!("\n╔══════════════════════════════════════════════════════════════╗");
-    println!("║                  WifiEnvironment 采集结果                   ║");
-    println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║ {}", pad_right(&format!("扫描到的前五 Wi‑Fi 网络 (共 {} 个):", networks.len()), 61));
-    if networks.is_empty() {
-        println!("║ {}", pad_right("(无)", 61));
-    } else {
-        for (idx, n) in networks.iter().enumerate() {
-            let line = format!("{}. {} (signal: {})", idx + 1, n.ssid, n.signal);
-            println!("║ {}", pad_right(&line, 61));
+async fn scan_wifi_environment(state: State<'_, AppState>) -> Result<Vec<WifiNetwork>, String> {
+    // 优先读缓存（后台任务已经采过），命中直接返回，不再重复扫描也不再重复打印
+    {
+        let guard = state.wifi_cache.lock().map_err(|e| e.to_string())?;
+        if let Some(ref cached) = *guard {
+            return Ok(cached.clone());
         }
     }
-    println!("╚══════════════════════════════════════════════════════════════╝\n");
 
-    log::info!("[WifiEnvironment] 采集完成，共 {} 个网络", networks.len());
+    // 缓存未就绪：兜底同步扫描一次
+    let networks = wifi::scan_top_wifi_networks(5)?;
+    print_wifi_context(&networks);
+    info!("[WifiEnvironment] 采集完成，共 {} 个网络", networks.len());
+    if let Ok(mut guard) = state.wifi_cache.lock() {
+        *guard = Some(networks.clone());
+    }
     Ok(networks)
 }
 
@@ -995,6 +1084,7 @@ pub fn run() {
         db: Mutex::new(None),
         activity_monitor: Mutex::new(None),
         device_info: Mutex::new(None),
+        wifi_cache: Mutex::new(None),
         is_logged_in: Mutex::new(false),
         user_info: Mutex::new(None),
     };
@@ -1053,8 +1143,12 @@ pub fn run() {
             // SPA
             send_spa_packet,
         ])
-        .setup(|_app| {
+        .setup(|app| {
             info!("应用设置完成");
+
+            // 后台启动设备信息 + Wi‑Fi 采集（不阻塞窗口/登录）
+            let app_handle = app.handle().clone();
+            spawn_background_collection(app_handle);
 
             // 设置定时清理任务
             std::thread::spawn(move || {
@@ -1064,7 +1158,7 @@ pub fn run() {
                     // 清理逻辑会在 activity 模块中处理
                 }
             });
-            
+
             Ok(())
         })
         .on_window_event(|_window, event| {
