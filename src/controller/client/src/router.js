@@ -10,6 +10,8 @@ import Callback from './views/Callback.vue'
 import PermissionApproval from './views/PermissionApproval.vue'
 import LoginSettingsPage from './views/LoginPageSetting.vue'
 import LoginPage from './views/LoginPage.vue'
+import DecisionGraphManagement from './views/DecisionGraphManagement.vue'
+import DecisionPolicyEditor from './views/DecisionPolicyEditor.vue'
 
 const routes = [
   {
@@ -35,6 +37,9 @@ const routes = [
       { path: 'resources', component: ResourceManagement },
       { path: 'user-groups', component: UserGroup },
       { path: 'resource-groups', component: ResourceGroup },
+      { path: 'decision-graphs', component: DecisionGraphManagement },
+      { path: 'decision-graphs/new', component: DecisionPolicyEditor },
+      { path: 'decision-graphs/:policyId', component: DecisionPolicyEditor },
       { path: 'permissions', component: PermissionApproval },
       { path: 'login-page-setting', component: LoginSettingsPage }
     ]
