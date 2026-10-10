@@ -157,6 +157,16 @@ const PermissionIcon = {
     ])
 }
 
+const DecisionGraphIcon = {
+    render: () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2 }, [
+        h('circle', { cx: 5, cy: 12, r: 2 }),
+        h('circle', { cx: 19, cy: 6, r: 2 }),
+        h('circle', { cx: 19, cy: 18, r: 2 }),
+        h('path', { d: 'M7 12h4a4 4 0 0 0 4-4V6h2' }),
+        h('path', { d: 'M7 12h4a4 4 0 0 1 4 4v2h2' })
+    ])
+}
+
 const LoginPageIcon = {
     render: () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2 }, [
         h('rect', { x: 3, y: 3, width: 18, height: 18, rx: 2 }),
@@ -171,13 +181,14 @@ const menuItems = [
     { path: '/resources', label: '资源管理', icon: ResourceIcon },
     { path: '/user-groups', label: '用户组管理', icon: UserGroupIcon },
     { path: '/resource-groups', label: '资源组管理', icon: ResourceGroupIcon },
+    { path: '/decision-graphs', label: '决策图管理', icon: DecisionGraphIcon },
     { path: '/permissions', label: '权限审批', icon: PermissionIcon },
     { path: '/login-page-setting', label: '登录设置页面', icon: LoginPageIcon }
 ]
 
-const activeMenu = computed(() => route.path)
+const activeMenu = computed(() => route.path.startsWith('/decision-graphs') ? '/decision-graphs' : route.path)
 const pageTitle = computed(() => {
-    const current = menuItems.find(item => item.path === route.path)
+    const current = menuItems.find(item => item.path === activeMenu.value)
     return current ? current.label : '控制台'
 })
 
