@@ -22,7 +22,7 @@ const mutations = {
         console.log('[Auth/Mutation] SET_LOGGED_IN 后 state.isLoggedIn:', state.isLoggedIn);
     },
     SET_USER(state, user) {
-        console.log('[Auth/Mutation] SET_USER:', user ? user.name || user.displayName : 'null');
+        console.log('[Auth/Mutation] SET_USER:', user ? 'present' : 'null');
         state.user = user
     },
     LOGOUT(state) {
@@ -35,7 +35,7 @@ const mutations = {
 const actions = {
     // 登录成功后调用
     loginSuccess({ commit }, user) {
-        console.log('[Auth/Action] loginSuccess 被调用, user:', user);
+        console.log('[Auth/Action] loginSuccess 被调用');
         commit('SET_LOGGED_IN', true)
         console.log('[Auth/Action] loginSuccess: SET_LOGGED_IN(true) 已提交');
         commit('SET_USER', user)

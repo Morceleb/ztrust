@@ -97,10 +97,10 @@ export function useKeystrokeTracker() {
             try {
                 if (window.__TAURI__) {
                     await invoke('activity_record_shortcut', { keyCombo });
-                    console.log('[KeystrokeTracker] 快捷键已记录:', keyCombo);
+                    console.log('[KeystrokeTracker] 快捷键已记录');
                 }
             } catch (err) {
-                console.log('[KeystrokeTracker] 后端记录失败:', err);
+                console.log('[KeystrokeTracker] 后端记录失败');
             }
 
             // 如果是带修饰键的组合键，跳过普通按键记录

@@ -70,14 +70,14 @@ const getBaseURL = () => {
     // 1. 首先尝试环境变量
     const envBaseURL = import.meta.env.VITE_API_BASE_URL;
     if (isValidBaseURL(envBaseURL)) {
-        console.log('[Request] 使用环境变量 baseURL:', envBaseURL);
+        console.log('[Request] 使用环境变量 baseURL');
         return envBaseURL;
     }
 
     // 2. 回退到 localStorage
     const storedAddress = localStorage.getItem('companyAddress');
     if (isValidBaseURL(storedAddress)) {
-        console.log('[Request] 使用 localStorage baseURL:', storedAddress);
+        console.log('[Request] 使用 localStorage baseURL');
         return storedAddress;
     }
 
@@ -190,7 +190,7 @@ request.interceptors.request.use(
         return config;
     },
     (error) => {
-        console.error('[Request] 请求配置错误:', error);
+        console.error('[Request] 请求配置错误:', { name: error?.name, code: error?.code });
         return Promise.reject(error);
     }
 );
@@ -246,10 +246,6 @@ request.interceptors.response.use(
         // 详细记录错误信息
         console.error('[Request] 响应错误:', {
             status: error.response?.status,
-            statusText: error.response?.statusText,
-            url: originalRequest?.url,
-            baseURL: originalRequest?.baseURL,
-            message: error.message,
             code: error.code,
             isTauri: isTauri,
         });
@@ -257,24 +253,21 @@ request.interceptors.response.use(
         // 处理网络错误（这通常是 "empty response" 的原因）
         if (!error.response) {
             console.error('[Request] 网络错误/无响应 (Empty Response):', {
-                message: error.message,
                 code: error.code,
-                url: originalRequest?.url,
-                baseURL: originalRequest?.baseURL,
             });
 
             // 在 Tauri 环境中，添加额外的诊断信息
             if (isTauri) {
                 console.error('[Request] Tauri 环境诊断:');
                 console.error('  - window.__TAURI__ 存在:', typeof window.__TAURI__ !== 'undefined');
-                console.error('  - 当前 baseURL:', originalRequest?.baseURL);
-                console.error('  - localStorage.companyAddress:', localStorage.getItem('companyAddress'));
+                console.error('  - 已配置 baseURL:', Boolean(originalRequest?.baseURL));
+                console.error('  - 已配置 companyAddress:', Boolean(localStorage.getItem('companyAddress')));
             }
         }
 
         // 处理 403 禁止访问
         if (error.response?.status === 403) {
-            console.error('[Request] 访问被拒绝:', error.response?.data?.message);
+            console.error('[Request] 访问被拒绝:', { status: error.response?.status });
         }
 
         return Promise.reject(error);

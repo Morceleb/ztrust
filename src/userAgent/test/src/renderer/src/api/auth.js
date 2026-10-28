@@ -33,7 +33,7 @@ export function saveSession(loginResp) {
 
     if (loginResp.session_id) {
         localStorage.setItem(KEY_SESSION_ID, String(loginResp.session_id));
-        console.log('[Auth] session_id 已保存:', loginResp.session_id);
+        console.log('[Auth] session_id 已保存');
     }
 
     if (loginResp.auth_strength) {

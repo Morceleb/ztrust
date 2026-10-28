@@ -65,11 +65,7 @@ fn scan_paired_bluetooth_devices() -> Result<Vec<BluetoothDevice>, String> {
         let _ = BluetoothFindDeviceClose(h_find);
     }
 
-    info!(
-        "[BluetoothEnvironment] 已配对蓝牙设备 (共 {} 个): {:?}",
-        devices.len(),
-        devices
-    );
+    info!("[BluetoothEnvironment] 已配对蓝牙设备共 {} 个", devices.len());
     Ok(devices)
 }
 

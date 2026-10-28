@@ -24,7 +24,7 @@ register('mouse', mouseTracker)
 
 // 超时处理
 const handleTimeout = (data) => {
-    console.log('[App] 检测到超时:', data)
+    console.log('[App] 检测到超时')
     store.dispatch('auth/timeoutLogout')
     router.push('/login')
 }

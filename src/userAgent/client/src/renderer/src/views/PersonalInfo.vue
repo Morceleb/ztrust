@@ -215,7 +215,7 @@ const handleAvatarChange = (event) => {
             avatar: base64Image
         })
         // TODO: 调用后端接口上传头像
-        console.log('上传头像:', base64Image.substring(0, 50) + '...')
+        console.log('上传头像，数据长度:', base64Image.length)
     }
     reader.onerror = () => {
         alert('读取图片失败，请重试')
@@ -273,7 +273,7 @@ const saveField = () => {
     }
 
     // TODO: 调用后端接口更新用户信息
-    console.log('保存字段:', editingField.value, '=', value)
+    console.log('保存字段:', editingField.value)
     closeEditModal()
 }
 </script>

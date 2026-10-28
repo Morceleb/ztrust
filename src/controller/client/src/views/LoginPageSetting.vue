@@ -647,7 +647,7 @@
   const initFromAPI = async () => {
     try {
       const res = await getLoginItems()
-      console.log('GET /config/login-items 返回:', res)
+      console.log('GET /config/login-items 完成:', { code: res?.code })
 
       let apiItems = []
       if (res?.code === 0 || res?.code === 200) {
@@ -663,7 +663,7 @@
       }
     } catch (err) {
       loadError.value = err.message
-      console.error('加载登录配置失败:', err)
+      console.error('加载登录配置失败:', { name: err?.name, status: err?.response?.status })
       defaultItems.forEach(d => itemsArr.push({ ...d }))
     } finally {
       loading.value = false
@@ -685,7 +685,7 @@
       }))
 
       const result = await saveLoginItems(payload)
-      console.log('保存接口返回:', result)
+      console.log('保存登录配置完成:', { code: result?.code })
       if (result?.code === 0 || result?.code === 200) {
         clearCssCache()
         showToast('保存成功', 'success')
@@ -693,7 +693,7 @@
         showToast(result?.msg || result?.message || '保存失败', 'error')
       }
     } catch (err) {
-      console.error('保存失败:', err)
+      console.error('保存失败:', { name: err?.name, status: err?.response?.status })
       showToast('保存失败: ' + (err.message || '网络错误'), 'error')
     }
   }

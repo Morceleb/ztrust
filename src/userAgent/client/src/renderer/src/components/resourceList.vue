@@ -111,7 +111,7 @@ const normalizeType = (type) => {
 const categories = computed(() => {
     const typeMap = {}
     const items = props.resources || []
-    console.log('[resourceList] props.resources:', items)
+    console.log('[resourceList] resource count:', items?.length || 0)
     items.forEach(item => {
         const normType = normalizeType(item.type)
         if (!typeMap[normType]) {
@@ -124,7 +124,7 @@ const categories = computed(() => {
         title: type === 'web_page' ? '网页应用' : type === 'api' ? 'API 接口' : type === 'static' ? '静态资源' : type,
         items
     }))
-    console.log('[resourceList] categories:', result)
+    console.log('[resourceList] category count:', result?.length || 0)
     return result
 })
 

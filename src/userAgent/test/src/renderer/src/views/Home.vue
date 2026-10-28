@@ -38,11 +38,9 @@ const fetchResources = async () => {
 
     try {
         const response = await request.get('/auth/access/resources')
-        console.log('[Home] 原始响应:', response)
-        console.log('[Home] response.data:', response.data)
-        console.log('[Home] response.data.data:', response.data?.data)
+        console.log('[Home] 资源列表请求成功，状态:', response.status)
         resources.value = response.data?.data || []
-        console.log('[Home] 最终 resources:', resources.value)
+        console.log('[Home] 最终资源数:', resources.value.length)
     } catch (error) {
         console.error('[Home] 请求失败:', {
             message: error.message,
@@ -66,7 +64,7 @@ const retry = () => {
 
 onBeforeMount(async () => {
     console.log('[Home] 组件挂载前，环境:', isTauri ? 'Tauri' : 'Browser');
-    console.log('[Home] baseURL:', localStorage.getItem('companyAddress') || import.meta.env.VITE_API_BASE_URL);
+    console.log('[Home] baseURL 已配置:', Boolean(localStorage.getItem('companyAddress') || import.meta.env.VITE_API_BASE_URL));
     await fetchResources();
 })
 

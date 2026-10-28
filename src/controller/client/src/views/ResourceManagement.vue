@@ -752,7 +752,7 @@ const handleSubmit = async () => {
             url: formData.value.url?.trim() || null,
             isActive: formData.value.is_active === true
         }
-        console.log('提交资源数据:', payload)
+        console.log('提交资源数据:', { operation: payload.id ? 'update' : 'create' })
         const res = await saveResource(payload)
         if (res.code === 200) {
             showToast(modalMode.value === 'add' ? '资源添加成功' : '资源修改成功')
@@ -898,7 +898,7 @@ const parseImportFile = (file) => {
             }
         } catch (err) {
             showToast('文件解析失败，请确认是有效的 Excel 或 CSV 文件')
-            console.error('parseImportFile error:', err)
+            console.error('parseImportFile error:', { name: err?.name })
         }
     }
     reader.readAsArrayBuffer(file)

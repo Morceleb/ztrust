@@ -64,7 +64,7 @@ const generateBrowserLayer = async () => {
             }
         }
     } catch (e) {
-        console.warn('[FingerprintService] WebGL 指纹不可用:', e)
+        console.warn('[FingerprintService] WebGL 指纹不可用')
     }
 
     const softwareHash = await hashBrowserField({
@@ -105,21 +105,21 @@ export const collectFingerprints = async () => {
         try {
             tauriDeviceInfo = await getTauriDeviceInfo()
         } catch (error) {
-            console.error('[FingerprintService] 获取 Tauri 设备信息失败:', error)
+            console.error('[FingerprintService] 获取 Tauri 设备信息失败')
         }
 
         try {
             wifiEnvironment = await scanWifiEnvironment()
-            console.log('[FingerprintService] 当前无线网络环境:', wifiEnvironment)
+            console.log('[FingerprintService] 无线网络环境采集完成，记录数:', wifiEnvironment.length)
         } catch (error) {
-            console.error('[FingerprintService] 获取无线网络环境失败:', error)
+            console.error('[FingerprintService] 获取无线网络环境失败')
         }
 
         try {
             bluetoothEnvironment = await getPairedBluetoothDevices()
-            console.log('[FingerprintService] 当前蓝牙环境:', bluetoothEnvironment)
+            console.log('[FingerprintService] 蓝牙环境采集完成，记录数:', bluetoothEnvironment.length)
         } catch (error) {
-            console.error('[FingerprintService] 获取蓝牙环境失败:', error)
+            console.error('[FingerprintService] 获取蓝牙环境失败')
         }
     }
 
@@ -135,6 +135,6 @@ export const collectFingerprints = async () => {
         generatedAt: new Date().toISOString(),
     }
 
-    console.log('[FingerprintService] 分层指纹与无线环境采集结果:', snapshot)
+    console.log('[FingerprintService] 分层指纹与无线环境采集完成')
     return snapshot
 }

@@ -22,7 +22,7 @@ async function storeToKeyring(key, value) {
         console.log(`[Keyring] 已保存: ${key}`);
         return true;
     } catch (err) {
-        console.error(`[Keyring] 保存失败 (${key}):`, err);
+        console.error(`[Keyring] 保存失败 (${key})`);
         return false;
     }
 }
@@ -38,7 +38,7 @@ async function readFromKeyring(key) {
         }
         return value;
     } catch (err) {
-        console.error(`[Keyring] 读取失败 (${key}):`, err);
+        console.error(`[Keyring] 读取失败 (${key})`);
         return null;
     }
 }
@@ -52,7 +52,7 @@ async function deleteFromKeyring(key) {
         console.log(`[Keyring] 已删除: ${key}`);
         return true;
     } catch (err) {
-        console.error(`[Keyring] 删除失败 (${key}):`, err);
+        console.error(`[Keyring] 删除失败 (${key})`);
         return false;
     }
 }

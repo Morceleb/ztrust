@@ -163,7 +163,7 @@ onMounted(async () => {
             locationLoading.value = false
         })
     } catch (e) {
-        console.error('获取设备信息失败:', e)
+        console.error('获取设备信息失败')
         loading.value = false
     }
 })
@@ -235,7 +235,7 @@ const handleBack = () => {
 }
 
 const openRemoveConfirm = (t) => {
-    console.log('[终端管理] 打开移除确认, 设备:', t)
+    console.log('[终端管理] 打开移除确认')
     terminalToRemove.value = t
     removeError.value = ''
     showRemoveModal.value = true
@@ -253,7 +253,7 @@ const confirmRemoveTrusted = async () => {
     }
 
     const deviceId = terminalToRemove.value.id
-    console.log('[终端管理] 开始移除授信终端, 设备ID:', deviceId)
+    console.log('[终端管理] 开始移除授信终端')
 
     removeLoading.value = true
     removeError.value = ''
@@ -276,7 +276,7 @@ const confirmRemoveTrusted = async () => {
 
         console.log('[终端管理] 响应状态:', res.status)
         const result = await res.json()
-        console.log('[终端管理] 响应数据:', result)
+        console.log('[终端管理] 请求完成:', { success: Boolean(result?.success) })
 
         if (res.ok || result.code === 200) {
             console.log('[终端管理] 移除成功')
@@ -285,7 +285,7 @@ const confirmRemoveTrusted = async () => {
             removeError.value = result.message || '移除失败，请重试'
         }
     } catch (err) {
-        console.error('[终端管理] 请求失败:', err)
+        console.error('[终端管理] 请求失败:', { name: err?.name, status: err?.response?.status })
         removeError.value = '移除失败，请检查网络'
     } finally {
         removeLoading.value = false

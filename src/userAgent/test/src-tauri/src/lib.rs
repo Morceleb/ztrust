@@ -126,10 +126,7 @@ async fn open_resource_window(
 ) -> Result<(), String> {
     use tauri_plugin_store::StoreExt;
 
-    info!(
-        "[Window] 打开资源窗口: id={}, title={}",
-        resource_id, title
-    );
+    info!("[Window] 打开资源窗口");
 
     let raw_base = base_url.unwrap_or_else(|| {
         let store = app.store("settings.json").ok();
@@ -187,11 +184,7 @@ async fn open_resource_window(
         )
     };
 
-    info!(
-        "[Window] 创建资源窗口: baseUrl={}, resourceId={}",
-        raw_base,
-        resource_id,
-    );
+    info!("[Window] 创建资源窗口");
 
     let label = format!("resource_{}", uuid::Uuid::new_v4().to_string().replace("-", ""));
 
@@ -207,7 +200,7 @@ async fn open_resource_window(
     .build()
     .map_err(|e| format!("创建资源窗口失败: {}", e))?;
 
-    info!("[Window] 资源窗口已创建: resourceId={}", resource_id);
+    info!("[Window] 资源窗口已创建");
     Ok(())
 }
 
@@ -217,7 +210,7 @@ async fn close_resource_window(
     resource_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    info!("[Window] 关闭资源窗口: resourceId={}", resource_id);
+    info!("[Window] 关闭资源窗口");
 
     // 记录资源关闭事件到活动监控
     {
@@ -234,7 +227,7 @@ async fn close_resource_window(
             // 获取窗口的 URL，检查是否包含此 resource_id
             if let Ok(url) = window.url() {
                 if url.to_string().contains(&resource_id) {
-                    info!("[Window] 关闭资源窗口: label={}", label);
+                    info!("[Window] 关闭资源窗口");
                     window.close().map_err(|e| e.to_string())?;
                     return Ok(());
                 }
@@ -252,7 +245,7 @@ async fn activity_init(
     user_info: UserInfo,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    info!("[Activity] 初始化监控，用户: {:?}", user_info);
+    info!("[Activity] 初始化监控");
     
     let mut monitor = state.activity_monitor.lock().map_err(|e| e.to_string())?;
     
@@ -372,16 +365,13 @@ async fn activity_get_stats(state: State<'_, AppState>) -> Result<Option<activit
     }
 }
 
-/// 把设备上下文采集结果按 8 个字段可视化打印到终端（仅在初始化或显式刷新时调用，避免重复打印）
+/// 把设备上下文采集状态按 8 个字段打印到终端，不输出采集值。
 fn print_device_context(info: &DeviceInfo) {
     println!("\n╔══════════════════════════════════════════════════════════════╗");
     println!("║                      设备上下文采集结果                      ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
 
-    // ① 设备ID
-    println!("║ ① 设备ID: {}", pad_right(&info.device_id, 52));
-
-    // ② 设备类型（基于平台 + CPU 简单判断 PC/Mac/Linux）
+    println!("║ ① 设备ID: {}", pad_right("已采集", 52));
     let device_type = match info.platform.as_str() {
         "Windows" => "台式机/笔记本 (PC)",
         "macOS" => "Mac",
@@ -389,108 +379,31 @@ fn print_device_context(info: &DeviceInfo) {
         _ => "未知设备",
     };
     println!("║ ② 设备类型: {}", pad_right(device_type, 50));
-
-    // ③ 操作系统版本与补丁级别（OS版本 + DisplayVersion + UBR + BuildNumber + 补丁数）
-    let hotfix_n = info.hotfix_list.len();
-    let os_with_patch = format!(
-        "{} | {} | UBR {} | Build {} | 补丁 {} 个",
-        info.os_version, info.display_version, info.ubr, info.build_number, hotfix_n
-    );
-    println!("║ ③ OS版本与补丁: {}", pad_right(&os_with_patch, 44));
-
-    // ④ 防火墙状态
-    let fw_status = if info.security.firewall.all_enabled {
-        "已全部启用 ✅"
-    } else if info.security.firewall.profile_states.is_empty() {
-        "未启用 ❌"
-    } else {
-        "部分启用 ⚠️"
-    };
-    let fw_detail = if info.security.firewall.profile_states.is_empty() {
-        info.security.firewall.raw_summary.chars().take(30).collect::<String>()
-    } else {
-        info.security
-            .firewall
-            .profile_states
-            .iter()
-            .map(|(k, v)| format!("{}:{}", k, v))
-            .collect::<Vec<_>>()
-            .join(" / ")
-    };
     println!(
-        "║ ④ 防火墙: {} | {}",
-        pad_right(fw_status, 16),
-        pad_right(&fw_detail, 30)
+        "║ ③ OS版本与补丁: {}",
+        pad_right(&format!("已采集，补丁 {} 个", info.hotfix_list.len()), 44)
     );
-
-    // ⑤ 磁盘加密状态
-    let disk_status = &info.security.disk_encryption.status;
-    let disk_detail = if info.security.disk_encryption.volumes.is_empty() {
-        "无卷".to_string()
-    } else {
-        info.security
-            .disk_encryption
-            .volumes
-            .iter()
-            .map(|v| format!("{}: {}% {} {}", v.volume.trim_end_matches('\\'), v.percentage, v.method, v.protection))
-            .collect::<Vec<_>>()
-            .join(" | ")
-    };
+    println!("║ ④ 防火墙: {}", pad_right("已采集", 50));
+    println!("║ ⑤ 磁盘加密: {}", pad_right("已采集", 48));
+    println!("║ ⑥ Root/越狱状态: {}", pad_right("已采集", 45));
     println!(
-        "║ ⑤ 磁盘加密: {} | {}",
-        pad_right(disk_status, 16),
-        pad_right(&disk_detail, 30)
+        "║ ⑦ 已安装软件: {}",
+        pad_right(&format!("{} 个", info.security.software_list.count), 46)
     );
-
-    // ⑥ Root / 越狱状态（Desktop OS 一般不适用，用 system_integrity 兜底展示）
-    let root_status = if info.security.security_state.system_integrity.is_empty()
-        || info.security.security_state.system_integrity == "N/A"
-    {
-        "N/A (桌面系统)".to_string()
-    } else {
-        info.security.security_state.system_integrity.clone()
-    };
-    println!("║ ⑥ Root/越狱状态: {}", pad_right(&root_status, 45));
-
-    // ⑦ 已安装软件列表（总数 + 前 5 个）
-    let sw_count = info.security.software_list.count;
-    let sw_summary = device::format_software_summary(&info.security.software_list, 5);
-    println!(
-        "║ ⑦ 已安装软件: {} 个 | 前5: {}",
-        pad_right(&sw_count.to_string(), 49),
-        pad_right(&sw_summary, 14)
-    );
-
-    // ⑧ 网络位置（本地 IP + 公网 IP + 防火墙整体）
-    let net_location = format!(
-        "本地 {} | 公网 {} | 防火墙 {}",
-        info.local_ip,
-        info.public_ip,
-        if info.security.security_state.security_level.contains("高") {
-            "启用"
-        } else {
-            "未启用"
-        }
-    );
-    println!("║ ⑧ 网络位置: {}", pad_right(&net_location, 50));
+    println!("║ ⑧ 网络位置: {}", pad_right("已采集", 50));
 
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 }
 
-/// 把 Wi‑Fi 扫描结果可视化打印到终端（仅在首次扫描或显式刷新时调用）
+/// 把 Wi‑Fi 扫描结果数量打印到终端，不输出 SSID/BSSID/信号值。
 fn print_wifi_context(networks: &[WifiNetwork]) {
     println!("\n╔══════════════════════════════════════════════════════════════╗");
     println!("║                  WifiEnvironment 采集结果                   ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║ {}", pad_right(&format!("扫描到的前五 Wi‑Fi 网络 (共 {} 个):", networks.len()), 61));
-    if networks.is_empty() {
-        println!("║ {}", pad_right("(无)", 61));
-    } else {
-        for (idx, n) in networks.iter().enumerate() {
-            let line = format!("{}. {} (signal: {})", idx + 1, n.ssid, n.signal);
-            println!("║ {}", pad_right(&line, 61));
-        }
-    }
+    println!(
+        "║ {}",
+        pad_right(&format!("Wi‑Fi 环境采集完成，共 {} 个网络", networks.len()), 61)
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 }
 
@@ -503,13 +416,13 @@ fn spawn_background_collection(app: AppHandle) {
     // 取得 app_data_dir
     let app_dir = match app.path().app_data_dir() {
         Ok(p) => p,
-        Err(e) => {
-            log::warn!("[Startup] 无法获取 app_data_dir，后台采集中止: {}", e);
+        Err(_) => {
+            log::warn!("[Startup] 无法获取 app_data_dir，后台采集中止");
             return;
         }
     };
-    if let Err(e) = std::fs::create_dir_all(&app_dir) {
-        log::warn!("[Startup] 创建 app_data_dir 失败: {}", e);
+    if std::fs::create_dir_all(&app_dir).is_err() {
+        log::warn!("[Startup] 创建 app_data_dir 失败");
     }
 
     let app_handle = app.clone();
@@ -520,18 +433,15 @@ fn spawn_background_collection(app: AppHandle) {
             Ok(info) => {
                 // 首次采集：打印可视化框 + 写日志
                 print_device_context(&info);
-                info!(
-                    "[Startup] 设备上下文采集完成 (device_id={})",
-                    &info.device_id
-                );
+                info!("[Startup] 设备上下文采集完成");
                 // 写入缓存
                 let state = app_handle.state::<AppState>();
                 if let Ok(mut guard) = state.device_info.lock() {
                     *guard = Some(info);
                 };
             }
-            Err(e) => {
-                log::error!("[Startup] 设备信息采集失败: {}", e);
+            Err(_) => {
+                log::error!("[Startup] 设备信息采集失败");
             }
         }
 
@@ -545,8 +455,8 @@ fn spawn_background_collection(app: AppHandle) {
                     *guard = Some(networks);
                 };
             }
-            Err(e) => {
-                log::warn!("[Startup] Wi‑Fi 扫描失败: {}", e);
+            Err(_) => {
+                log::warn!("[Startup] Wi‑Fi 扫描失败");
             }
         }
     });
@@ -574,8 +484,8 @@ async fn get_device_info(
         .path()
         .app_data_dir()
         .map_err(|e| format!("无法获取 app_data_dir: {}", e))?;
-    if let Err(e) = std::fs::create_dir_all(&app_dir) {
-        log::warn!("[DeviceInfo] 创建 app_data_dir 失败: {}", e);
+    if std::fs::create_dir_all(&app_dir).is_err() {
+        log::warn!("[DeviceInfo] 创建 app_data_dir 失败");
     }
 
     let mut device = state.device_info.lock().map_err(|e| e.to_string())?;
@@ -583,7 +493,7 @@ async fn get_device_info(
 
     // 兜底路径上打印一次（让用户仍能看到框），正常情况不会到这里
     print_device_context(info);
-    log::info!("[DeviceInfo] 设备上下文采集完成 (device_id={})", &info.device_id);
+    log::info!("[DeviceInfo] 设备上下文采集完成");
     Ok(info.clone())
 }
 
@@ -858,7 +768,7 @@ async fn send_spa_packet(
     device_id: String,
     license_id: String,
 ) -> Result<(), String> {
-    info!("[SPA Command] 收到发送请求: {}:{}", server_address, port);
+    info!("[SPA Command] 收到发送请求");
     spa::send_spa_packet(&server_address, port, &token_code, &device_id, &license_id)
 }
 
@@ -959,10 +869,7 @@ async fn save_auth_info(
     }
 
     info!(
-        "[Auth] 完整认证信息已保存: securityCode长度={}, deviceId长度={}, licenseId长度={}, deviceToken存在={}",
-        security_code.len(),
-        device_id.len(),
-        license_id.len(),
+        "[Auth] 完整认证信息已保存，deviceToken存在={}",
         device_token.is_some()
     );
 
@@ -990,7 +897,7 @@ async fn activity_mark_batch_uploaded(
     batch_ids: Vec<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    info!("[Activity] 标记批量上传完成: {:?}", batch_ids);
+    info!("[Activity] 标记批量上传完成，共 {} 条", batch_ids.len());
 
     let monitor = state.activity_monitor.lock().map_err(|e| e.to_string())?;
     if let Some(ref m) = *monitor {

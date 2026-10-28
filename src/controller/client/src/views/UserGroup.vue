@@ -539,7 +539,7 @@ async function fetchRoleGroups() {
     loading.value = true
     try {
         const res = await listRoleGroups()
-        console.log('角色组数据:', res)
+        console.log('角色组数据加载完成:', { code: res?.code })
         let groupList = []
         if (res.code === 200) {
             groupList = Array.isArray(res.data) ? res.data : (res.data?.list || [])
@@ -565,7 +565,7 @@ async function fetchRoleGroups() {
                                 nameMap[rgId] = detailRes.data.name || ''
                             }
                         } catch (e) {
-                            console.error('获取资源组详情失败:', rgId, e)
+                            console.error('获取资源组详情失败:', { name: e?.name, status: e?.response?.status })
                         }
                     })
                 )
@@ -589,7 +589,7 @@ async function fetchRoleGroups() {
                 })
             }
         } catch (e) {
-            console.error('获取权限配置失败:', e)
+            console.error('获取权限配置失败:', { name: e?.name, status: e?.response?.status })
         }
         // 获取每个角色组的详细信息（包括组成员）
         const groupsWithMembers = await Promise.all(
@@ -618,7 +618,7 @@ async function fetchRoleGroups() {
                         }
                     }
                 } catch (e) {
-                    console.error('获取角色组详情失败:', e)
+                    console.error('获取角色组详情失败:', { name: e?.name, status: e?.response?.status })
                 }
                 return { ...group, members: [], resourceGroups: permissionsMap[group.id] || [] }
             })
@@ -626,7 +626,7 @@ async function fetchRoleGroups() {
         groups.value = groupsWithMembers
     } catch (e) {
         showToast('加载角色组列表失败', 'error')
-        console.error('加载角色组失败:', e)
+        console.error('加载角色组失败:', { name: e?.name, status: e?.response?.status })
     } finally {
         loading.value = false
     }
@@ -962,7 +962,7 @@ const handleResourcesSubmit = async () => {
                 allPermissions.value = permRes.data
             }
         } catch (e) {
-            console.error('获取权限列表失败:', e)
+            console.error('获取权限列表失败:', { name: e?.name, status: e?.response?.status })
         }
     } catch (e) {
         showToast(e?.message || '网络错误', 'error')
@@ -1067,7 +1067,7 @@ async function fetchResourceGroups() {
             resourceGroups.value = res
         }
     } catch (e) {
-        console.error('获取资源组列表失败:', e)
+        console.error('获取资源组列表失败:', { name: e?.name, status: e?.response?.status })
     }
 }
 </script>

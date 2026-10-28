@@ -122,34 +122,15 @@ pub fn send_spa_packet(
     device_id: &str,
     license_id: &str,
 ) -> Result<(), String> {
-    // 提取纯主机地址（移除协议和端口）
-    let pure_host = server_address
-        .trim_start_matches("http://")
-        .trim_start_matches("https://")
-        .split(':')
-        .next()
-        .unwrap_or(server_address);
-
-    info!(
-        "[SPA] 开始发送 SPA 报文到 {}:{}",
-        pure_host, port
-    );
+    info!("[SPA] 开始发送 SPA 报文");
 
     // 派生 SpaKey (32字节)
     let spa_key = derive_spa_token(token_code);
-    info!("[SPA] SpaKey 派生完成: {}", hex::encode(&spa_key));
+    info!("[SPA] SpaKey 派生完成");
 
     // 解析 DeviceID (32字节) 和 LicenseID (16字节)
-    info!(
-        "[SPA] DeviceID 输入: 长度={}, 预览={}",
-        device_id.len(),
-        &device_id.chars().take(8).collect::<String>()
-    );
-    info!(
-        "[SPA] LicenseID 输入: 长度={}, 预览={}",
-        license_id.len(),
-        &license_id.chars().take(8).collect::<String>()
-    );
+    info!("[SPA] DeviceID 输入长度: {}", device_id.len());
+    info!("[SPA] LicenseID 输入长度: {}", license_id.len());
     let mut device_id_bytes = hex_to_bytes(device_id)
         .map_err(|e| format!("DeviceID 解析失败: {}", e))?;
     let mut license_id_bytes = hex_to_bytes(license_id)
@@ -275,7 +256,7 @@ pub fn send_spa_packet_with_retry(
             Ok(()) => return Ok(()),
             Err(e) => {
                 last_error = e;
-                info!("[SPA] 发送失败: {}", last_error);
+                info!("[SPA] 发送失败");
                 if attempt < max_retries {
                     std::thread::sleep(std::time::Duration::from_millis(500));
                 }

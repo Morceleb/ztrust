@@ -192,7 +192,7 @@
                 const authToken = params.get('authToken') || '';
 
                 console.log('[Proxy] baseUrl:', baseUrl);
-                console.log('[Proxy] resourceId:', resourceId);
+                console.log('[Proxy] resourceId present:', Boolean(resourceId));
                 console.log('[Proxy] authToken present:', !!authToken);
 
                 // 规范化 baseUrl：去掉尾部斜杠，去掉可能存在的 /api 前缀
@@ -265,7 +265,7 @@
                     try {
                         if (statusEl) statusEl.textContent = '正在请求目标资源...';
                         const req = new Request(targetUrl, buildFetchOptions());
-                        console.log('[Proxy] 请求头:', Object.fromEntries(req.headers.entries()));
+                        console.log('[Proxy] 请求已构造，携带认证:', req.headers.has('Authorization'));
 
                         const response = await fetch(req);
                         if (statusEl) statusEl.textContent = '收到响应: ' + response.status;
@@ -340,7 +340,7 @@
                 loadResource();
             } catch (e) {
                 const msg = e && e.message ? e.message : String(e);
-                console.error('[Proxy] 初始化错误:', e);
+                console.error('[Proxy] 初始化错误');
                 try { setError('初始化失败: ' + msg); } catch (_) {
                     document.body.innerHTML = '<pre style="padding:20px">加载错误: ' + msg + '</pre>';
                 }

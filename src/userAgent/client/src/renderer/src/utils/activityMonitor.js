@@ -26,26 +26,25 @@ class ActivityMonitorClient {
 
         // 监听超时事件
         window.electronAPI.onTimeout((data) => {
-            console.log('[ActivityMonitorClient] 收到超时事件:', data)
+            console.log('[ActivityMonitorClient] 收到超时事件')
             this.handleTimeout(data)
         })
 
         // 监听行为数据上报
         window.electronAPI.onActivityReport((data) => {
-            console.log('[ActivityMonitorClient] 收到行为记录:', data)
+            console.log('[ActivityMonitorClient] 收到行为记录')
             this.handleReport(data)
         })
 
         // 监听批量上传请求
         window.electronAPI.onActivityUploadBatch((records) => {
             console.log('[ActivityMonitorClient] 收到批量上传请求:', records.length, '条')
-            console.log('[ActivityMonitorClient] 记录详情:', JSON.stringify(records).substring(0, 500))
             this.handleBatchUpload(records)
         })
 
         // 监听设备信息
         window.electronAPI.onDeviceInfo((data) => {
-            console.log('[ActivityMonitorClient] 收到设备信息:', data)
+            console.log('[ActivityMonitorClient] 收到设备信息')
             this.deviceInfo = data
             this.handleDeviceInfo(data)
         })
@@ -130,7 +129,6 @@ class ActivityMonitorClient {
      */
     async handleBatchUpload(payload) {
         console.log('[ActivityMonitorClient] handleBatchUpload 被调用')
-        console.log('[ActivityMonitorClient] 收到的 payload:', JSON.stringify(payload).substring(0, 500))
 
         // 支持新旧两种格式兼容
         const records = payload?.data || payload
@@ -142,7 +140,7 @@ class ActivityMonitorClient {
         try {
             console.log('[ActivityMonitorClient] 开始调用 uploadBatch，records 数量:', records.length)
             const result = await this.uploadBatch(records)
-            console.log('[ActivityMonitorClient] uploadBatch 完成，结果:', result)
+            console.log('[ActivityMonitorClient] uploadBatch 完成，成功:', Boolean(result))
             // 上传成功后提取 batch_id 列表，通知主进程标记已上传
             const batchIds = records
                 .map(record => record.content?.batchId || record.batch_id)
@@ -152,7 +150,10 @@ class ActivityMonitorClient {
                 console.log(`[ActivityMonitorClient] 已通知主进程标记 ${batchIds.length} 条记录为已上传`)
             }
         } catch (error) {
-            console.error('[ActivityMonitorClient] 批量上传失败:', error)
+            console.error('[ActivityMonitorClient] 批量上传失败:', {
+                code: error?.code,
+                status: error?.response?.status
+            })
         }
     }
 
@@ -164,11 +165,17 @@ class ActivityMonitorClient {
         console.log('[ActivityMonitorClient] 请求数据条数:', records.length)
         try {
             const response = await request.post('/context/process', { data: records })
-            console.log(`[ActivityMonitorClient] 批量上传成功，响应:`, response)
+            console.log('[ActivityMonitorClient] 批量上传成功，状态:', response.status)
             return response.data
         } catch (error) {
-            console.error(`[ActivityMonitorClient] 批量上传失败:`, error)
-            console.error('[ActivityMonitorClient] 错误详情:', error.response?.data, error.message)
+            console.error('[ActivityMonitorClient] 批量上传失败:', {
+                code: error?.code,
+                status: error?.response?.status
+            })
+            console.error('[ActivityMonitorClient] 错误详情:', {
+                code: error?.code,
+                status: error?.response?.status
+            })
             throw error
         }
     }
@@ -190,10 +197,13 @@ class ActivityMonitorClient {
                 electronVersion: deviceInfo.electron
             })
 
-            console.log('[ActivityMonitorClient] 设备绑定成功:', response.data)
+            console.log('[ActivityMonitorClient] 设备绑定成功')
             return response.data
         } catch (error) {
-            console.error('[ActivityMonitorClient] 设备绑定失败:', error)
+            console.error('[ActivityMonitorClient] 设备绑定失败:', {
+                code: error?.code,
+                status: error?.response?.status
+            })
             throw error
         }
     }

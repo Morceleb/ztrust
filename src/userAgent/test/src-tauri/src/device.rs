@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 
-pub use crate::device_security::{collect_device_security, DeviceSecurity, format_software_summary};
+pub use crate::device_security::{collect_device_security, DeviceSecurity};
 
 static DEVICE_ID_FILE: &str = "device_id.txt";
 
@@ -69,8 +69,8 @@ fn read_or_create_device_id(app_dir: &PathBuf) -> String {
     // 新生成：UUID v4 → SHA256 → 64 字符 hex
     let raw = uuid::Uuid::new_v4().to_string();
     let upgraded = upgrade_device_id_to_32_bytes(&raw);
-    if let Err(e) = std::fs::write(&file_path, &upgraded) {
-        log::warn!("[DeviceID] 写入 device_id 文件失败: {}", e);
+    if std::fs::write(&file_path, &upgraded).is_err() {
+        log::warn!("[DeviceID] 写入 device_id 文件失败");
     }
     upgraded
 }

@@ -17,11 +17,11 @@ export function useDeviceFingerprint() {
             deviceInfo.value = result.deviceInfo
             isReady.value = true
 
-            console.log('[DeviceFingerprint] 生成完成:', fingerprint.value)
+            console.log('[DeviceFingerprint] 生成完成')
 
             return result
         } catch (error) {
-            console.error('[DeviceFingerprint] 生成失败:', error)
+            console.error('[DeviceFingerprint] 生成失败')
             return null
         }
     }

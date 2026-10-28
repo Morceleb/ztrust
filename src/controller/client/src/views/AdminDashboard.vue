@@ -194,7 +194,7 @@ onMounted(async () => {
             stats.value.resourceGroups = resourceGroupsRes.length
         }
     } catch (e) {
-        console.error('获取统计数据失败:', e)
+        console.error('获取统计数据失败:', { name: e?.name, status: e?.response?.status })
     }
 })
 </script>

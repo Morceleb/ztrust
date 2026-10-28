@@ -22,7 +22,6 @@ import {
     savePassword,
     getPassword,
     keyringDelete,
-    clearLocalStorageCredentials,
 } from '@/utils/keyringService'
 import { getDeviceId, getDeviceMeta, getDeviceToken, saveDeviceToken, clearDeviceToken, hasCompleteDeviceCredentials } from '@/utils/deviceService'
 import { saveSession, getAuthStrength } from '@/api/auth'
@@ -124,7 +123,7 @@ const ensureSpaPacketSent = async (rawAddress, securityCodeValue) => {
         );
         console.log('[Login] SPA 报文自动发送完成');
     } catch (err) {
-        console.warn('[Login] SPA 报文自动发送失败（将在登录时重试）:', err);
+        console.warn('[Login] SPA 报文自动发送失败（将在登录时重试）');
     }
 }
 
@@ -157,6 +156,11 @@ onMounted(async () => {
     const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
     console.log('[Login] 页面加载，环境:', isTauri ? 'Tauri' : 'Browser');
 
+    // 不再从 localStorage 持久化密码或安全码，并清理旧版本遗留的明文凭据。
+    // Tauri 端的系统密钥库数据不受此清理逻辑影响。
+    localStorage.removeItem('savedPassword');
+    localStorage.removeItem('securityCode');
+
     // 总是先读取一次已保存的地址
     // 安全码永远以空白展示（只在用户输入时显示输入内容），不在 onMounted 时回填
     const savedAddress = localStorage.getItem('companyAddress');
@@ -178,7 +182,7 @@ onMounted(async () => {
 
     if (savedAddress && hasDeviceToken) {
         currentStep.value = 'login';
-        console.log('[Login] 已加载保存的公司地址（可信设备免安全码）:', savedAddress);
+        console.log('[Login] 已加载保存的公司地址（可信设备免安全码）');
 
         if (isTauri) {
             const savedUsernameVal = await getUsername();
@@ -194,10 +198,8 @@ onMounted(async () => {
             }
         } else {
             const savedUsernameVal = localStorage.getItem('savedUsername');
-            const savedPasswordVal = localStorage.getItem('savedPassword');
             if (savedUsernameVal) username.value = savedUsernameVal;
-            if (savedPasswordVal) {
-                password.value = savedPasswordVal;
+            if (localStorage.getItem('rememberMe') === 'true') {
                 rememberMe.value = true;
             }
         }
@@ -249,16 +251,11 @@ const handleCompanySubmit = async () => {
             localStorage.removeItem('ztrust_device_token')
         }
 
-        // Tauri 环境：安全码存入密钥库
-        // 注意：只有当用户实际输入了安全码时才保存，避免空字符串覆盖原有真实安全码
+        // 仅 Tauri 环境将安全码存入系统密钥库；Web 端只在当前页面内存中使用。
+        // 只有当用户实际输入了安全码时才保存，避免空字符串覆盖原有真实安全码。
         const trimmedSecurityCode = securityCode.value.trim();
-        if (trimmedSecurityCode) {
-            if (isTauri) {
-                await saveSecurityCode(trimmedSecurityCode);
-            } else {
-                // 非 Tauri 环境：存入 localStorage（向后兼容）
-                localStorage.setItem('securityCode', trimmedSecurityCode);
-            }
+        if (trimmedSecurityCode && isTauri) {
+            await saveSecurityCode(trimmedSecurityCode);
         }
 
         // 保存到 localStorage（保存完整地址，包括端口）
@@ -278,7 +275,7 @@ const handleCompanySubmit = async () => {
             await handleLogin();
         }
     } catch (error) {
-        console.error('[Login] 初始化失败:', error);
+        console.error('[Login] 初始化失败:', { name: error?.name });
         companyError.value = `连接失败: ${error.message || error}`;
     } finally {
         isCompanyLoading.value = false
@@ -359,7 +356,7 @@ const sendLoginSpa = async () => {
         await ensureSpaPacketSent(rawAddress, securityCode);
         console.log('[Login] SPA 报文已发送');
     } catch (e) {
-        console.warn('[Login] SPA 报文发送失败:', e);
+        console.warn('[Login] SPA 报文发送失败');
     }
 };
 
@@ -378,6 +375,7 @@ const sendLoginSpa = async () => {
  *   重试时 device_token 仍为空（重输安全码不会生成新 device_token），所以仍会带 security_code。
  */
 const tryLoginSilent = async () => {
+    const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
     const deviceId = await getDeviceId();
     const deviceToken = getDeviceToken();
     const hasToken = !!(deviceToken && deviceToken.trim());
@@ -393,8 +391,10 @@ const tryLoginSilent = async () => {
         payload.device_token = deviceToken;
     } else {
         // 不可信或首次：带安全码让 8900 走 Casdoor 校验 + Identity remember
-        const securityCode = await getSecurityCode() || '';
-        payload.security_code = securityCode || undefined;
+        const loginSecurityCode = isTauri
+            ? (await getSecurityCode() || '')
+            : securityCode.value.trim();
+        payload.security_code = loginSecurityCode || undefined;
     }
 
     return request.post('/auth/login', payload);
@@ -420,7 +420,7 @@ const handleLogin = async () => {
     // 发送 SPA 报文打开目标端口——不再阻塞登录请求。
     // 后台异步跑即可：失败仅记录日志，登录本身不依赖 SPA 完成。
     // 如果未来 SPA 服务端校验不通，再回退到错误处理。
-    sendLoginSpa().catch((e) => console.warn('[Login] SPA 报文发送失败:', e));
+    sendLoginSpa().catch(() => console.warn('[Login] SPA 报文发送失败'));
 
     const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
 
@@ -470,11 +470,9 @@ const handleLogin = async () => {
             throw err;
         }
 
-        console.log('[Login] 登录响应原始:', JSON.stringify(response));
         console.log('[Login] 响应结构分析:', {
             responseType: typeof response,
             hasData: 'data' in (response || {}),
-            responseData: response?.data,
             responseDataKeys: response?.data ? Object.keys(response.data) : [],
             dataDataKeys: response?.data?.data ? Object.keys(response.data.data) : [],
         });
@@ -495,7 +493,7 @@ const handleLogin = async () => {
         // ── 保存会话凭证（session_id / auth_strength / device_id）──
         saveSession(rawData);
         if (rawData.session_id) {
-            console.log('[Login] ✓ session_id 已保存:', rawData.session_id);
+            console.log('[Login] ✓ session_id 已保存');
         }
 
         // ── 登录活动打点 ──
@@ -518,7 +516,7 @@ const handleLogin = async () => {
             trustedDeviceHint.value = '已记住此设备，下次无需安全码';
         }
 
-        // 若勾选记住我，保存用户名和密码
+        // Tauri 使用系统密钥库保存用户名和密码；Web 端只保存用户名。
         if (rememberMe.value) {
             if (isTauri) {
                 await saveUsername(username.value);
@@ -526,10 +524,9 @@ const handleLogin = async () => {
                 localStorage.setItem('rememberMe', 'true');
             } else {
                 localStorage.setItem('savedUsername', username.value);
-                localStorage.setItem('savedPassword', password.value);
             }
             localStorage.setItem('rememberMe', 'true');
-            console.log('[Login] ✓ 已保存用户名和密码');
+            console.log('[Login] ✓ 登录偏好已保存');
         } else {
             if (isTauri) {
                 await keyringDelete('username');
@@ -563,11 +560,11 @@ const handleLogin = async () => {
                     });
                     console.log('[Login] ✓ 认证信息已保存到 Tauri store');
                 } catch (err) {
-                    console.error('[Login] 保存认证信息到 Tauri store 失败:', err);
+                    console.error('[Login] 保存认证信息到 Tauri store 失败:', { name: err?.name });
                 }
             }
         } else {
-            console.error('[Login] ✗ access_token 为空，无法保存！响应结构:', rawData);
+            console.error('[Login] ✗ access_token 为空，无法保存');
         }
 
         if (refresh_token) {
@@ -576,10 +573,11 @@ const handleLogin = async () => {
         }
         if (user) {
             sessionStorage.setItem('user_info', JSON.stringify(user));
-            console.log('[Login] ✓ 用户信息已保存:', user);
+            console.log('[Login] ✓ 用户信息已保存');
         }
 
         // 登录成功
+        securityCode.value = '';
         await store.dispatch('auth/loginSuccess', user);
         router.replace('/index');
     } catch (err) {

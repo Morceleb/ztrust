@@ -44,7 +44,7 @@ class SessionActivityCollector {
     startPeriodicFlush() {
         if (this.flushTimer) return;
         this.flushTimer = setInterval(() => {
-            this.flush().catch((e) => console.warn('[ActivityCollector] 周期 flush 失败:', e));
+            this.flush().catch(() => console.warn('[ActivityCollector] 周期 flush 失败'));
         }, FLUSH_INTERVAL_MS);
         console.log('[ActivityCollector] 周期 flush 已启动 (', FLUSH_INTERVAL_MS, 'ms )');
     }

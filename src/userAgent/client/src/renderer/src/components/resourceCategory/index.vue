@@ -62,7 +62,7 @@ const props = defineProps({
 })
 
 onMounted(() => {
-    console.log('[ResourceCategory] onMounted, items:', props.items)
+    console.log('[ResourceCategory] onMounted, item count:', props.items?.length || 0)
 })
 
 // 模态框状态
@@ -134,7 +134,7 @@ const submitPost = async () => {
     try {
         // 使用封装后的 request（axios）
         const response = await request.post(`/auth/access/${resourceId}`, body)
-        console.log('请求成功：', response.data)
+        console.log('资源访问请求成功，状态:', response.status)
         // 成功后打开新页面
         window.open(`${localStorage.getItem('companyAddress')}/auth/access/${resourceId}`, '_blank')
 

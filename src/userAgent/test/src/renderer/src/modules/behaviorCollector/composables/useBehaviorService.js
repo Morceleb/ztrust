@@ -38,7 +38,7 @@ export function useBehaviorCollector() {
                     snapshot[name] = data;
                 }
             } catch (e) {
-                console.error(`[BehaviorCollector] ${name} 采集失败:`, e);
+                console.error(`[BehaviorCollector] ${name} 采集失败`);
             }
         });
 
@@ -60,7 +60,7 @@ export function useBehaviorCollector() {
 
             return await response.json();
         } catch (e) {
-            console.error('[BehaviorCollector] 发送失败:', e);
+            console.error('[BehaviorCollector] 发送失败');
             // 可以在这里添加重试逻辑或本地存储
         }
     };
@@ -82,7 +82,7 @@ export function useBehaviorCollector() {
 
             const data = collectAll();
             records.value.push(data);
-            console.log('[BehaviorCollector] 采集数据:', data);
+            console.log('[BehaviorCollector] 采集完成');
         }, intervalMs);
 
         // 定期刷新
@@ -116,7 +116,7 @@ export function useBehaviorCollector() {
             await send({ data: batch });
             console.log(`[BehaviorCollector] 已刷新 ${batch.length} 条记录`);
         } catch (e) {
-            console.error('[BehaviorCollector] 刷新失败:', e);
+            console.error('[BehaviorCollector] 刷新失败');
             // 失败时放回队列
             records.value.unshift(...batch);
         }

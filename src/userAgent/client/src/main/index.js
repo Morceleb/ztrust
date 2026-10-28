@@ -140,7 +140,7 @@ function createWindow() {
                 const stmt = database.db.prepare(sql)
                 return stmt.all(...params)
             } catch (error) {
-                console.error('[Main] 数据库查询失败:', error)
+                console.error('[Main] 数据库查询失败:', { name: error?.name })
                 throw error
             }
         }
@@ -153,7 +153,7 @@ function createWindow() {
                 const stmt = database.db.prepare(sql)
                 return stmt.run(...params)
             } catch (error) {
-                console.error('[Main] 数据库执行失败:', error)
+                console.error('[Main] 数据库执行失败:', { name: error?.name })
                 throw error
             }
         }
@@ -190,7 +190,7 @@ function initAppDatabase() {
         }, 24 * 60 * 60 * 1000) // 24小时
 
     } catch (error) {
-        console.error('[Main] 数据库初始化失败:', error)
+        console.error('[Main] 数据库初始化失败:', { name: error?.name })
     }
 }
 

@@ -332,7 +332,7 @@ impl ActivityMonitor {
     pub fn init(&mut self, user_id: String, user_name: String) {
         self.user_id = Some(user_id);
         self.user_name = Some(user_name);
-        info!("[ActivityMonitor] 已初始化，用户: {:?}", self.user_name);
+        info!("[ActivityMonitor] 已初始化，用户信息存在: {}", self.user_name.is_some());
     }
 
     pub fn reset(&mut self, user_id: &str, user_name: &str) {
@@ -359,7 +359,7 @@ impl ActivityMonitor {
         self.user_name = Some(user_name.to_string());
         self.last_activity = Mutex::new(Instant::now());
 
-        info!("[ActivityMonitor] 已重置，用户: {}", user_name);
+        info!("[ActivityMonitor] 已重置");
     }
 
     pub fn start(&self) {

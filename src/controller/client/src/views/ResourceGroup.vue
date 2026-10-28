@@ -440,7 +440,7 @@ async function fetchGroups() {
                         }
                     }
                 } catch (e) {
-                    console.error('获取资源组详情失败:', e)
+                    console.error('获取资源组详情失败:', { name: e?.name, status: e?.response?.status })
                 }
                 return { ...g, matchedResources: [] }
             })
@@ -575,7 +575,7 @@ const confirmDelete = async () => {
                 }
             }
         } catch (e) {
-            console.error('删除权限绑定失败:', e)
+            console.error('删除权限绑定失败:', { name: e?.name, status: e?.response?.status })
         }
 
         // 再删除资源组
@@ -742,7 +742,7 @@ const saveGroupResources = async () => {
             importantLevel: m.effectiveLevel || 1
         }))
     }
-    console.log('发送数据:', JSON.stringify(payload, null, 2))
+    console.log('提交资源组绑定，资源数:', payload.resourceIds?.length || 0)
     try {
         const res = await bindResourcesToGroup(payload)
         if (res.code === 200) {

@@ -56,7 +56,7 @@ export async function sendSpaPacket(serverAddress, tokenCode, deviceId, licenseI
         console.log('[SPA] SPA 报文发送成功')
         return { success: true }
     } catch (error) {
-        console.error('[SPA] SPA 报文发送失败:', error)
+        console.error('[SPA] SPA 报文发送失败')
         throw error
     }
 }
@@ -91,7 +91,8 @@ export async function sendSpaPacketSafe({ serverAddress, tokenCode, deviceId, li
 }
 
 /**
- * 读取持久化的安全码（keyring → localStorage 回退）
+ * 从系统密钥库读取持久化的安全码。
+ * 不再回退到 localStorage，避免继续使用旧版本遗留的明文安全码。
  * @returns {Promise<string|null>}
  */
 async function readStoredSecurityCode() {
@@ -101,11 +102,10 @@ async function readStoredSecurityCode() {
             const code = await getSecurityCode()
             if (code) return code
         } catch (e) {
-            console.warn('[SPA] 从 keyring 读取安全码失败:', e)
+            console.warn('[SPA] 从 keyring 读取安全码失败')
         }
     }
-    // 回退：浏览器环境或 keyring 不可用时读 localStorage
-    return localStorage.getItem('securityCode')
+    return null
 }
 
 /**
@@ -123,7 +123,7 @@ function resolveServerAddress(overrideAddress) {
  * 高层封装：根据持久化凭据自动发送 SPA 报文。
  * 适用于「资源点击前」和「后台定时」两种场景。
  *
- * - 自动从 keyring / localStorage 取安全码
+ * - 自动从系统密钥库取安全码
  * - 自动从 localStorage 取公司地址
  * - 自动调用 Tauri 命令拿设备指纹
  * - 非 Tauri 环境直接跳过（不做 fetch 探测，避免被网关拦）
@@ -178,7 +178,7 @@ export async function ensureSpaSent(options = {}) {
                     }
                 }
             } catch (e) {
-                console.warn(`[SPA] (${reason}) 获取设备信息失败:`, e)
+                console.warn(`[SPA] (${reason}) 获取设备信息失败`)
             }
             if (!deviceId) {
                 return { success: false, error: 'no device id' }
@@ -192,7 +192,7 @@ export async function ensureSpaSent(options = {}) {
                 licenseId: DEFAULT_LICENSE_ID,
             })
             if (!res.success) {
-                console.warn(`[SPA] (${reason}) SPA 报文发送失败:`, res.error)
+                console.warn(`[SPA] (${reason}) SPA 报文发送失败`)
             }
             return res
         } finally {
@@ -222,7 +222,7 @@ export function startSpaHeartbeat(options = {}) {
         if (stopped) return
         // 静默：失败仅记录日志
         ensureSpaSent({ reason: 'heartbeat', serverAddress: options.serverAddress })
-            .catch((e) => console.warn('[SPA] (heartbeat) 异常:', e))
+            .catch(() => console.warn('[SPA] (heartbeat) 异常'))
     }
 
     // 立即先触发一次（资源加载/路由切换前先开门），再按间隔调度

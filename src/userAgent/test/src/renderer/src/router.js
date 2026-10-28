@@ -99,9 +99,9 @@ router.beforeEach(async (to, from, next) => {
         }
 
         try {
-            console.log('[Router] 尝试静默鉴权，baseURL:', baseURL);
+            console.log('[Router] 尝试静默鉴权，baseURL 已配置:', Boolean(baseURL));
             const res = await request.get('/auth/test')
-            console.log('[Router] 静默鉴权响应:', JSON.stringify(res));
+            console.log('[Router] 静默鉴权完成');
 
             const resData = res.data;
             console.log('[Router] 静默鉴权响应结构:', {

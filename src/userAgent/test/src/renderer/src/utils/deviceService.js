@@ -39,7 +39,7 @@ export async function getDeviceId() {
                 return id;
             }
         } catch (e) {
-            console.warn('[DeviceService] Rust get_device_id 失败, fallback 到 localStorage 缓存:', e);
+            console.warn('[DeviceService] Rust get_device_id 失败, fallback 到 localStorage 缓存');
         }
     }
 
@@ -82,7 +82,7 @@ export async function getDeviceMeta() {
             const { invoke } = window.__TAURI__.core;
             return await invoke('get_device_meta');
         } catch (e) {
-            console.warn('[DeviceService] Rust get_device_meta 失败:', e);
+            console.warn('[DeviceService] Rust get_device_meta 失败');
         }
     }
     // fallback

@@ -42,7 +42,7 @@ export function useBehaviorCollector() {
                 body: JSON.stringify(payload)
             })
         } catch (e) {
-            console.error('发送失败', e)
+            console.error('发送失败')
             // 可选：存 indexedDB 等
         }
     }
@@ -54,12 +54,12 @@ export function useBehaviorCollector() {
         // 第一次立即采集
         const firstData = collectAll()
         // send(firstData)
-        console.log('BehaviorCollector first data:', firstData)
+        console.log('BehaviorCollector first data collected, field count:', Object.keys(firstData).length)
 
         intervalId = setInterval(() => {
             const data = collectAll()
             // send(data)
-            console.log('BehaviorCollector data:', data)
+            console.log('BehaviorCollector data collected, field count:', Object.keys(data).length)
         }, intervalMs)
     }
 

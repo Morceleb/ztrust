@@ -572,7 +572,7 @@ const confirmDelete = async () => {
                         return normalized.some(m => m.userId === userId) ? { id: group.id, members: normalized } : null
                     }
                 } catch (e) {
-                    console.error('获取角色组详情失败:', e)
+                    console.error('获取角色组详情失败:', { name: e?.name, status: e?.response?.status })
                 }
                 return null
             })
@@ -593,7 +593,7 @@ const confirmDelete = async () => {
                 try {
                     await assignUsersToRoleGroup({ role_group_id: group.id, user_ids: remaining })
                 } catch (e) {
-                    console.error('同步角色组成员失败:', e)
+                    console.error('同步角色组成员失败:', { name: e?.name, status: e?.response?.status })
                 }
             })
         )
@@ -802,8 +802,7 @@ const parseImportFile = (file) => {
                 }
             }
         } catch (err) {
-            console.error('parseImportFile error:', err)
-            console.error('Error stack:', err.stack)
+            console.error('parseImportFile error:', { name: err?.name })
             let errorMsg = '文件解析失败，请确认是有效的 Excel 或 CSV 文件'
             if (err.name === 'TypeError' && err.message.includes('read')) {
                 errorMsg = '浏览器不支持此文件格式，请使用 Chrome、Edge 或 Firefox 浏览器'
@@ -994,7 +993,7 @@ async function onViewTokenCode(user) {
             showToast(res.message || '获取安全码失败')
         }
     } catch (e) {
-        console.error('获取安全码异常:', e)
+        console.error('获取安全码异常:', { name: e?.name, status: e?.response?.status })
         showToast('获取安全码失败，请稍后重试')
     }
 }
@@ -1006,9 +1005,9 @@ async function onPrimarySpa(user) {
     loadingSpaUserId.value = user.id
     if (rotate) setUserSpaStatus(user.id, 'updating')
     try {
-        console.log('发放安全码请求:', { userId: user.id, rotate })
+        console.log('发放安全码请求:', { rotate })
         const res = await apiIssue(user.id, rotate)
-        console.log('发放安全码响应:', res)
+        console.log('发放安全码响应:', { code: res.code, hasData: Boolean(res.data) })
         if (res.code === 200 && typeof res.data === 'string' && res.data) {
             lastTokenHex.value = res.data
             showTokenModal.value = true
@@ -1023,7 +1022,7 @@ async function onPrimarySpa(user) {
         }
         showToast(res.message || '操作失败')
     } catch (e) {
-        console.error('发放安全码异常:', e)
+        console.error('发放安全码异常:', { name: e?.name, status: e?.response?.status })
         showToast(e?.message || '网络错误')
     } finally {
         loadingSpaUserId.value = null
@@ -1152,7 +1151,11 @@ const handleUserSubmit = async () => {
             status: 'active'
         }
 
-        console.log('提交用户数据:', payload)
+        console.log('提交用户数据:', {
+            operation: payload.id ? 'update' : 'create',
+            hasEmail: Boolean(payload.email),
+            hasPhone: Boolean(payload.phone)
+        })
         const res = await apiSaveUser(payload)
 
         if (res.code === 200) {

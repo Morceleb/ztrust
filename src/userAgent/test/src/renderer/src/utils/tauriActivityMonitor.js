@@ -30,41 +30,41 @@ class ActivityMonitorClient {
         // 监听超时事件
         this.unlistenFunctions.push(
             listen('auth:timeout', (event) => {
-                console.log('[ActivityMonitorClient] 收到超时事件:', event.payload);
+                console.log('[ActivityMonitorClient] 收到超时事件');
                 this.handleTimeout(event.payload);
             }).catch(err => {
-                console.error('[ActivityMonitorClient] 监听超时事件失败:', err);
+                console.error('[ActivityMonitorClient] 监听超时事件失败');
             })
         );
 
         // 监听行为数据上报
         this.unlistenFunctions.push(
             listen('activity:report', (event) => {
-                console.log('[ActivityMonitorClient] 收到行为记录:', event.payload);
+                console.log('[ActivityMonitorClient] 收到行为记录');
                 this.handleReport(event.payload);
             }).catch(err => {
-                console.error('[ActivityMonitorClient] 监听行为记录失败:', err);
+                console.error('[ActivityMonitorClient] 监听行为记录失败');
             })
         );
 
         // 监听批量上传请求
         this.unlistenFunctions.push(
             listen('activity:upload-batch', (event) => {
-                console.log('[ActivityMonitorClient] 收到批量上传请求:', event.payload);
+                console.log('[ActivityMonitorClient] 收到批量上传请求');
                 this.handleBatchUpload(event.payload);
             }).catch(err => {
-                console.error('[ActivityMonitorClient] 监听批量上传失败:', err);
+                console.error('[ActivityMonitorClient] 监听批量上传失败');
             })
         );
 
         // 监听设备信息
         this.unlistenFunctions.push(
             listen('device:info', (event) => {
-                console.log('[ActivityMonitorClient] 收到设备信息:', event.payload);
+                console.log('[ActivityMonitorClient] 收到设备信息');
                 this.deviceInfo = event.payload;
                 this.handleDeviceInfo(event.payload);
             }).catch(err => {
-                console.error('[ActivityMonitorClient] 监听设备信息失败:', err);
+                console.error('[ActivityMonitorClient] 监听设备信息失败');
             })
         );
 
@@ -73,12 +73,12 @@ class ActivityMonitorClient {
 
     async init(userInfo) {
         try {
-            console.log('[ActivityMonitorClient] 初始化监控，用户信息:', userInfo);
+            console.log('[ActivityMonitorClient] 初始化监控，用户信息存在:', Boolean(userInfo));
             await invoke('activity_init', { userInfo });
             this.initialized = true;
             console.log('[ActivityMonitorClient] 监控已初始化');
         } catch (error) {
-            console.error('[ActivityMonitorClient] 初始化失败:', error);
+            console.error('[ActivityMonitorClient] 初始化失败');
             console.error('[ActivityMonitorClient] 错误详情:', {
                 message: error.message,
                 code: error.code,
@@ -94,7 +94,7 @@ class ActivityMonitorClient {
             await invoke('activity_start');
             console.log('[ActivityMonitorClient] 监控已启动');
         } catch (error) {
-            console.error('[ActivityMonitorClient] 启动失败:', error);
+            console.error('[ActivityMonitorClient] 启动失败');
             throw error;
         }
     }
@@ -105,28 +105,28 @@ class ActivityMonitorClient {
             await invoke('activity_stop');
             console.log('[ActivityMonitorClient] 监控已停止');
         } catch (error) {
-            console.error('[ActivityMonitorClient] 停止失败:', error);
+            console.error('[ActivityMonitorClient] 停止失败');
             throw error;
         }
     }
 
     async setLoginState(isLoggedIn, userInfo) {
         try {
-            console.log('[ActivityMonitorClient] 设置登录状态:', { isLoggedIn, userInfo });
+            console.log('[ActivityMonitorClient] 设置登录状态:', { isLoggedIn, hasUserInfo: Boolean(userInfo) });
             await invoke('activity_set_login_state', { isLoggedIn, userInfo });
             console.log('[ActivityMonitorClient] 登录状态已设置');
         } catch (error) {
-            console.error('[ActivityMonitorClient] 设置登录状态失败:', error);
+            console.error('[ActivityMonitorClient] 设置登录状态失败');
         }
     }
 
     async reset(userInfo) {
         try {
-            console.log('[ActivityMonitorClient] 重置监控:', userInfo);
+            console.log('[ActivityMonitorClient] 重置监控，用户信息存在:', Boolean(userInfo));
             await invoke('activity_reset', { userInfo });
             console.log('[ActivityMonitorClient] 监控已重置');
         } catch (error) {
-            console.error('[ActivityMonitorClient] 重置失败:', error);
+            console.error('[ActivityMonitorClient] 重置失败');
         }
     }
 
@@ -139,7 +139,7 @@ class ActivityMonitorClient {
         try {
             return await invoke('activity_get_stats');
         } catch (error) {
-            console.error('[ActivityMonitorClient] 获取状态失败:', error);
+            console.error('[ActivityMonitorClient] 获取状态失败');
             return null;
         }
     }
@@ -148,7 +148,7 @@ class ActivityMonitorClient {
         try {
             return await invoke('activity_get_stats');
         } catch (error) {
-            console.error('[ActivityMonitorClient] 获取统计失败:', error);
+            console.error('[ActivityMonitorClient] 获取统计失败');
             return null;
         }
     }
@@ -157,10 +157,10 @@ class ActivityMonitorClient {
         try {
             console.log('[ActivityMonitorClient] 获取设备信息...');
             const info = await invoke('get_device_info');
-            console.log('[ActivityMonitorClient] 设备信息:', info);
+            console.log('[ActivityMonitorClient] 设备信息获取完成');
             return info;
         } catch (error) {
-            console.error('[ActivityMonitorClient] 获取设备信息失败:', error);
+            console.error('[ActivityMonitorClient] 获取设备信息失败');
             return null;
         }
     }
@@ -173,11 +173,11 @@ class ActivityMonitorClient {
      */
     async recordShortcut(keyCombo) {
         try {
-            console.log('[ActivityMonitorClient] 记录快捷键:', keyCombo);
+            console.log('[ActivityMonitorClient] 记录快捷键');
             await invoke('activity_record_shortcut', { keyCombo });
             console.log('[ActivityMonitorClient] 快捷键记录成功');
         } catch (error) {
-            console.error('[ActivityMonitorClient] 快捷键记录失败:', error);
+            console.error('[ActivityMonitorClient] 快捷键记录失败');
         }
     }
 
@@ -187,11 +187,11 @@ class ActivityMonitorClient {
      */
     async recordCommand(commandName) {
         try {
-            console.log('[ActivityMonitorClient] 记录命令:', commandName);
+            console.log('[ActivityMonitorClient] 记录命令');
             await invoke('activity_record_command', { commandName });
             console.log('[ActivityMonitorClient] 命令记录成功');
         } catch (error) {
-            console.error('[ActivityMonitorClient] 命令记录失败:', error);
+            console.error('[ActivityMonitorClient] 命令记录失败');
         }
     }
 
@@ -202,11 +202,11 @@ class ActivityMonitorClient {
      */
     async recordFile(path, operation) {
         try {
-            console.log('[ActivityMonitorClient] 记录文件操作:', { path, operation });
+            console.log('[ActivityMonitorClient] 记录文件操作:', { operation });
             await invoke('activity_record_file', { path, operation });
             console.log('[ActivityMonitorClient] 文件操作记录成功');
         } catch (error) {
-            console.error('[ActivityMonitorClient] 文件操作记录失败:', error);
+            console.error('[ActivityMonitorClient] 文件操作记录失败');
         }
     }
 
@@ -217,11 +217,11 @@ class ActivityMonitorClient {
      */
     async recordResourceOpen(resourceId, title) {
         try {
-            console.log('[ActivityMonitorClient] 记录资源打开:', { resourceId, title });
+            console.log('[ActivityMonitorClient] 记录资源打开');
             await invoke('activity_record_resource_open', { resourceId, title });
             console.log('[ActivityMonitorClient] 资源打开记录成功');
         } catch (error) {
-            console.error('[ActivityMonitorClient] 资源打开记录失败:', error);
+            console.error('[ActivityMonitorClient] 资源打开记录失败');
         }
     }
 
@@ -236,7 +236,7 @@ class ActivityMonitorClient {
             console.log('[ActivityMonitorClient] 频率报告:', report);
             return report;
         } catch (error) {
-            console.error('[ActivityMonitorClient] 获取频率报告失败:', error);
+            console.error('[ActivityMonitorClient] 获取频率报告失败');
             return null;
         }
     }
@@ -244,34 +244,34 @@ class ActivityMonitorClient {
     // ==================== 数据处理 ====================
 
     handleTimeout(data) {
-        console.log('[ActivityMonitorClient] 处理超时事件:', data);
+        console.log('[ActivityMonitorClient] 处理超时事件');
         this.timeoutHandlers.forEach(handler => {
             try {
                 handler(data);
             } catch (e) {
-                console.error('[ActivityMonitorClient] 超时处理器执行失败:', e);
+                console.error('[ActivityMonitorClient] 超时处理器执行失败');
             }
         });
     }
 
     handleReport(data) {
-        console.log('[ActivityMonitorClient] 处理行为报告:', data);
+        console.log('[ActivityMonitorClient] 处理行为报告');
         this.reportHandlers.forEach(handler => {
             try {
                 handler(data);
             } catch (e) {
-                console.error('[ActivityMonitorClient] 报告处理器执行失败:', e);
+                console.error('[ActivityMonitorClient] 报告处理器执行失败');
             }
         });
     }
 
     handleDeviceInfo(data) {
-        console.log('[ActivityMonitorClient] 处理设备信息:', data);
+        console.log('[ActivityMonitorClient] 处理设备信息');
         this.deviceHandlers.forEach(handler => {
             try {
                 handler(data);
             } catch (e) {
-                console.error('[ActivityMonitorClient] 设备信息处理器执行失败:', e);
+                console.error('[ActivityMonitorClient] 设备信息处理器执行失败');
             }
         });
     }
@@ -279,7 +279,6 @@ class ActivityMonitorClient {
     async handleBatchUpload(payload) {
         console.log('[ActivityMonitorClient] 处理批量上传...');
         console.log('[ActivityMonitorClient] payload 类型:', typeof payload);
-        console.log('[ActivityMonitorClient] payload:', JSON.stringify(payload).substring(0, 500));
 
         const records = payload?.data || payload;
         if (!records || records.length === 0) {
@@ -290,7 +289,7 @@ class ActivityMonitorClient {
         try {
             console.log('[ActivityMonitorClient] 开始上传，记录数量:', records.length);
             const result = await this.uploadBatch(records);
-            console.log('[ActivityMonitorClient] 批量上传完成:', result);
+            console.log('[ActivityMonitorClient] 批量上传完成，成功:', Boolean(result));
 
             const batchIds = records
                 .map(record => record.content?.batchId || record.batch_id)
@@ -301,11 +300,11 @@ class ActivityMonitorClient {
                     await invoke('activity_mark_batch_uploaded', { batchIds });
                     console.log(`[ActivityMonitorClient] 已通知后端标记 ${batchIds.length} 条记录为已上传`);
                 } catch (e) {
-                    console.error('[ActivityMonitorClient] 标记已上传失败:', e);
+                    console.error('[ActivityMonitorClient] 标记已上传失败');
                 }
             }
         } catch (error) {
-            console.error('[ActivityMonitorClient] 批量上传失败:', error);
+            console.error('[ActivityMonitorClient] 批量上传失败');
         }
     }
 
@@ -318,7 +317,7 @@ class ActivityMonitorClient {
 
     async bindDevice(deviceInfo) {
         // 设备绑定逻辑
-        console.log('[ActivityMonitorClient] 设备绑定:', deviceInfo);
+        console.log('[ActivityMonitorClient] 设备绑定请求开始');
         return { success: true };
     }
 
@@ -327,7 +326,7 @@ class ActivityMonitorClient {
             console.log('[ActivityMonitorClient] 报告注销:', type);
             await invoke('activity_logout', { logoutType: type });
         } catch (error) {
-            console.error('[ActivityMonitorClient] 注销报告失败:', error);
+            console.error('[ActivityMonitorClient] 注销报告失败');
         }
 
         // 保留 companyAddress、rememberMe 与 keyring 中的安全码（供下次登录使用）
@@ -392,7 +391,7 @@ class ActivityMonitorClient {
                     console.log(`[ActivityMonitorClient] 移除监听器 ${index}`);
                 }
             } catch (e) {
-                console.error(`[ActivityMonitorClient] 移除监听器 ${index} 失败:`, e);
+                console.error(`[ActivityMonitorClient] 移除监听器 ${index} 失败`);
             }
         });
         

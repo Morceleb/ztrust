@@ -115,7 +115,7 @@ class ActivityMonitor {
             this.db = initDatabase()
             console.log('[ActivityMonitor] 数据库初始化成功')
         } catch (error) {
-            console.error('[ActivityMonitor] 数据库初始化失败:', error)
+            console.error('[ActivityMonitor] 数据库初始化失败:', { name: error?.name })
         }
 
         // 获取设备指纹
@@ -167,7 +167,7 @@ class ActivityMonitor {
         this.setupWindowListeners()
         this.setupSystemListeners()
 
-        console.log('[ActivityMonitor] 初始化完成，sessionId:', this.session.sessionId)
+        console.log('[ActivityMonitor] 初始化完成')
     }
 
     /**
@@ -290,7 +290,7 @@ class ActivityMonitor {
             }
 
         } catch (error) {
-            console.error('[ActivityMonitor] 采样鼠标位置失败:', error)
+            console.error('[ActivityMonitor] 采样鼠标位置失败:', { name: error?.name })
         }
     }
 
@@ -675,7 +675,7 @@ class ActivityMonitor {
             }
 
         } catch (error) {
-            console.error('[ActivityMonitor] 保存批次数据失败:', error)
+            console.error('[ActivityMonitor] 保存批次数据失败:', { name: error?.name })
         }
     }
 
@@ -774,7 +774,7 @@ class ActivityMonitor {
             }
 
         } catch (error) {
-            console.error('[ActivityMonitor] 上传待处理数据失败:', error)
+            console.error('[ActivityMonitor] 上传待处理数据失败:', { name: error?.name })
         }
     }
 
@@ -801,7 +801,7 @@ class ActivityMonitor {
             this.db.addToUploadQueue('logout', 0, logoutData)
 
         } catch (error) {
-            console.error('[ActivityMonitor] 保存注销记录失败:', error)
+            console.error('[ActivityMonitor] 保存注销记录失败:', { name: error?.name })
         }
     }
 

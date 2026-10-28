@@ -25,7 +25,7 @@ impl Database {
                 .map_err(|e| format!("创建数据库目录失败: {}", e))?;
         }
         
-        info!("数据库路径: {:?}", db_path);
+        info!("数据库路径初始化完成");
         
         let conn = Connection::open(&db_path)
             .map_err(|e| format!("打开数据库失败: {}", e))?;

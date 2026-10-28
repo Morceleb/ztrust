@@ -176,7 +176,7 @@ class ActivityDatabase {
             sessionInfo.startTime
         )
 
-        console.log('[ActivityDatabase] 创建会话:', sessionInfo.sessionId)
+        console.log('[ActivityDatabase] 创建会话成功')
         return result.lastInsertRowid
     }
 
@@ -185,7 +185,7 @@ class ActivityDatabase {
             UPDATE user_sessions SET end_time = ?, logout_type = ? WHERE session_id = ?
         `)
         stmt.run(Date.now(), logoutType, sessionId)
-        console.log('[ActivityDatabase] 结束会话:', sessionId)
+        console.log('[ActivityDatabase] 结束会话成功')
     }
 
     getActiveSession(userId) {

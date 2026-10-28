@@ -63,7 +63,7 @@ const props = defineProps({
 })
 
 onMounted(() => {
-    console.log('[ResourceCategory] onMounted, items:', props.items)
+    console.log('[ResourceCategory] onMounted, item count:', props.items?.length || 0)
 })
 
 // 模态框状态
@@ -92,7 +92,7 @@ const isPostMethod = (item) => {
 const handleCardClick = (item) => {
     // 访问资源前先发送 SPA 报文以开放服务端端口（非阻塞）
     ensureSpaSent({ reason: 'resource-click' })
-        .catch((e) => console.warn('[ResourceCategory] SPA 报文发送失败（继续访问）:', e))
+        .catch(() => console.warn('[ResourceCategory] SPA 报文发送失败（继续访问）'))
 
     if (isPostMethod(item)) {
         // POST：打开模态框输入 body
@@ -123,7 +123,7 @@ const openResourceWindow = async (resourceId, resourceName) => {
     try {
         await window.__TAURI__.core.invoke('open_resource_window', invokeParams)
     } catch (err) {
-        console.error('打开窗口失败:', err)
+        console.error('打开窗口失败')
         window.open(targetUrl, '_blank')
     }
 }
@@ -160,12 +160,12 @@ const submitPost = async () => {
 
     // POST 提交前再敲一次门，确保新窗口打开时端口仍开着
     ensureSpaSent({ reason: 'resource-post-submit' })
-        .catch((e) => console.warn('[ResourceCategory] SPA 报文发送失败（继续提交）:', e))
+        .catch(() => console.warn('[ResourceCategory] SPA 报文发送失败（继续提交）'))
 
     try {
         // 使用封装后的 request（axios）
         const response = await request.post(`/auth/access/${resourceId}`, body)
-        console.log('请求成功：', response.data)
+        console.log('资源访问请求成功，状态:', response.status)
         openResourceWindow(resourceId, currentResource.value.name || '资源访问')
     } catch (error) {
         const status = error.response?.status || '未知'

@@ -17,13 +17,11 @@ const resources = ref([])
 onBeforeMount(async () => {
     try {
         const response = await request.get('/auth/access/resources')
-        console.log('原始响应:', response)
-        console.log('response.data:', response.data)
-        console.log('response.data.data:', response.data?.data)
+        console.log('资源列表请求成功，状态:', response.status)
         resources.value = response.data?.data || []
-        console.log('最终 resources:', resources.value)
+        console.log('最终资源数:', resources.value.length)
     } catch (error) {
-        console.error('请求失败:', error)
+        console.error('请求失败:', { name: error?.name, status: error?.response?.status })
         resources.value = []
     }
 })

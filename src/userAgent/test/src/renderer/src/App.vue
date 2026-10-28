@@ -36,11 +36,11 @@ onMounted(async () => {
     //   后续需要设备信息时直接复用，不会重复触发 Rust 端 PowerShell/netsh。
     // - 失败仅记录日志，不影响页面与登录。
     collectFingerprints()
-        .then((fingerprints) => {
-            console.log('[App] 双指纹与无线环境已生成:', fingerprints)
+        .then(() => {
+            console.log('[App] 双指纹与无线环境已生成')
         })
-        .catch((error) => {
-            console.error('[App] 初始化双指纹失败:', error)
+        .catch(() => {
+            console.error('[App] 初始化双指纹失败')
         })
 });
 
